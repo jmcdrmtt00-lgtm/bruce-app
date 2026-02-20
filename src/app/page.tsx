@@ -1,11 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import NewHireForm from '../components/NewHireForm';
-import LoginInfoSheet from '../components/LoginInfoSheet';
-import OnboardingChecklist from '../components/OnboardingChecklist';
-import { NewHire, GeneratedOutput } from '../types';
-import { ROLES } from '../data/roles';
+import NewHireForm from '@/components/NewHireForm';
+import LoginInfoSheet from '@/components/LoginInfoSheet';
+import OnboardingChecklist from '@/components/OnboardingChecklist';
+import { NewHire, GeneratedOutput } from '@/types';
+import { ROLES } from '@/data/roles';
 
 export default function Home() {
   const [output, setOutput] = useState<GeneratedOutput | null>(null);

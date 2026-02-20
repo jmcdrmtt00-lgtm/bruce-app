@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { ROLES } from '../data/roles';
-import { SITES } from '../data/sites';
-import { NewHire } from '../types';
+import { ROLES } from '@/data/roles';
+import { SITES } from '@/data/sites';
+import { NewHire } from '@/types';
 
 interface Props {
   onSubmit: (hire: NewHire) => void;

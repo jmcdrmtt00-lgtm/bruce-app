@@ -1,8 +1,8 @@
 'use client';
 
-import { GeneratedOutput } from '../types';
-import { ROLES, SYSTEM_LABELS } from '../data/roles';
-import { SITES } from '../data/sites';
+import { GeneratedOutput } from '@/types';
+import { ROLES, SYSTEM_LABELS } from '@/data/roles';
+import { SITES } from '@/data/sites';
 
 interface Props {
   output: GeneratedOutput;

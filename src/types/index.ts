@@ -1,6 +1,6 @@
-import { System, ComputerType } from '../data/roles';
-import { ROLES } from '../data/roles';
-import { SITES } from '../data/sites';
+import { System, ComputerType } from '@/data/roles';
+import { ROLES } from '@/data/roles';
+import { SITES } from '@/data/sites';
 
 export interface NewHire {
   firstName: string;
