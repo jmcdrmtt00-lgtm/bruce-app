@@ -1,12 +1,10 @@
 'use client';
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
-import { Plus, Database } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import Link from 'next/link';
+import { Mic, MicOff, ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
-import AddTaskModal from '@/components/AddTaskModal';
-import VoiceInput from '@/components/VoiceInput';
 
 const PRIORITY_BADGE: Record<string, string> = {
   high:   'badge-error',
@@ -14,29 +12,20 @@ const PRIORITY_BADGE: Record<string, string> = {
   low:    'badge-info',
 };
 
-const UPDATE_TYPES = [
-  { value: 'approach' as const, label: 'Approach' },
-  { value: 'progress' as const, label: 'Progress' },
-  { value: 'resolved' as const, label: 'Resolved' },
-];
-
 function TaskTable({
   tasks,
   onRowClick,
 }: {
   tasks: Incident[];
-  onRowClick: (id: string) => void;
+  onRowClick: (task: Incident) => void;
 }) {
-  const router = useRouter();
-
   if (tasks.length === 0) {
     return (
-      <div className="card bg-base-100 shadow p-6 text-center text-base-content/40 text-sm">
+      <div className="card bg-base-100 shadow p-4 text-center text-base-content/40 text-sm">
         No tasks
       </div>
     );
   }
-
   return (
     <div className="overflow-x-auto rounded-box shadow">
       <table className="table table-sm bg-base-100 w-full">
@@ -45,7 +34,6 @@ function TaskTable({
             <th className="w-8">#</th>
             <th>Name</th>
             <th>Priority</th>
-            <th>Customer</th>
             <th>Screen</th>
           </tr>
         </thead>
@@ -54,11 +42,11 @@ function TaskTable({
             <tr
               key={task.id}
               className="hover cursor-pointer"
-              onClick={() => onRowClick(task.id)}
+              onClick={() => onRowClick(task)}
             >
               <td className="text-base-content/40 text-xs">{task.task_number}</td>
               <td>
-                <p className="max-w-[180px] truncate font-medium text-sm">
+                <p className="max-w-[220px] truncate font-medium text-sm">
                   {task.title || task.description.slice(0, 60)}
                 </p>
               </td>
@@ -69,20 +57,15 @@ function TaskTable({
                   </span>
                 )}
               </td>
-              <td className="text-xs text-base-content/60">
-                <p className="max-w-[110px] truncate">{task.reported_by ?? ''}</p>
-              </td>
               <td>
                 {task.screen && (
-                  <button
+                  <Link
+                    href="/onboarding"
                     className="badge badge-outline badge-sm hover:badge-primary transition-colors"
-                    onClick={e => {
-                      e.stopPropagation();
-                      router.push('/onboarding');
-                    }}
+                    onClick={e => e.stopPropagation()}
                   >
                     {task.screen}
-                  </button>
+                  </Link>
                 )}
               </td>
             </tr>
@@ -94,89 +77,187 @@ function TaskTable({
 }
 
 export default function DashboardPage() {
-  const router = useRouter();
   const [tasks, setTasks] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
-  const [updateType, setUpdateType] = useState<'approach' | 'progress' | 'resolved'>('progress');
-  const [saving, setSaving] = useState(false);
   const [seeding, setSeeding] = useState(false);
+
+  // Panel state
+  const [mode, setMode] = useState<'add' | 'update'>('add');
+  const [taskNumber, setTaskNumber] = useState('');
+  const [taskName, setTaskName] = useState('');
+  const [priority, setPriority] = useState<'high' | 'medium' | 'low' | ''>('');
+  const [customer, setCustomer] = useState('');
+  const [screen, setScreen] = useState('');
+  const [status, setStatus] = useState<'pending' | 'in_progress' | 'resolved'>('pending');
+  const [note, setNote] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  // Voice for note
+  const [listeningNote, setListeningNote] = useState(false);
+  const noteRecRef = useRef<unknown>(null);
+
+  // Voice for task #
+  const [listeningNum, setListeningNum] = useState(false);
+  const numRecRef = useRef<unknown>(null);
 
   const loadTasks = useCallback(() => {
     fetch('/api/issues')
       .then(r => r.json())
-      .then(data => {
-        setTasks(data.incidents ?? []);
-        setLoading(false);
-      })
+      .then(data => { setTasks(data.incidents ?? []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
   const inProgress = useMemo(
-    () => tasks
-      .filter(t => t.status === 'in_progress')
-      .sort((a, b) => a.task_number - b.task_number),
+    () => tasks.filter(t => t.status === 'in_progress').sort((a, b) => a.task_number - b.task_number),
     [tasks]
   );
-
   const queue = useMemo(
-    () => tasks
-      .filter(t => t.status === 'pending' || t.status === 'open')
-      .sort((a, b) => a.task_number - b.task_number),
+    () => tasks.filter(t => t.status === 'pending' || t.status === 'open').sort((a, b) => a.task_number - b.task_number),
     [tasks]
   );
-
   const allActive = useMemo(() => [...inProgress, ...queue], [inProgress, queue]);
 
-  const searchResults = useMemo(() => {
-    if (!searchQuery.trim()) return [];
-    const q = searchQuery.trim().toLowerCase();
-    const numQ = parseInt(q);
-    return allActive.filter(t => {
-      if (!isNaN(numQ) && t.task_number === numQ) return true;
-      return (t.title || t.description).toLowerCase().includes(q);
-    }).slice(0, 6);
-  }, [searchQuery, allActive]);
+  function resetPanel() {
+    setTaskNumber('');
+    setTaskName('');
+    setPriority('');
+    setCustomer('');
+    setScreen('');
+    setStatus('pending');
+    setNote('');
+    setSelectedTask(null);
+  }
+
+  function loadTask(task: Incident) {
+    setMode('update');
+    setTaskNumber(String(task.task_number));
+    setTaskName(task.title || task.description);
+    setPriority(task.priority || '');
+    setCustomer(task.reported_by || '');
+    const s = task.status === 'open' ? 'pending' : task.status;
+    setStatus(s as 'pending' | 'in_progress' | 'resolved');
+    setNote('');
+    setSelectedTask(task);
+  }
+
+  function handleTaskNumberInput(val: string) {
+    setTaskNumber(val);
+    const num = parseInt(val.trim());
+    if (!isNaN(num)) {
+      const found = allActive.find(t => t.task_number === num);
+      if (found) loadTask(found);
+    }
+  }
+
+  function parseSpokenNumber(text: string): string {
+    const digits = text.replace(/\D/g, '');
+    if (digits) return digits;
+    const words: Record<string, number> = {
+      one: 1, two: 2, three: 3, four: 4, five: 5,
+      six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+      eleven: 11, twelve: 12, thirteen: 13, fourteen: 14, fifteen: 15,
+      sixteen: 16, seventeen: 17, eighteen: 18, nineteen: 19, twenty: 20,
+    };
+    return words[text.toLowerCase().trim()] ? String(words[text.toLowerCase().trim()]) : '';
+  }
+
+  function startVoice(
+    onResult: (text: string) => void,
+    setActive: (v: boolean) => void,
+    ref: React.MutableRefObject<unknown>,
+    continuous = false
+  ) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SR) { toast.error('Voice input requires Chrome.'); return; }
+    const r = new SR();
+    r.continuous = continuous;
+    r.interimResults = false;
+    r.onresult = (e: { results: SpeechRecognitionResultList }) => {
+      const text = Array.from(e.results).map((res: SpeechRecognitionResult) => res[0].transcript).join(' ');
+      onResult(text);
+    };
+    r.onend = () => setActive(false);
+    r.start();
+    ref.current = r;
+    setActive(true);
+  }
+
+  function stopVoice(ref: React.MutableRefObject<unknown>, setActive: (v: boolean) => void) {
+    (ref.current as { stop: () => void } | null)?.stop();
+    setActive(false);
+  }
+
+  async function handleSave() {
+    if (mode === 'add') {
+      if (!taskName.trim()) { toast.error('Task name is required'); return; }
+      setSaving(true);
+      try {
+        const res = await fetch('/api/issues', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title:       taskName.trim(),
+            reported_by: customer.trim() || null,
+            priority:    priority || null,
+            screen:      screen   || null,
+            status,
+          }),
+        });
+        if (!res.ok) throw new Error();
+        toast.success('Task added!');
+        resetPanel();
+        loadTasks();
+      } catch {
+        toast.error('Failed to add task.');
+      }
+      setSaving(false);
+    } else {
+      if (!selectedTask) { toast.error('Select a task first (click a row or enter a task #).'); return; }
+      setSaving(true);
+      try {
+        await fetch(`/api/issues/${selectedTask.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            title:       taskName.trim() || null,
+            reported_by: customer.trim() || null,
+            priority:    priority || null,
+            status,
+          }),
+        });
+        if (note.trim()) {
+          const updateType = status === 'resolved' ? 'resolved' : 'progress';
+          await fetch(`/api/issues/${selectedTask.id}/updates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: updateType, note: note.trim() }),
+          });
+        }
+        toast.success('Task updated!');
+        resetPanel();
+        loadTasks();
+      } catch {
+        toast.error('Failed to update task.');
+      }
+      setSaving(false);
+    }
+  }
 
   async function handleSeedData() {
     setSeeding(true);
     try {
       const res = await fetch('/api/seed', { method: 'POST' });
-      if (!res.ok) {
-        const data = await res.json();
-        toast.error(data.error || 'Failed to load demo data');
-      } else {
-        toast.success('Demo data loaded!');
-        loadTasks();
-      }
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || 'Failed to load demo data'); }
+      else { toast.success('Demo data loaded!'); loadTasks(); }
     } catch {
       toast.error('Failed to load demo data');
     }
     setSeeding(false);
-  }
-
-  async function handleAddUpdate(note: string) {
-    if (!selectedTask) return;
-    setSaving(true);
-    try {
-      const res = await fetch(`/api/issues/${selectedTask.id}/updates`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type: updateType, note }),
-      });
-      if (!res.ok) throw new Error();
-      toast.success('Update saved!');
-      setSelectedTask(null);
-      setSearchQuery('');
-      loadTasks();
-    } catch {
-      toast.error('Failed to save update.');
-    }
-    setSaving(false);
   }
 
   if (loading) {
@@ -188,170 +269,249 @@ export default function DashboardPage() {
   }
 
   return (
-    <>
-      <main className="min-h-screen bg-base-200 p-4">
+    <main className="min-h-screen bg-base-200 p-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_300px] gap-4 items-start">
 
-        {/* Empty state */}
-        {tasks.length === 0 && (
-          <div className="max-w-md mx-auto mt-16 text-center">
-            <div className="card bg-base-100 shadow-xl p-8">
-              <Database className="w-12 h-12 text-base-content/30 mx-auto mb-4" />
-              <h2 className="text-xl font-bold mb-2">No tasks yet</h2>
-              <p className="text-base-content/60 mb-6">
-                Start by adding a task, or load demo data to explore.
-              </p>
-              <div className="flex gap-3 justify-center">
-                <button
-                  className="btn btn-primary gap-2"
-                  onClick={() => setShowAddModal(true)}
-                >
-                  <Plus className="w-4 h-4" /> Add Task
-                </button>
-                <button
-                  className="btn btn-outline gap-2"
-                  onClick={handleSeedData}
-                  disabled={seeding}
-                >
-                  {seeding
-                    ? <span className="loading loading-spinner loading-sm" />
-                    : <Database className="w-4 h-4" />
-                  }
-                  Load Demo Data
-                </button>
-              </div>
+        {/* In Progress */}
+        <div>
+          <div className="stats bg-base-100 shadow w-full mb-3">
+            <div className="stat py-3">
+              <div className="stat-title text-sm">In Progress</div>
+              <div className="stat-value text-2xl text-warning">{inProgress.length}</div>
             </div>
           </div>
-        )}
+          <TaskTable tasks={inProgress} onRowClick={loadTask} />
+        </div>
 
-        {/* Main 3-column layout */}
-        {tasks.length > 0 && (
-          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_300px] gap-4 items-start max-w-[1400px] mx-auto">
+        {/* Queue */}
+        <div>
+          <div className="stats bg-base-100 shadow w-full mb-3">
+            <div className="stat py-3">
+              <div className="stat-title text-sm">Queue</div>
+              <div className="stat-value text-2xl text-info">{queue.length}</div>
+            </div>
+          </div>
+          <TaskTable tasks={queue} onRowClick={loadTask} />
+          {tasks.length === 0 && (
+            <button
+              className="btn btn-outline btn-sm w-full mt-2"
+              onClick={handleSeedData}
+              disabled={seeding}
+            >
+              {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
+            </button>
+          )}
+        </div>
 
-            {/* In Progress Column */}
-            <div>
-              <div className="stats bg-base-100 shadow w-full mb-3">
-                <div className="stat py-3">
-                  <div className="stat-title text-sm">In Progress</div>
-                  <div className="stat-value text-2xl text-warning">{inProgress.length}</div>
+        {/* Add / Update Panel */}
+        <div className="lg:sticky lg:top-4">
+          <div className="card bg-base-100 shadow">
+            <div className="card-body p-4 space-y-3">
+
+              {/* Mode toggle */}
+              <div className="flex gap-2">
+                <button
+                  className={`btn btn-sm flex-1 ${mode === 'add' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => { setMode('add'); resetPanel(); }}
+                >
+                  Add
+                </button>
+                <button
+                  className={`btn btn-sm flex-1 ${mode === 'update' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => { setMode('update'); resetPanel(); }}
+                >
+                  Update
+                </button>
+              </div>
+
+              {/* Task # (update mode) */}
+              {mode === 'update' && (
+                <div className="flex gap-1">
+                  <input
+                    type="text"
+                    className="input input-bordered input-sm flex-1"
+                    placeholder="Task # (or click a row)"
+                    value={taskNumber}
+                    onChange={e => handleTaskNumberInput(e.target.value)}
+                  />
+                  <button
+                    className={`btn btn-sm ${listeningNum ? 'btn-error' : 'btn-outline'}`}
+                    title="Say task number"
+                    onClick={() => listeningNum
+                      ? stopVoice(numRecRef as React.MutableRefObject<unknown>, setListeningNum)
+                      : startVoice(
+                          text => handleTaskNumberInput(parseSpokenNumber(text)),
+                          setListeningNum,
+                          numRecRef as React.MutableRefObject<unknown>,
+                          false
+                        )
+                    }
+                  >
+                    {listeningNum ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                  </button>
+                </div>
+              )}
+
+              {/* Task Name */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">
+                    Task Name{mode === 'add' ? ' *' : ''}
+                  </span>
+                </label>
+                <input
+                  className="input input-bordered input-sm w-full"
+                  value={taskName}
+                  onChange={e => setTaskName(e.target.value)}
+                  placeholder={mode === 'add' ? 'Describe the task...' : ''}
+                />
+              </div>
+
+              {/* Priority */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">Priority</span>
+                </label>
+                <div className="flex gap-1">
+                  {(['high', 'medium', 'low'] as const).map(p => (
+                    <button
+                      key={p}
+                      className={`btn btn-xs flex-1 capitalize ${priority === p ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => setPriority(prev => prev === p ? '' : p)}
+                    >
+                      {p}
+                    </button>
+                  ))}
                 </div>
               </div>
-              <TaskTable
-                tasks={inProgress}
-                onRowClick={id => router.push(`/issues/${id}`)}
-              />
-            </div>
 
-            {/* Queue Column */}
-            <div>
-              <div className="stats bg-base-100 shadow w-full mb-3">
-                <div className="stat py-3">
-                  <div className="stat-title text-sm">Queue</div>
-                  <div className="stat-value text-2xl text-info">{queue.length}</div>
-                </div>
+              {/* Customer */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">Customer</span>
+                </label>
+                <input
+                  className="input input-bordered input-sm w-full"
+                  value={customer}
+                  onChange={e => setCustomer(e.target.value)}
+                  placeholder="Who is this for?"
+                />
               </div>
-              <TaskTable
-                tasks={queue}
-                onRowClick={id => router.push(`/issues/${id}`)}
-              />
-            </div>
 
-            {/* Right Panel */}
-            <div className="lg:sticky lg:top-4 space-y-3">
-              <button
-                className="btn btn-primary w-full gap-2"
-                onClick={() => setShowAddModal(true)}
-              >
-                <Plus className="w-4 h-4" /> Add Task
-              </button>
+              {/* Screen (add mode only) */}
+              {mode === 'add' && (
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Screen</span>
+                  </label>
+                  <select
+                    className="select select-bordered select-sm w-full"
+                    value={screen}
+                    onChange={e => setScreen(e.target.value)}
+                  >
+                    <option value="">None</option>
+                    <option value="Onboarding">Onboarding</option>
+                  </select>
+                </div>
+              )}
 
-              <div className="card bg-base-100 shadow">
-                <div className="card-body p-4 space-y-3">
-                  <p className="font-semibold text-sm">Update a Task</p>
-
-                  {/* Task search */}
-                  <div className="relative">
-                    <input
-                      type="text"
-                      className="input input-bordered input-sm w-full"
-                      placeholder="Task # or name..."
-                      value={searchQuery}
-                      onChange={e => {
-                        setSearchQuery(e.target.value);
-                        setSelectedTask(null);
-                      }}
-                    />
-                    {searchQuery && !selectedTask && searchResults.length > 0 && (
-                      <div className="absolute z-10 w-full bg-base-100 border border-base-300 rounded-box shadow-lg mt-1 overflow-hidden">
-                        {searchResults.map(t => (
-                          <div
-                            key={t.id}
-                            className="px-3 py-2 hover:bg-base-200 cursor-pointer text-sm"
-                            onClick={() => {
-                              setSelectedTask(t);
-                              setSearchQuery('');
-                            }}
-                          >
-                            <span className="text-base-content/40 mr-2">#{t.task_number}</span>
-                            {(t.title || t.description).slice(0, 50)}
-                          </div>
-                        ))}
-                      </div>
-                    )}
-                    {searchQuery && !selectedTask && searchResults.length === 0 && (
-                      <div className="absolute z-10 w-full bg-base-100 border border-base-300 rounded-box shadow-lg mt-1 px-3 py-2 text-sm text-base-content/40">
-                        No matching tasks
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Selected task update form */}
-                  {selectedTask && (
-                    <div className="space-y-3">
-                      <div className="flex items-start justify-between gap-2 bg-base-200 rounded-lg p-2">
-                        <p className="text-sm font-medium leading-snug">
-                          <span className="text-base-content/40 mr-1">#{selectedTask.task_number}</span>
-                          {(selectedTask.title || selectedTask.description).slice(0, 55)}
-                        </p>
-                        <button
-                          className="btn btn-ghost btn-xs shrink-0"
-                          onClick={() => { setSelectedTask(null); setSearchQuery(''); }}
-                        >
-                          ✕
-                        </button>
-                      </div>
-
-                      <div className="flex gap-1 flex-wrap">
-                        {UPDATE_TYPES.map(t => (
-                          <button
-                            key={t.value}
-                            className={`btn btn-xs ${updateType === t.value ? 'btn-primary' : 'btn-outline'}`}
-                            onClick={() => setUpdateType(t.value)}
-                          >
-                            {t.label}
-                          </button>
-                        ))}
-                      </div>
-
-                      <VoiceInput
-                        onSave={handleAddUpdate}
-                        placeholder="Type or speak your update..."
-                        saveLabel={saving ? 'Saving...' : 'Save Update'}
-                      />
-                    </div>
+              {/* Status */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">Status</span>
+                </label>
+                <div className="flex gap-1">
+                  <button
+                    className={`btn btn-xs flex-1 ${status === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setStatus('pending')}
+                  >
+                    Queue
+                  </button>
+                  <button
+                    className={`btn btn-xs flex-1 ${status === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
+                    onClick={() => setStatus('in_progress')}
+                  >
+                    In Progress
+                  </button>
+                  {mode === 'update' && (
+                    <button
+                      className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
+                      onClick={() => setStatus('resolved')}
+                    >
+                      Complete
+                    </button>
                   )}
                 </div>
               </div>
+
+              {/* Note (update mode only) */}
+              {mode === 'update' && (
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Note</span>
+                  </label>
+                  <div className="flex gap-1 items-start">
+                    <textarea
+                      className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                      rows={3}
+                      value={note}
+                      onChange={e => setNote(e.target.value)}
+                      placeholder="Type or speak an update..."
+                    />
+                    <button
+                      className={`btn btn-sm ${listeningNote ? 'btn-error' : 'btn-outline'}`}
+                      title={listeningNote ? 'Stop' : 'Speak'}
+                      onClick={() => listeningNote
+                        ? stopVoice(noteRecRef as React.MutableRefObject<unknown>, setListeningNote)
+                        : startVoice(
+                            text => setNote(prev => prev ? `${prev} ${text}` : text),
+                            setListeningNote,
+                            noteRecRef as React.MutableRefObject<unknown>,
+                            true
+                          )
+                      }
+                    >
+                      {listeningNote ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* View details link */}
+              {mode === 'update' && selectedTask && (
+                <Link
+                  href={`/issues/${selectedTask.id}`}
+                  className="btn btn-ghost btn-xs gap-1 w-full"
+                >
+                  <ExternalLink className="w-3 h-3" /> View full details
+                </Link>
+              )}
+
+              {/* Save */}
+              <button
+                className="btn btn-primary btn-sm w-full"
+                onClick={handleSave}
+                disabled={saving}
+              >
+                {saving ? <span className="loading loading-spinner loading-sm" /> : 'Save'}
+              </button>
+
+              {/* Load demo data (only when no tasks exist) */}
+              {tasks.length === 0 && (
+                <button
+                  className="btn btn-ghost btn-xs w-full"
+                  onClick={handleSeedData}
+                  disabled={seeding}
+                >
+                  {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
+                </button>
+              )}
+
             </div>
-
           </div>
-        )}
-      </main>
+        </div>
 
-      <AddTaskModal
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSaved={loadTasks}
-      />
-    </>
+      </div>
+    </main>
   );
 }
