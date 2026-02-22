@@ -36,7 +36,7 @@ export default function Header() {
     <header className="navbar bg-base-100 shadow-sm px-4">
       <div className="flex-1 flex items-center gap-2">
         <MonitorCheck className="w-6 h-6 text-primary" />
-        <span className="font-bold text-lg">Bruce IT</span>
+        <span className="font-bold text-lg">IT Buddy</span>
       </div>
       {user && (
         <div className="flex-none flex items-center gap-1 mr-2">

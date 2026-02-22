@@ -33,7 +33,7 @@ export default function SignupPage() {
       <div className="card bg-base-100 shadow-xl w-full max-w-sm">
         <div className="card-body">
           <h1 className="text-2xl font-bold text-center mb-2">Create Account</h1>
-          <p className="text-base-content/60 text-center text-sm mb-4">Bruce IT Onboarding</p>
+          <p className="text-base-content/60 text-center text-sm mb-4">IT Buddy</p>
           <form onSubmit={handleSignup} className="space-y-4">
             <div className="form-control">
               <label className="label"><span className="label-text font-semibold">Email</span></label>
