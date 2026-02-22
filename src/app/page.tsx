@@ -35,10 +35,9 @@ function TaskTable({
       <table className="table table-sm bg-base-100 w-full">
         <thead>
           <tr>
-            <th className="w-8">#</th>
+            <th className="w-6">#</th>
             <th>Name</th>
-            <th>Priority</th>
-            <th>Screen</th>
+            <th className="w-10"></th>
           </tr>
         </thead>
         <tbody>
@@ -50,25 +49,23 @@ function TaskTable({
             >
               <td className="text-base-content/40 text-xs">{task.task_number}</td>
               <td>
-                <p className="max-w-[220px] truncate font-medium text-sm">
+                <p className="truncate font-medium text-sm">
                   {task.title || task.description.slice(0, 60)}
                 </p>
               </td>
-              <td>
+              <td className="text-right">
                 {task.priority && (
                   <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
-                    {PRIORITY_LABEL[task.priority] ?? task.priority}
+                    {PRIORITY_LABEL[task.priority]}
                   </span>
                 )}
-              </td>
-              <td>
-                {task.screen && (
+                {task.screen && !task.priority && (
                   <Link
                     href="/onboarding"
                     className="badge badge-outline badge-sm hover:badge-primary transition-colors"
                     onClick={e => e.stopPropagation()}
                   >
-                    {task.screen}
+                    Onb
                   </Link>
                 )}
               </td>
