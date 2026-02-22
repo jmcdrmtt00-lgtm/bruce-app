@@ -1,155 +1,357 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import Link from 'next/link';
-import { Plus, UserPlus, AlertCircle, Clock, CheckCircle2, ChevronRight } from 'lucide-react';
+import { useEffect, useState, useCallback, useMemo } from 'react';
+import { useRouter } from 'next/navigation';
+import { Plus, Database } from 'lucide-react';
+import toast from 'react-hot-toast';
 import { Incident } from '@/types';
+import AddTaskModal from '@/components/AddTaskModal';
+import VoiceInput from '@/components/VoiceInput';
 
-const STATUS_CONFIG = {
-  open:        { label: 'Open',        className: 'badge-error'   },
-  in_progress: { label: 'In Progress', className: 'badge-warning' },
-  resolved:    { label: 'Resolved',    className: 'badge-success' },
+const PRIORITY_BADGE: Record<string, string> = {
+  high:   'badge-error',
+  medium: 'badge-warning',
+  low:    'badge-info',
 };
 
-function timeAgo(iso: string) {
-  const diff = Date.now() - new Date(iso).getTime();
-  const mins = Math.floor(diff / 60000);
-  if (mins < 60) return `${mins}m ago`;
-  const hrs = Math.floor(mins / 60);
-  if (hrs < 24) return `${hrs}h ago`;
-  return `${Math.floor(hrs / 24)}d ago`;
+const UPDATE_TYPES = [
+  { value: 'approach' as const, label: 'Approach' },
+  { value: 'progress' as const, label: 'Progress' },
+  { value: 'resolved' as const, label: 'Resolved' },
+];
+
+function TaskTable({
+  tasks,
+  onRowClick,
+}: {
+  tasks: Incident[];
+  onRowClick: (id: string) => void;
+}) {
+  const router = useRouter();
+
+  if (tasks.length === 0) {
+    return (
+      <div className="card bg-base-100 shadow p-6 text-center text-base-content/40 text-sm">
+        No tasks
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-x-auto rounded-box shadow">
+      <table className="table table-sm bg-base-100 w-full">
+        <thead>
+          <tr>
+            <th className="w-8">#</th>
+            <th>Name</th>
+            <th>Priority</th>
+            <th>Customer</th>
+            <th>Screen</th>
+          </tr>
+        </thead>
+        <tbody>
+          {tasks.map(task => (
+            <tr
+              key={task.id}
+              className="hover cursor-pointer"
+              onClick={() => onRowClick(task.id)}
+            >
+              <td className="text-base-content/40 text-xs">{task.task_number}</td>
+              <td>
+                <p className="max-w-[180px] truncate font-medium text-sm">
+                  {task.title || task.description.slice(0, 60)}
+                </p>
+              </td>
+              <td>
+                {task.priority && (
+                  <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
+                    {task.priority}
+                  </span>
+                )}
+              </td>
+              <td className="text-xs text-base-content/60">
+                <p className="max-w-[110px] truncate">{task.reported_by ?? ''}</p>
+              </td>
+              <td>
+                {task.screen && (
+                  <button
+                    className="badge badge-outline badge-sm hover:badge-primary transition-colors"
+                    onClick={e => {
+                      e.stopPropagation();
+                      router.push('/onboarding');
+                    }}
+                  >
+                    {task.screen}
+                  </button>
+                )}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
 }
 
 export default function DashboardPage() {
-  const [incidents, setIncidents] = useState<Incident[]>([]);
+  const router = useRouter();
+  const [tasks, setTasks] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
+  const [updateType, setUpdateType] = useState<'approach' | 'progress' | 'resolved'>('progress');
+  const [saving, setSaving] = useState(false);
+  const [seeding, setSeeding] = useState(false);
 
-  useEffect(() => {
+  const loadTasks = useCallback(() => {
     fetch('/api/issues')
       .then(r => r.json())
-      .then(data => { setIncidents(data.incidents ?? []); setLoading(false); })
+      .then(data => {
+        setTasks(data.incidents ?? []);
+        setLoading(false);
+      })
       .catch(() => setLoading(false));
   }, []);
 
-  const open       = incidents.filter(i => i.status === 'open').length;
-  const inProgress = incidents.filter(i => i.status === 'in_progress').length;
-  const resolved   = incidents.filter(i => i.status === 'resolved').length;
-  const onboarding = incidents.filter(i => i.source === 'onboarding' && i.status !== 'resolved').length;
-  const recent     = incidents.slice(0, 6);
+  useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  const inProgress = useMemo(
+    () => tasks
+      .filter(t => t.status === 'in_progress')
+      .sort((a, b) => a.task_number - b.task_number),
+    [tasks]
+  );
+
+  const queue = useMemo(
+    () => tasks
+      .filter(t => t.status === 'pending' || t.status === 'open')
+      .sort((a, b) => a.task_number - b.task_number),
+    [tasks]
+  );
+
+  const allActive = useMemo(() => [...inProgress, ...queue], [inProgress, queue]);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return [];
+    const q = searchQuery.trim().toLowerCase();
+    const numQ = parseInt(q);
+    return allActive.filter(t => {
+      if (!isNaN(numQ) && t.task_number === numQ) return true;
+      return (t.title || t.description).toLowerCase().includes(q);
+    }).slice(0, 6);
+  }, [searchQuery, allActive]);
+
+  async function handleSeedData() {
+    setSeeding(true);
+    try {
+      const res = await fetch('/api/seed', { method: 'POST' });
+      if (!res.ok) {
+        const data = await res.json();
+        toast.error(data.error || 'Failed to load demo data');
+      } else {
+        toast.success('Demo data loaded!');
+        loadTasks();
+      }
+    } catch {
+      toast.error('Failed to load demo data');
+    }
+    setSeeding(false);
+  }
+
+  async function handleAddUpdate(note: string) {
+    if (!selectedTask) return;
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/issues/${selectedTask.id}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type: updateType, note }),
+      });
+      if (!res.ok) throw new Error();
+      toast.success('Update saved!');
+      setSelectedTask(null);
+      setSearchQuery('');
+      loadTasks();
+    } catch {
+      toast.error('Failed to save update.');
+    }
+    setSaving(false);
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-base-200 flex items-center justify-center">
+        <span className="loading loading-spinner loading-lg" />
+      </div>
+    );
+  }
 
   return (
-    <main className="min-h-screen bg-base-200 py-8 px-4">
-      <div className="max-w-4xl mx-auto space-y-6">
+    <>
+      <main className="min-h-screen bg-base-200 p-4">
 
-        {/* Header */}
-        <div>
-          <h1 className="text-3xl font-bold">Dashboard</h1>
-          <p className="text-base-content/60 mt-1">Oriol Healthcare IT</p>
-        </div>
-
-        {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="card bg-base-100 shadow">
-            <div className="card-body py-4 px-5">
-              <div className="flex items-center gap-2 mb-1">
-                <AlertCircle className="w-4 h-4 text-error" />
-                <span className="text-sm font-semibold text-base-content/60">Open</span>
+        {/* Empty state */}
+        {tasks.length === 0 && (
+          <div className="max-w-md mx-auto mt-16 text-center">
+            <div className="card bg-base-100 shadow-xl p-8">
+              <Database className="w-12 h-12 text-base-content/30 mx-auto mb-4" />
+              <h2 className="text-xl font-bold mb-2">No tasks yet</h2>
+              <p className="text-base-content/60 mb-6">
+                Start by adding a task, or load demo data to explore.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <button
+                  className="btn btn-primary gap-2"
+                  onClick={() => setShowAddModal(true)}
+                >
+                  <Plus className="w-4 h-4" /> Add Task
+                </button>
+                <button
+                  className="btn btn-outline gap-2"
+                  onClick={handleSeedData}
+                  disabled={seeding}
+                >
+                  {seeding
+                    ? <span className="loading loading-spinner loading-sm" />
+                    : <Database className="w-4 h-4" />
+                  }
+                  Load Demo Data
+                </button>
               </div>
-              <p className="text-3xl font-bold">{loading ? '—' : open}</p>
             </div>
           </div>
-          <div className="card bg-base-100 shadow">
-            <div className="card-body py-4 px-5">
-              <div className="flex items-center gap-2 mb-1">
-                <Clock className="w-4 h-4 text-warning" />
-                <span className="text-sm font-semibold text-base-content/60">In Progress</span>
-              </div>
-              <p className="text-3xl font-bold">{loading ? '—' : inProgress}</p>
-            </div>
-          </div>
-          <div className="card bg-base-100 shadow">
-            <div className="card-body py-4 px-5">
-              <div className="flex items-center gap-2 mb-1">
-                <CheckCircle2 className="w-4 h-4 text-success" />
-                <span className="text-sm font-semibold text-base-content/60">Resolved</span>
-              </div>
-              <p className="text-3xl font-bold">{loading ? '—' : resolved}</p>
-            </div>
-          </div>
-          <div className="card bg-base-100 shadow">
-            <div className="card-body py-4 px-5">
-              <div className="flex items-center gap-2 mb-1">
-                <UserPlus className="w-4 h-4 text-primary" />
-                <span className="text-sm font-semibold text-base-content/60">Onboarding</span>
-              </div>
-              <p className="text-3xl font-bold">{loading ? '—' : onboarding}</p>
-            </div>
-          </div>
-        </div>
+        )}
 
-        {/* Quick actions */}
-        <div className="card bg-base-100 shadow">
-          <div className="card-body py-4 px-5">
-            <h2 className="font-bold text-lg mb-3">Quick Actions</h2>
-            <div className="flex gap-3 flex-wrap">
-              <Link href="/issues/new" className="btn btn-primary gap-2">
-                <Plus className="w-4 h-4" />
-                Log IT Issue
-              </Link>
-              <Link href="/onboarding" className="btn btn-secondary gap-2">
-                <UserPlus className="w-4 h-4" />
-                New Hire
-              </Link>
-            </div>
-          </div>
-        </div>
+        {/* Main 3-column layout */}
+        {tasks.length > 0 && (
+          <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_300px] gap-4 items-start max-w-[1400px] mx-auto">
 
-        {/* Recent activity */}
-        <div className="card bg-base-100 shadow">
-          <div className="card-body py-4 px-5">
-            <div className="flex items-center justify-between mb-4">
-              <h2 className="font-bold text-lg">Recent Activity</h2>
-              <Link href="/issues" className="btn btn-ghost btn-sm">View all</Link>
+            {/* In Progress Column */}
+            <div>
+              <div className="stats bg-base-100 shadow w-full mb-3">
+                <div className="stat py-3">
+                  <div className="stat-title text-sm">In Progress</div>
+                  <div className="stat-value text-2xl text-warning">{inProgress.length}</div>
+                </div>
+              </div>
+              <TaskTable
+                tasks={inProgress}
+                onRowClick={id => router.push(`/issues/${id}`)}
+              />
             </div>
 
-            {loading ? (
-              <div className="flex justify-center py-8">
-                <span className="loading loading-spinner loading-md" />
+            {/* Queue Column */}
+            <div>
+              <div className="stats bg-base-100 shadow w-full mb-3">
+                <div className="stat py-3">
+                  <div className="stat-title text-sm">Queue</div>
+                  <div className="stat-value text-2xl text-info">{queue.length}</div>
+                </div>
               </div>
-            ) : recent.length === 0 ? (
-              <div className="text-center py-8 text-base-content/50">
-                <p>No activity yet. Log your first issue or onboard a new hire.</p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {recent.map(incident => {
-                  const cfg = STATUS_CONFIG[incident.status];
-                  const isOnboarding = incident.source === 'onboarding';
-                  return (
-                    <Link
-                      key={incident.id}
-                      href={`/issues/${incident.id}`}
-                      className="flex items-center gap-3 py-2 px-3 rounded-lg hover:bg-base-200 transition-colors"
-                    >
-                      {isOnboarding
-                        ? <UserPlus className="w-4 h-4 text-primary shrink-0" />
-                        : <AlertCircle className="w-4 h-4 text-base-content/40 shrink-0" />
-                      }
-                      <span className="flex-1 text-sm truncate">
-                        {incident.title ?? incident.description.slice(0, 60)}
-                      </span>
-                      <span className={`badge badge-sm ${cfg.className} shrink-0`}>{cfg.label}</span>
-                      <span className="text-xs text-base-content/40 shrink-0">{timeAgo(incident.created_at)}</span>
-                      <ChevronRight className="w-3 h-3 text-base-content/30 shrink-0" />
-                    </Link>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-        </div>
+              <TaskTable
+                tasks={queue}
+                onRowClick={id => router.push(`/issues/${id}`)}
+              />
+            </div>
 
-      </div>
-    </main>
+            {/* Right Panel */}
+            <div className="lg:sticky lg:top-4 space-y-3">
+              <button
+                className="btn btn-primary w-full gap-2"
+                onClick={() => setShowAddModal(true)}
+              >
+                <Plus className="w-4 h-4" /> Add Task
+              </button>
+
+              <div className="card bg-base-100 shadow">
+                <div className="card-body p-4 space-y-3">
+                  <p className="font-semibold text-sm">Update a Task</p>
+
+                  {/* Task search */}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      className="input input-bordered input-sm w-full"
+                      placeholder="Task # or name..."
+                      value={searchQuery}
+                      onChange={e => {
+                        setSearchQuery(e.target.value);
+                        setSelectedTask(null);
+                      }}
+                    />
+                    {searchQuery && !selectedTask && searchResults.length > 0 && (
+                      <div className="absolute z-10 w-full bg-base-100 border border-base-300 rounded-box shadow-lg mt-1 overflow-hidden">
+                        {searchResults.map(t => (
+                          <div
+                            key={t.id}
+                            className="px-3 py-2 hover:bg-base-200 cursor-pointer text-sm"
+                            onClick={() => {
+                              setSelectedTask(t);
+                              setSearchQuery('');
+                            }}
+                          >
+                            <span className="text-base-content/40 mr-2">#{t.task_number}</span>
+                            {(t.title || t.description).slice(0, 50)}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    {searchQuery && !selectedTask && searchResults.length === 0 && (
+                      <div className="absolute z-10 w-full bg-base-100 border border-base-300 rounded-box shadow-lg mt-1 px-3 py-2 text-sm text-base-content/40">
+                        No matching tasks
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Selected task update form */}
+                  {selectedTask && (
+                    <div className="space-y-3">
+                      <div className="flex items-start justify-between gap-2 bg-base-200 rounded-lg p-2">
+                        <p className="text-sm font-medium leading-snug">
+                          <span className="text-base-content/40 mr-1">#{selectedTask.task_number}</span>
+                          {(selectedTask.title || selectedTask.description).slice(0, 55)}
+                        </p>
+                        <button
+                          className="btn btn-ghost btn-xs shrink-0"
+                          onClick={() => { setSelectedTask(null); setSearchQuery(''); }}
+                        >
+                          ✕
+                        </button>
+                      </div>
+
+                      <div className="flex gap-1 flex-wrap">
+                        {UPDATE_TYPES.map(t => (
+                          <button
+                            key={t.value}
+                            className={`btn btn-xs ${updateType === t.value ? 'btn-primary' : 'btn-outline'}`}
+                            onClick={() => setUpdateType(t.value)}
+                          >
+                            {t.label}
+                          </button>
+                        ))}
+                      </div>
+
+                      <VoiceInput
+                        onSave={handleAddUpdate}
+                        placeholder="Type or speak your update..."
+                        saveLabel={saving ? 'Saving...' : 'Save Update'}
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+          </div>
+        )}
+      </main>
+
+      <AddTaskModal
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSaved={loadTasks}
+      />
+    </>
   );
 }

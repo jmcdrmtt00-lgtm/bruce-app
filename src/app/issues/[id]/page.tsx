@@ -9,9 +9,16 @@ import VoiceInput from '@/components/VoiceInput';
 import { Incident, IncidentUpdate } from '@/types';
 
 const STATUS_CONFIG = {
+  pending:     { label: 'Queue',       className: 'badge-info'    },
   open:        { label: 'Open',        className: 'badge-error'   },
   in_progress: { label: 'In Progress', className: 'badge-warning' },
   resolved:    { label: 'Resolved',    className: 'badge-success' },
+};
+
+const PRIORITY_BADGE: Record<string, string> = {
+  high:   'badge-error',
+  medium: 'badge-warning',
+  low:    'badge-info',
 };
 
 const UPDATE_TYPES: { value: 'approach' | 'progress' | 'resolved'; label: string; badge: string }[] = [
@@ -26,7 +33,7 @@ function formatDateTime(iso: string) {
   });
 }
 
-export default function IssueDetailPage() {
+export default function TaskDetailPage() {
   const params = useParams();
   const id = params.id as string;
   const [incident, setIncident] = useState<Incident | null>(null);
@@ -48,7 +55,7 @@ export default function IssueDetailPage() {
 
   useEffect(() => { loadData(); }, [loadData]);
 
-  async function handleStatusChange(newStatus: 'open' | 'in_progress' | 'resolved') {
+  async function handleStatusChange(newStatus: Incident['status']) {
     await fetch(`/api/issues/${id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -86,29 +93,29 @@ export default function IssueDetailPage() {
     return (
       <main className="min-h-screen bg-base-200 py-8 px-4">
         <div className="max-w-2xl mx-auto">
-          <p>Issue not found.</p>
-          <Link href="/issues" className="btn btn-ghost mt-4">Back to Issues</Link>
+          <p>Task not found.</p>
+          <Link href="/" className="btn btn-ghost mt-4">Back to Dashboard</Link>
         </div>
       </main>
     );
   }
 
-  const statusCfg = STATUS_CONFIG[incident.status];
+  const statusCfg = STATUS_CONFIG[incident.status] ?? STATUS_CONFIG.open;
 
   return (
     <main className="min-h-screen bg-base-200 py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-5">
 
-        <Link href="/issues" className="btn btn-ghost btn-sm gap-1">
-          <ChevronLeft className="w-4 h-4" /> Back to Issues
+        <Link href="/" className="btn btn-ghost btn-sm gap-1">
+          <ChevronLeft className="w-4 h-4" /> Back to Dashboard
         </Link>
 
-        {/* Incident header card */}
+        {/* Task header card */}
         <div className="card bg-base-100 shadow-xl">
           <div className="card-body">
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`badge badge-lg ${statusCfg.className}`}>{statusCfg.label}</span>
-              {(['open', 'in_progress', 'resolved'] as const)
+              {(['pending', 'in_progress', 'resolved'] as const)
                 .filter(s => s !== incident.status)
                 .map(s => (
                   <button
@@ -122,17 +129,40 @@ export default function IssueDetailPage() {
               }
             </div>
 
-            <h1 className="text-xl font-bold mt-2">
-              {incident.title ?? 'IT Issue'}
-            </h1>
+            <div className="flex items-start gap-2 mt-2">
+              {incident.task_number && (
+                <span className="text-base-content/40 text-sm mt-1 shrink-0">#{incident.task_number}</span>
+              )}
+              <h1 className="text-xl font-bold flex-1">
+                {incident.title ?? 'Task'}
+              </h1>
+            </div>
+
+            <div className="flex flex-wrap gap-2 mt-1">
+              {incident.priority && (
+                <span className={`badge ${PRIORITY_BADGE[incident.priority]}`}>
+                  {incident.priority} priority
+                </span>
+              )}
+              {incident.screen && (
+                <Link href="/onboarding" className="badge badge-outline hover:badge-primary">
+                  {incident.screen}
+                </Link>
+              )}
+            </div>
+
             {incident.reported_by && (
-              <p className="text-sm text-base-content/60">Reported by {incident.reported_by}</p>
+              <p className="text-sm text-base-content/60 mt-1">Customer: {incident.reported_by}</p>
             )}
             <p className="text-xs text-base-content/40">{formatDateTime(incident.created_at)}</p>
 
-            <div className="divider my-2" />
-            <p className="text-xs font-bold uppercase text-base-content/60 mb-1">Problem Description</p>
-            <p className="text-sm leading-relaxed">{incident.description}</p>
+            {incident.description && incident.description !== incident.title && (
+              <>
+                <div className="divider my-2" />
+                <p className="text-xs font-bold uppercase text-base-content/60 mb-1">Notes</p>
+                <p className="text-sm leading-relaxed">{incident.description}</p>
+              </>
+            )}
           </div>
         </div>
 

@@ -47,11 +47,18 @@ export async function PATCH(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { status } = await request.json();
+  const body = await request.json();
+  const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
+
+  if (body.status !== undefined)      updates.status      = body.status;
+  if (body.priority !== undefined)    updates.priority    = body.priority    || null;
+  if (body.screen !== undefined)      updates.screen      = body.screen      || null;
+  if (body.title !== undefined)       updates.title       = body.title       || null;
+  if (body.reported_by !== undefined) updates.reported_by = body.reported_by || null;
 
   const { error } = await supabase
     .from('incidents')
-    .update({ status, updated_at: new Date().toISOString() })
+    .update(updates)
     .eq('id', id)
     .eq('user_id', user.id);
 

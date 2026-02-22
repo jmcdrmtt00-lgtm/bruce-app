@@ -31,23 +31,27 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { description, reported_by } = await request.json();
+  const { title: providedTitle, description, reported_by, priority, screen, status } = await request.json();
 
-  // Ask Python backend to generate a short title — non-blocking, falls back to null
-  let title: string | null = null;
-  try {
-    const backendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
-    const res = await fetch(`${backendUrl}/api/summarize`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ description }),
-    });
-    if (res.ok) {
-      const json = await res.json();
-      title = json.title ?? null;
+  let title: string | null = providedTitle ?? null;
+  const desc: string = description || providedTitle || '';
+
+  // Only call AI for title if no user-provided title and there's a description
+  if (!title && desc) {
+    try {
+      const backendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+      const res = await fetch(`${backendUrl}/api/summarize`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ description: desc }),
+      });
+      if (res.ok) {
+        const json = await res.json();
+        title = json.title ?? null;
+      }
+    } catch {
+      // Backend not running — title stays null
     }
-  } catch {
-    // Backend not running locally — title stays null, no problem
   }
 
   const { data, error } = await supabase
@@ -55,13 +59,15 @@ export async function POST(request: NextRequest) {
     .insert({
       user_id: user.id,
       title,
-      description,
+      description: desc,
       reported_by: reported_by || null,
-      status: 'open',
+      priority: priority || null,
+      screen: screen || null,
+      status: status || 'pending',
     })
-    .select('id')
+    .select('*')
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ id: data.id });
+  return NextResponse.json({ incident: data });
 }
