@@ -6,6 +6,7 @@ import { Plus, ChevronRight, AlertCircle, Clock, CheckCircle2, UserPlus, Wrench 
 import { Incident } from '@/types';
 
 const STATUS_CONFIG = {
+  pending:     { label: 'Queue',       className: 'badge-info'    },
   open:        { label: 'Open',        className: 'badge-error'   },
   in_progress: { label: 'In Progress', className: 'badge-warning' },
   resolved:    { label: 'Resolved',    className: 'badge-success' },
