@@ -1,12 +1,13 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { GeneratedOutput } from '@/types';
 import { ROLES, SYSTEM_LABELS } from '@/data/roles';
 import { SITES } from '@/data/sites';
 
 interface Props {
   output: GeneratedOutput;
+  sessionId: string | null;
   onStartOver: () => void;
 }
 
@@ -15,7 +16,7 @@ interface CheckItem {
   label: string;
 }
 
-export default function OnboardingChecklist({ output, onStartOver }: Props) {
+export default function OnboardingChecklist({ output, sessionId, onStartOver }: Props) {
   const { hire, loginId, systems, computerType } = output;
   const role = ROLES[hire.role];
   const site = SITES[hire.site];
@@ -62,6 +63,17 @@ export default function OnboardingChecklist({ output, onStartOver }: Props) {
   const completedCount = Object.values(checked).filter(Boolean).length;
   const totalCount = allItems.length;
   const percent = totalCount > 0 ? Math.round((completedCount / totalCount) * 100) : 0;
+
+  // Mark session complete in Supabase when all items are checked
+  useEffect(() => {
+    if (percent === 100 && sessionId) {
+      fetch(`/api/onboarding/${sessionId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'complete' }),
+      }).catch(() => {});
+    }
+  }, [percent, sessionId]);
 
   function renderSection(title: string, items: CheckItem[]) {
     if (items.length === 0) return null;

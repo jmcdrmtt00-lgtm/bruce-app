@@ -19,3 +19,25 @@ export interface GeneratedOutput {
   systems: System[];
   computerType: ComputerType;
 }
+
+export interface Incident {
+  id: string;
+  user_id: string;
+  title: string | null;
+  description: string;
+  reported_by: string | null;
+  status: 'open' | 'in_progress' | 'resolved';
+  source: 'issue' | 'onboarding';
+  onboarding_session_id: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface IncidentUpdate {
+  id: string;
+  incident_id: string;
+  user_id: string;
+  type: 'approach' | 'progress' | 'resolved';
+  note: string;
+  created_at: string;
+}

@@ -12,7 +12,7 @@ export const ROLES = {
   sdc:             { label: 'SDC',                         computer: 'desktop' as ComputerType,        systems: ['ad','m365','pcc','ukg','ringcentral'] as System[] },
   home_health:     { label: 'Home Healthcare',             computer: 'desktop+laptop' as ComputerType, systems: ['ad','m365','pcc','ukg','ringcentral'] as System[] },
   maintenance:     { label: 'Maintenance',                 computer: 'desktop' as ComputerType,        systems: ['ad','m365','ringcentral'] as System[] },
-  kitchen:         { label: 'Kitchen / Food Services',     computer: 'desktop' as ComputerType,        systems: ['ad','m365','ringcentral'] as System[] },
+  kitchen:         { label: 'Kitchen / Food Services',     computer: 'none' as ComputerType,           systems: [] as System[] },
   concierge:       { label: 'Concierge',                   computer: 'desktop' as ComputerType,        systems: ['ad','m365','pcc','ringcentral'] as System[] },
   it:              { label: 'IT',                          computer: 'desktop' as ComputerType,        systems: ['ad','m365','pcc','ukg','ringcentral','splashtop'] as System[] },
   clinical_floor:  { label: 'CNA / Floor Clinical',        computer: 'none' as ComputerType,           systems: ['ukg'] as System[] },

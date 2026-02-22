@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import toast from 'react-hot-toast';
-import { createClient } from '@/libs/supabase';
+import { supabase } from '@/libs/supabase';
 
 export default function SignupPage() {
   const router = useRouter();
@@ -18,7 +18,6 @@ export default function SignupPage() {
     if (password !== confirm) { toast.error('Passwords do not match'); return; }
     if (password.length < 6) { toast.error('Password must be at least 6 characters'); return; }
     setLoading(true);
-    const supabase = createClient();
     const { error } = await supabase.auth.signUp({ email, password });
     if (error) {
       toast.error(error.message);

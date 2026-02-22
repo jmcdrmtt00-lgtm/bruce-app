@@ -1,6 +1,8 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 from dotenv import load_dotenv
+from services import ai_service
 
 load_dotenv()
 
@@ -15,14 +17,27 @@ app.add_middleware(
 )
 
 
+class AskRequest(BaseModel):
+    prompt: str
+    system: str = ""
+
+
+class SummarizeRequest(BaseModel):
+    description: str
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
 
 
-# AI endpoints will be added here as Bruce's features grow.
-# Example:
-#
-# @app.post("/api/ask")
-# async def ask_ai(request: AskRequest):
-#     return await ai_service.ask(request.prompt)
+@app.post("/api/ask")
+async def ask(request: AskRequest):
+    text = await ai_service.ask(request.prompt, request.system)
+    return {"text": text}
+
+
+@app.post("/api/summarize")
+async def summarize(request: SummarizeRequest):
+    title = await ai_service.summarize_incident(request.description)
+    return {"title": title}

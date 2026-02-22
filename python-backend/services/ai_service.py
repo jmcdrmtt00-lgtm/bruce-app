@@ -13,3 +13,14 @@ async def ask(prompt: str, system: str = "") -> str:
         messages=[{"role": "user", "content": prompt}],
     )
     return message.content[0].text
+
+
+async def summarize_incident(description: str) -> str:
+    """Generate a short title for an IT incident from its description."""
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=30,
+        system="Generate a very short title (5-8 words) for this IT problem. Return only the title, nothing else.",
+        messages=[{"role": "user", "content": description}],
+    )
+    return message.content[0].text.strip()
