@@ -34,6 +34,17 @@ const DEMO_TASKS = [
   { title: 'Set up iPhone for new staff member',                priority: 'low',    status: 'pending', reported_by: null,               screen: null         },
   { title: 'Lori Piracci HR laptop — confirm setup complete',   priority: 'low',    status: 'pending', reported_by: 'Lori Piracci',     screen: null         },
   { title: "Upgrade Emily Matson's ThinkCentre to Win 11",      priority: 'low',    status: 'pending', reported_by: 'Emily Matson',     screen: null         },
+  // Resolved (10)
+  { title: 'Replaced Beth Matson\'s ThinkCentre hard drive',    priority: 'high',   status: 'resolved', reported_by: 'Beth Matson',       screen: null         },
+  { title: 'Set up workstation for Alexys Gonelli',             priority: 'medium', status: 'resolved', reported_by: 'Alexys Gonelli',    screen: null         },
+  { title: 'Fixed VPN connectivity for remote billing staff',   priority: 'high',   status: 'resolved', reported_by: null,                screen: null         },
+  { title: 'Onboarded new Oak Wing charge nurse',               priority: null,     status: 'resolved', reported_by: null,                screen: 'Onboarding' },
+  { title: "Replaced Catherine Pichardo's keyboard and mouse",  priority: 'low',    status: 'resolved', reported_by: 'Catherine Pichardo', screen: null        },
+  { title: 'Installed HP LaserJet driver on Nursing Station PC', priority: 'medium', status: 'resolved', reported_by: null,               screen: null         },
+  { title: 'Recovered deleted files for Lori Piracci HR',       priority: 'high',   status: 'resolved', reported_by: 'Lori Piracci',      screen: null         },
+  { title: 'Set up Splashtop for Danielle Mattei home access',  priority: 'medium', status: 'resolved', reported_by: 'Danielle Mattei',  screen: null         },
+  { title: 'Cleared virus/malware from Activities laptop',      priority: 'high',   status: 'resolved', reported_by: null,                screen: null         },
+  { title: 'Upgraded Wachusett Wing switch firmware',           priority: 'medium', status: 'resolved', reported_by: null,                screen: null         },
 ];
 
 export async function POST() {
