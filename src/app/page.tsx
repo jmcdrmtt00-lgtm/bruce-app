@@ -12,6 +12,10 @@ const PRIORITY_BADGE: Record<string, string> = {
   low:    'badge-info',
 };
 
+const PRIORITY_LABEL: Record<string, string> = {
+  high: 'H', medium: 'M', low: 'L',
+};
+
 function TaskTable({
   tasks,
   onRowClick,
@@ -53,7 +57,7 @@ function TaskTable({
               <td>
                 {task.priority && (
                   <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
-                    {task.priority}
+                    {PRIORITY_LABEL[task.priority] ?? task.priority}
                   </span>
                 )}
               </td>
@@ -100,6 +104,14 @@ export default function DashboardPage() {
   // Voice for task #
   const [listeningNum, setListeningNum] = useState(false);
   const numRecRef = useRef<unknown>(null);
+
+  // Find Similar state
+  const [simNum, setSimNum] = useState('');
+  const [simName, setSimName] = useState('');
+  const [simElab, setSimElab] = useState('');
+  const [simLoading, setSimLoading] = useState(false);
+  const [simResults, setSimResults] = useState<{ id: string; task_number: number; title: string; similarity: string }[]>([]);
+  const [simMessage, setSimMessage] = useState('');
 
   const loadTasks = useCallback(() => {
     fetch('/api/issues')
@@ -247,6 +259,29 @@ export default function DashboardPage() {
     }
   }
 
+  async function handleFindSimilar() {
+    if (!simName.trim()) { toast.error('Enter a task name to search.'); return; }
+    setSimLoading(true);
+    setSimResults([]);
+    setSimMessage('');
+    try {
+      const res = await fetch('/api/similar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskName: simName.trim(), elaboration: simElab.trim() }),
+      });
+      const data = await res.json();
+      if (!res.ok) { setSimMessage(data.error || 'Search failed.'); }
+      else {
+        setSimResults(data.results ?? []);
+        if ((data.results ?? []).length === 0) setSimMessage(data.message || 'No similar tasks found.');
+      }
+    } catch {
+      setSimMessage('Search failed.');
+    }
+    setSimLoading(false);
+  }
+
   async function handleSeedData() {
     setSeeding(true);
     try {
@@ -270,7 +305,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-base-200 p-4">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_300px] gap-4 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_360px] gap-4 items-start">
 
         {/* In Progress */}
         <div>
@@ -507,6 +542,73 @@ export default function DashboardPage() {
 
             </div>
           </div>
+          {/* Find Similar Tasks */}
+          <div className="card bg-base-100 shadow">
+            <div className="card-body p-4 space-y-3">
+              <p className="font-semibold text-sm">Find similar tasks in the past</p>
+
+              <div className="flex gap-1">
+                <input
+                  type="text"
+                  className="input input-bordered input-sm w-16"
+                  placeholder="#"
+                  value={simNum}
+                  onChange={e => {
+                    setSimNum(e.target.value);
+                    const num = parseInt(e.target.value);
+                    if (!isNaN(num)) {
+                      const found = allActive.find(t => t.task_number === num);
+                      if (found) setSimName(found.title || found.description);
+                    }
+                  }}
+                />
+                <input
+                  type="text"
+                  className="input input-bordered input-sm flex-1"
+                  placeholder="Task name"
+                  value={simName}
+                  onChange={e => setSimName(e.target.value)}
+                />
+              </div>
+
+              <textarea
+                className="textarea textarea-bordered textarea-sm w-full text-sm"
+                rows={2}
+                placeholder="Elaborate on what kind of similarity you're looking for..."
+                value={simElab}
+                onChange={e => setSimElab(e.target.value)}
+              />
+
+              <button
+                className="btn btn-outline btn-sm w-full"
+                onClick={handleFindSimilar}
+                disabled={simLoading}
+              >
+                {simLoading ? <span className="loading loading-spinner loading-sm" /> : 'Find'}
+              </button>
+
+              {simMessage && (
+                <p className="text-xs text-base-content/50 text-center">{simMessage}</p>
+              )}
+
+              {simResults.length > 0 && (
+                <div className="space-y-2">
+                  {simResults.map(r => (
+                    <div key={r.id} className="bg-base-200 rounded-lg p-2">
+                      <Link
+                        href={`/issues/${r.id}`}
+                        className="text-sm font-medium hover:text-primary"
+                      >
+                        #{r.task_number} {r.title}
+                      </Link>
+                      <p className="text-xs text-base-content/60 mt-0.5">{r.similarity}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </div>
+
         </div>
 
       </div>
