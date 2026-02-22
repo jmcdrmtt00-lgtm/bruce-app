@@ -444,9 +444,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Note (update mode only) */}
-              {mode === 'update' && (
-                <div className="form-control">
+              {/* Note */}
+              <div className="form-control">
                   <label className="label py-0">
                     <span className="label-text text-xs font-semibold">Note</span>
                   </label>
@@ -474,8 +473,7 @@ export default function DashboardPage() {
                       {listeningNote ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
                     </button>
                   </div>
-                </div>
-              )}
+              </div>
 
               {/* View details link */}
               {mode === 'update' && selectedTask && (
