@@ -33,12 +33,12 @@ function TaskTable({
   }
   return (
     <div className="overflow-x-auto rounded-box shadow">
-      <table className="table table-sm bg-base-100 w-full">
+      <table className="table table-sm table-fixed bg-base-100 w-full">
         <thead>
           <tr>
             <th className="w-8">#</th>
             <th>Task Name</th>
-            <th className="w-20 text-center">{variant === 'inProgress' ? 'Priority' : 'Source'}</th>
+            <th className="w-24 text-center">{variant === 'inProgress' ? 'Priority' : 'Source'}</th>
             <th className="w-28 text-center">Screen</th>
           </tr>
         </thead>
@@ -304,7 +304,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-base-200 px-8 py-4">
-      <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-6 items-start">
 
         {/* Tables column */}
         <div className="space-y-6">
