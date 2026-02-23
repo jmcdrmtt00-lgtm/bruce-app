@@ -1,5 +1,6 @@
 import os
 import anthropic
+from services import prompt_loader
 
 client = anthropic.Anthropic(api_key=os.environ.get("ANTHROPIC_API_KEY"))
 
@@ -9,7 +10,7 @@ async def ask(prompt: str, system: str = "") -> str:
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1024,
-        system=system or "You are a helpful IT assistant for Oriol Healthcare.",
+        system=system or prompt_loader.get_ask_prompt(),
         messages=[{"role": "user", "content": prompt}],
     )
     return message.content[0].text
@@ -75,17 +76,7 @@ async def generate_sql(question: str, target: str) -> str:
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=512,
-        system=f"""You are a SQL generator for an IT management app.
-Given a natural language question, generate a single PostgreSQL SELECT query.
-
-Rules:
-- Use ONLY SELECT. Never INSERT, UPDATE, DELETE, DROP, or any DDL.
-- Always include WHERE user_id = '{{user_id}}' (literal placeholder text).
-- Add LIMIT 50 unless the user asks for more.
-- Return ONLY the SQL query — no explanation, no markdown, no code fences.
-
-Schema:
-{schema}""",
+        system=f"{prompt_loader.get_sql_prompt()}\n\nSchema:\n{schema}",
         messages=[{"role": "user", "content": question}],
     )
     return message.content[0].text.strip()
@@ -110,19 +101,7 @@ async def check_suggestions(completed_tasks: list[dict]) -> list[dict]:
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=1024,
-        system=f"""You are an IT assistant that reviews completed task notes for follow-up suggestions.
-Today is {today}.
-
-Look for notes that suggest a future action with a specific time frame (e.g. "consider doing X in 3 months",
-"replace Y next year", "follow up in 6 weeks").
-
-For each suggestion where that time has now passed or is within 2 weeks from today, return it.
-
-Respond with a JSON array only — no other text:
-[{{"title": "Short task title", "reason": "Brief explanation referencing the original task"}}]
-
-If no suggestions are ready, return [].
-""",
+        system=f"{prompt_loader.get_suggestions_prompt()}\nToday is {today}.",
         messages=[{"role": "user", "content": task_list}],
     )
 
