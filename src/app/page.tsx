@@ -121,6 +121,9 @@ export default function DashboardPage() {
   const [listeningDate, setListeningDate] = useState(false);
   const dateRecRef = useRef<unknown>(null);
 
+  // Tracks a function that clears the last voice-populated field (for "Hey Buddy, clear that")
+  const clearLastVoiceFieldRef = useRef<() => void>(() => {});
+
   const loadTasks = useCallback(() => {
     fetch('/api/issues')
       .then(r => r.json())
@@ -299,6 +302,31 @@ export default function DashboardPage() {
     }
   }
 
+  function handleVoiceCommand(command: string) {
+    const cmd = command.toLowerCase().trim().replace(/^[,.]?\s*/, '');
+    if (cmd.includes('clear') || cmd.includes('remove') || cmd.includes('erase') || cmd.includes('delete')) {
+      clearLastVoiceFieldRef.current();
+      toast('Field cleared');
+    } else if (cmd.includes('save')) {
+      handleSave();
+    } else {
+      toast(`Hey Buddy didn't understand: "${command}"`);
+    }
+  }
+
+  function wrapVoiceResult(onResult: (text: string) => void, clearFn: () => void) {
+    return (text: string) => {
+      const lower = text.toLowerCase().trim();
+      if (lower.startsWith('hey buddy')) {
+        const command = text.slice('hey buddy'.length).trim();
+        handleVoiceCommand(command);
+      } else {
+        onResult(text);
+        clearLastVoiceFieldRef.current = clearFn;
+      }
+    };
+  }
+
   async function handleSeedData() {
     setSeeding(true);
     try {
@@ -387,7 +415,10 @@ export default function DashboardPage() {
                     onClick={() => listeningNum
                       ? stopVoice(numRecRef as React.MutableRefObject<unknown>, setListeningNum)
                       : startVoice(
-                          text => handleTaskNumberInput(parseSpokenNumber(text)),
+                          wrapVoiceResult(
+                            text => handleTaskNumberInput(parseSpokenNumber(text)),
+                            () => handleTaskNumberInput('')
+                          ),
                           setListeningNum,
                           numRecRef as React.MutableRefObject<unknown>,
                           false
@@ -419,7 +450,10 @@ export default function DashboardPage() {
                     onClick={() => listeningName
                       ? stopVoice(nameRecRef as React.MutableRefObject<unknown>, setListeningName)
                       : startVoice(
-                          text => setTaskName(prev => prev ? `${prev} ${text}` : text),
+                          wrapVoiceResult(
+                            text => setTaskName(prev => prev ? `${prev} ${text}` : text),
+                            () => setTaskName('')
+                          ),
                           setListeningName,
                           nameRecRef as React.MutableRefObject<unknown>,
                           true
@@ -469,7 +503,10 @@ export default function DashboardPage() {
                     onClick={() => listeningCustomer
                       ? stopVoice(customerRecRef as React.MutableRefObject<unknown>, setListeningCustomer)
                       : startVoice(
-                          text => setCustomer(text),
+                          wrapVoiceResult(
+                            text => setCustomer(text),
+                            () => setCustomer('')
+                          ),
                           setListeningCustomer,
                           customerRecRef as React.MutableRefObject<unknown>,
                           false
@@ -545,7 +582,10 @@ export default function DashboardPage() {
                     onClick={() => listeningDate
                       ? stopVoice(dateRecRef as React.MutableRefObject<unknown>, setListeningDate)
                       : startVoice(
-                          text => { const d = parseSpokenDate(text); if (d) setDateDue(d); },
+                          wrapVoiceResult(
+                            text => { const d = parseSpokenDate(text); if (d) setDateDue(d); },
+                            () => setDateDue('')
+                          ),
                           setListeningDate,
                           dateRecRef as React.MutableRefObject<unknown>,
                           false
@@ -576,7 +616,10 @@ export default function DashboardPage() {
                       onClick={() => listeningNote
                         ? stopVoice(noteRecRef as React.MutableRefObject<unknown>, setListeningNote)
                         : startVoice(
-                            text => setNote(prev => prev ? `${prev} ${text}` : text),
+                            wrapVoiceResult(
+                              text => setNote(prev => prev ? `${prev} ${text}` : text),
+                              () => setNote('')
+                            ),
                             setListeningNote,
                             noteRecRef as React.MutableRefObject<unknown>,
                             true
