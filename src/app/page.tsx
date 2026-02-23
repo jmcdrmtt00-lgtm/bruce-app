@@ -113,6 +113,14 @@ export default function DashboardPage() {
   const [listeningNum, setListeningNum] = useState(false);
   const numRecRef = useRef<unknown>(null);
 
+  // Voice for other fields
+  const [listeningName, setListeningName] = useState(false);
+  const nameRecRef = useRef<unknown>(null);
+  const [listeningCustomer, setListeningCustomer] = useState(false);
+  const customerRecRef = useRef<unknown>(null);
+  const [listeningDate, setListeningDate] = useState(false);
+  const dateRecRef = useRef<unknown>(null);
+
   const loadTasks = useCallback(() => {
     fetch('/api/issues')
       .then(r => r.json())
@@ -182,6 +190,16 @@ export default function DashboardPage() {
       const found = allActive.find(t => t.task_number === num);
       if (found) loadTask(found);
     }
+  }
+
+  function parseSpokenDate(text: string): string {
+    const d = new Date(text);
+    if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
+    // Try prepending current year for "February 28"-style input
+    const withYear = new Date(`${text} ${new Date().getFullYear()}`);
+    if (!isNaN(withYear.getTime())) return withYear.toISOString().split('T')[0];
+    toast.error(`Couldn't parse "${text}" as a date`);
+    return '';
   }
 
   function parseSpokenNumber(text: string): string {
@@ -388,12 +406,29 @@ export default function DashboardPage() {
                     Task Name{mode === 'add' ? ' *' : ''}
                   </span>
                 </label>
-                <input
-                  className="input input-bordered input-sm w-full"
-                  value={taskName}
-                  onChange={e => setTaskName(e.target.value)}
-                  placeholder={mode === 'add' ? 'Describe the task...' : ''}
-                />
+                <div className="flex gap-1">
+                  <input
+                    className="input input-bordered input-sm flex-1"
+                    value={taskName}
+                    onChange={e => setTaskName(e.target.value)}
+                    placeholder={mode === 'add' ? 'Describe the task...' : ''}
+                  />
+                  <button
+                    className={`btn btn-sm ${listeningName ? 'btn-error' : 'btn-outline'}`}
+                    title="Speak task name"
+                    onClick={() => listeningName
+                      ? stopVoice(nameRecRef as React.MutableRefObject<unknown>, setListeningName)
+                      : startVoice(
+                          text => setTaskName(prev => prev ? `${prev} ${text}` : text),
+                          setListeningName,
+                          nameRecRef as React.MutableRefObject<unknown>,
+                          true
+                        )
+                    }
+                  >
+                    {listeningName ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                  </button>
+                </div>
               </div>
 
               {/* Priority */}
@@ -421,12 +456,29 @@ export default function DashboardPage() {
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Customer</span>
                 </label>
-                <input
-                  className="input input-bordered input-sm w-full"
-                  value={customer}
-                  onChange={e => setCustomer(e.target.value)}
-                  placeholder="Who is this for?"
-                />
+                <div className="flex gap-1">
+                  <input
+                    className="input input-bordered input-sm flex-1"
+                    value={customer}
+                    onChange={e => setCustomer(e.target.value)}
+                    placeholder="Who is this for?"
+                  />
+                  <button
+                    className={`btn btn-sm ${listeningCustomer ? 'btn-error' : 'btn-outline'}`}
+                    title="Speak customer name"
+                    onClick={() => listeningCustomer
+                      ? stopVoice(customerRecRef as React.MutableRefObject<unknown>, setListeningCustomer)
+                      : startVoice(
+                          text => setCustomer(text),
+                          setListeningCustomer,
+                          customerRecRef as React.MutableRefObject<unknown>,
+                          false
+                        )
+                    }
+                  >
+                    {listeningCustomer ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                  </button>
+                </div>
               </div>
 
               {/* Screen (add mode only) */}
@@ -480,12 +532,29 @@ export default function DashboardPage() {
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Date Due</span>
                 </label>
-                <input
-                  type="date"
-                  className="input input-bordered input-sm w-full"
-                  value={dateDue}
-                  onChange={e => setDateDue(e.target.value)}
-                />
+                <div className="flex gap-1">
+                  <input
+                    type="date"
+                    className="input input-bordered input-sm flex-1"
+                    value={dateDue}
+                    onChange={e => setDateDue(e.target.value)}
+                  />
+                  <button
+                    className={`btn btn-sm ${listeningDate ? 'btn-error' : 'btn-outline'}`}
+                    title="Speak due date"
+                    onClick={() => listeningDate
+                      ? stopVoice(dateRecRef as React.MutableRefObject<unknown>, setListeningDate)
+                      : startVoice(
+                          text => { const d = parseSpokenDate(text); if (d) setDateDue(d); },
+                          setListeningDate,
+                          dateRecRef as React.MutableRefObject<unknown>,
+                          false
+                        )
+                    }
+                  >
+                    {listeningDate ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                  </button>
+                </div>
               </div>
 
               {/* Note */}
