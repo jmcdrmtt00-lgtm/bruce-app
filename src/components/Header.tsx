@@ -9,10 +9,9 @@ import { supabase } from '@/libs/supabase';
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const NAV = [
-  { href: '/',            label: 'Dashboard'   },
-  { href: '/onboarding',  label: 'Onboarding'  },
-  { href: '/issues',      label: 'Tasks'       },
-  { href: '/history',     label: 'History'     },
+  { href: '/',                 label: 'Dashboard'            },
+  { href: '/query-tasks',      label: 'Query Completed Tasks' },
+  { href: '/query-inventory',  label: 'Query Inventory'       },
 ];
 
 export default function Header() {
