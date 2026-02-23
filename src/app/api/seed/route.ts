@@ -11,48 +11,25 @@ async function getClient() {
   );
 }
 
-const DEMO_TASKS = [
-  // In Progress (10) — 3 with priority, 7 without
-  { title: 'Replace Oak Wing Nurses Station Win 7 machines',    priority: 'high',   status: 'in_progress', reported_by: null,                 screen: null         },
-  { title: 'Printer not printing for Catherine Pichardo',       priority: 'high',   status: 'in_progress', reported_by: 'Catherine Pichardo', screen: null         },
-  { title: 'Fix broken HP LaserJet in Business Office',         priority: 'medium', status: 'in_progress', reported_by: null,                 screen: null         },
-  { title: 'Upgrade Oakdale Kitchen PC from Win 7',             priority: null,     status: 'in_progress', reported_by: null,                 screen: null         },
-  { title: "Set up Splashtop remote access for Tara D'Andrea",  priority: null,     status: 'in_progress', reported_by: "Tara D'Andrea",      screen: null         },
-  { title: "Replace Bob Oriol's Intel NUC (warranty expired)",  priority: null,     status: 'in_progress', reported_by: 'Bob Oriol',          screen: null         },
-  { title: 'Onboard new Activities coordinator',                priority: null,     status: 'in_progress', reported_by: null,                 screen: 'Onboarding' },
-  { title: "Replace Jay Kublbeck's Oakdale Maintenance PC",     priority: null,     status: 'in_progress', reported_by: 'Jay Kublbeck',       screen: null         },
-  { title: 'Set up second ThinkCentre for Danielle Mattei',     priority: null,     status: 'in_progress', reported_by: 'Danielle Mattei',    screen: null         },
-  { title: 'Update asset tags after recent equipment moves',    priority: null,     status: 'in_progress', reported_by: null,                 screen: null         },
-  // Queue (10) — 3 with priority, 7 without
-  { title: "Replace Becky Gardner's Social Services PC",        priority: 'high',   status: 'pending', reported_by: 'Becky Gardner',    screen: null         },
-  { title: 'Review network switch in Oakdale',                  priority: 'high',   status: 'pending', reported_by: null,               screen: null         },
-  { title: 'Audit all Chromebooks for expired warranties',      priority: 'medium', status: 'pending', reported_by: null,               screen: null         },
-  { title: "Upgrade Ildi's Activities Tower (Win 7, warranty expired 2015)", priority: null, status: 'pending', reported_by: null,       screen: null         },
-  { title: "Set up new laptop for Tara D'Andrea (home use)",    priority: null,     status: 'pending', reported_by: "Tara D'Andrea",    screen: null         },
-  { title: 'Onboard new nurse in Wachusett wing',               priority: null,     status: 'pending', reported_by: null,               screen: 'Onboarding' },
-  { title: "Replace Nathan Oriol's ThinkCentre (no warranty on file)", priority: null, status: 'pending', reported_by: 'Nathan Oriol', screen: null         },
-  { title: 'Set up iPhone for new staff member',                priority: null,     status: 'pending', reported_by: null,               screen: null         },
-  { title: 'Lori Piracci HR laptop — confirm setup complete',   priority: null,     status: 'pending', reported_by: 'Lori Piracci',     screen: null         },
-  { title: "Upgrade Emily Matson's ThinkCentre to Win 11",      priority: null,     status: 'pending', reported_by: 'Emily Matson',     screen: null         },
-  // Resolved (10)
-  { title: 'Replaced Beth Matson\'s ThinkCentre hard drive',    priority: 'high',   status: 'resolved', reported_by: 'Beth Matson',       screen: null         },
-  { title: 'Set up workstation for Alexys Gonelli',             priority: 'medium', status: 'resolved', reported_by: 'Alexys Gonelli',    screen: null         },
-  { title: 'Fixed VPN connectivity for remote billing staff',   priority: 'high',   status: 'resolved', reported_by: null,                screen: null         },
-  { title: 'Onboarded new Oak Wing charge nurse',               priority: null,     status: 'resolved', reported_by: null,                screen: 'Onboarding' },
-  { title: "Replaced Catherine Pichardo's keyboard and mouse",  priority: 'low',    status: 'resolved', reported_by: 'Catherine Pichardo', screen: null        },
-  { title: 'Installed HP LaserJet driver on Nursing Station PC', priority: 'medium', status: 'resolved', reported_by: null,               screen: null         },
-  { title: 'Recovered deleted files for Lori Piracci HR',       priority: 'high',   status: 'resolved', reported_by: 'Lori Piracci',      screen: null         },
-  { title: 'Set up Splashtop for Danielle Mattei home access',  priority: 'medium', status: 'resolved', reported_by: 'Danielle Mattei',  screen: null         },
-  { title: 'Cleared virus/malware from Activities laptop',      priority: 'high',   status: 'resolved', reported_by: null,                screen: null         },
-  { title: 'Upgraded Wachusett Wing switch firmware',           priority: 'medium', status: 'resolved', reported_by: null,                screen: null         },
-];
+function daysFromNow(n: number) {
+  const d = new Date();
+  d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+
+function monthsAgo(n: number) {
+  const d = new Date();
+  d.setMonth(d.getMonth() - n);
+  return d.toISOString().split('T')[0];
+}
+
+const today = daysFromNow(0);
 
 export async function POST() {
   const supabase = await getClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Only seed if no tasks exist yet
   const { count } = await supabase
     .from('incidents')
     .select('id', { count: 'exact', head: true })
@@ -65,19 +42,103 @@ export async function POST() {
     );
   }
 
-  const rows = DEMO_TASKS.map(t => ({
-    user_id:     user.id,
-    title:       t.title,
+  // ── In Progress: 3H, 2L, 5 blank ─────────────────────────────────────────
+  const inProgressTasks = [
+    // H (3) — with date_due; one is an onboarding task due today
+    { title: 'Onboard new Activities coordinator',               priority: 'high', date_due: today,               screen: 'Onboarding', reported_by: null },
+    { title: 'Replace Oak Wing Nurses Station Win 7 machines',   priority: 'high', date_due: daysFromNow(3),      screen: null,         reported_by: null },
+    { title: 'Printer not printing for Catherine Pichardo',      priority: 'high', date_due: daysFromNow(1),      screen: null,         reported_by: 'Catherine Pichardo' },
+    // L (2)
+    { title: 'Update asset tags after recent equipment moves',   priority: 'low',  date_due: null,                screen: null,         reported_by: null },
+    { title: 'Upgrade Oakdale Kitchen PC from Win 7',            priority: 'low',  date_due: null,                screen: null,         reported_by: null },
+    // Blank (5)
+    { title: "Set up Splashtop remote access for Tara D'Andrea", priority: null,   date_due: null,                screen: null,         reported_by: "Tara D'Andrea" },
+    { title: "Replace Bob Oriol's Intel NUC (warranty expired)", priority: null,   date_due: null,                screen: null,         reported_by: 'Bob Oriol' },
+    { title: "Replace Jay Kublbeck's Oakdale Maintenance PC",    priority: null,   date_due: null,                screen: null,         reported_by: 'Jay Kublbeck' },
+    { title: 'Set up second ThinkCentre for Danielle Mattei',    priority: null,   date_due: null,                screen: null,         reported_by: 'Danielle Mattei' },
+    { title: 'Fix broken HP LaserJet in Business Office',        priority: null,   date_due: null,                screen: null,         reported_by: null },
+  ];
+
+  // ── Queue: 3 tasks, one auto_suggested ───────────────────────────────────
+  const queueTasks = [
+    { title: "Replace Becky Gardner's Social Services PC",   priority: null, screen: null,         auto_suggested: false, reported_by: 'Becky Gardner' },
+    { title: 'Onboard new nurse in Wachusett wing',          priority: null, screen: 'Onboarding', auto_suggested: false, reported_by: null },
+    { title: 'Review and replace Oakdale network switch',    priority: null, screen: null,         auto_suggested: true,  reported_by: null },
+  ];
+
+  // ── Resolved: 10 tasks (no medium priority) ───────────────────────────────
+  const resolvedTasks = [
+    { title: "Replaced Beth Matson's ThinkCentre hard drive",      priority: 'high', reported_by: 'Beth Matson',       date_completed: monthsAgo(1),  withNote: null },
+    { title: 'Set up workstation for Alexys Gonelli',               priority: null,   reported_by: 'Alexys Gonelli',    date_completed: monthsAgo(1),  withNote: null },
+    { title: 'Fixed VPN connectivity for remote billing staff',     priority: 'high', reported_by: null,                date_completed: monthsAgo(2),  withNote: null },
+    { title: 'Onboarded new Oak Wing charge nurse',                  priority: null,   reported_by: null,                date_completed: monthsAgo(2),  withNote: null },
+    { title: "Replaced Catherine Pichardo's keyboard and mouse",    priority: 'low',  reported_by: 'Catherine Pichardo', date_completed: monthsAgo(1), withNote: null },
+    { title: 'Installed HP LaserJet driver on Nursing Station PC',  priority: null,   reported_by: null,                date_completed: monthsAgo(4),  withNote: null },
+    { title: 'Recovered deleted files for Lori Piracci HR',         priority: 'high', reported_by: 'Lori Piracci',      date_completed: monthsAgo(4),  withNote: null },
+    { title: 'Set up Splashtop for Danielle Mattei home access',    priority: null,   reported_by: 'Danielle Mattei',   date_completed: monthsAgo(5),  withNote: null },
+    { title: 'Cleared virus/malware from Activities laptop',        priority: 'high', reported_by: null,                date_completed: monthsAgo(6),  withNote: null },
+    // 3 months ago — note triggers the auto_suggested queue task above
+    { title: 'Replaced Oakdale network switch (east wing)',         priority: null,   reported_by: null,                date_completed: monthsAgo(3),
+      withNote: 'Switch is running fine now. The west wing switch is getting old too — consider replacing it in about 3 months.' },
+  ];
+
+  // Insert in_progress tasks
+  const inProgressRows = inProgressTasks.map(t => ({
+    user_id:    user.id,
+    title:      t.title,
     description: t.title,
     reported_by: t.reported_by,
-    priority:    t.priority,
-    screen:      t.screen,
-    status:      t.status,
-    source:      'issue',
+    priority:   t.priority,
+    screen:     t.screen,
+    status:     'in_progress',
+    source:     'issue',
+    date_due:   t.date_due,
   }));
 
-  const { error } = await supabase.from('incidents').insert(rows);
+  // Insert queue tasks
+  const queueRows = queueTasks.map(t => ({
+    user_id:       user.id,
+    title:         t.title,
+    description:   t.title,
+    reported_by:   t.reported_by,
+    priority:      t.priority,
+    screen:        t.screen,
+    status:        'pending',
+    source:        'issue',
+    auto_suggested: t.auto_suggested,
+  }));
+
+  // Insert resolved tasks
+  const resolvedRows = resolvedTasks.map(t => ({
+    user_id:        user.id,
+    title:          t.title,
+    description:    t.title,
+    reported_by:    t.reported_by,
+    priority:       t.priority,
+    screen:         null,
+    status:         'resolved',
+    source:         'issue',
+    date_completed: t.date_completed,
+  }));
+
+  const allRows = [...inProgressRows, ...queueRows, ...resolvedRows];
+  const { data: inserted, error } = await supabase
+    .from('incidents')
+    .insert(allRows)
+    .select('id, title');
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
-  return NextResponse.json({ success: true, count: rows.length });
+  // Add the suggestion note to the 3-month-old resolved task
+  const switchTask = inserted?.find(t => t.title === 'Replaced Oakdale network switch (east wing)');
+  if (switchTask) {
+    await supabase.from('incident_updates').insert({
+      incident_id: switchTask.id,
+      user_id:     user.id,
+      type:        'resolved',
+      note:        resolvedTasks.find(t => t.withNote)!.withNote,
+    });
+  }
+
+  return NextResponse.json({ success: true, count: allRows.length });
 }

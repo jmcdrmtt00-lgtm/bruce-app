@@ -29,9 +29,12 @@ export interface Incident {
   status: 'open' | 'in_progress' | 'resolved' | 'pending';
   source: 'issue' | 'onboarding';
   onboarding_session_id: string | null;
-  priority: 'high' | 'medium' | 'low' | null;
+  priority: 'high' | 'low' | null;
   screen: string | null;
   task_number: number;
+  date_due: string | null;
+  date_completed: string | null;
+  auto_suggested: boolean;
   created_at: string;
   updated_at: string;
 }

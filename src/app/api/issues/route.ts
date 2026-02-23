@@ -31,7 +31,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { title: providedTitle, description, reported_by, priority, screen, status } = await request.json();
+  const { title: providedTitle, description, reported_by, priority, screen, status, date_due } = await request.json();
 
   let title: string | null = providedTitle ?? null;
   const desc: string = description || providedTitle || '';
@@ -64,6 +64,7 @@ export async function POST(request: NextRequest) {
       priority: priority || null,
       screen: screen || null,
       status: status || 'pending',
+      date_due: date_due || null,
     })
     .select('*')
     .single();

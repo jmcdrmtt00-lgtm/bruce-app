@@ -55,6 +55,8 @@ export async function PATCH(
   if (body.screen !== undefined)      updates.screen      = body.screen      || null;
   if (body.title !== undefined)       updates.title       = body.title       || null;
   if (body.reported_by !== undefined) updates.reported_by = body.reported_by || null;
+  if (body.date_due !== undefined)    updates.date_due    = body.date_due    || null;
+  if (body.status === 'resolved')     updates.date_completed = new Date().toISOString().split('T')[0];
 
   const { error } = await supabase
     .from('incidents')

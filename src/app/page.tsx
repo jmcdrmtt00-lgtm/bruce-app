@@ -7,21 +7,22 @@ import toast from 'react-hot-toast';
 import { Incident } from '@/types';
 
 const PRIORITY_BADGE: Record<string, string> = {
-  high:   'badge-error',
-  medium: 'badge-warning',
-  low:    'badge-info',
+  high: 'badge-error',
+  low:  'badge-success',
 };
 
 const PRIORITY_LABEL: Record<string, string> = {
-  high: 'H', medium: 'M', low: 'L',
+  high: 'H', low: 'L',
 };
 
 function TaskTable({
   tasks,
   onRowClick,
+  showSource = false,
 }: {
   tasks: Incident[];
   onRowClick: (task: Incident) => void;
+  showSource?: boolean;
 }) {
   if (tasks.length === 0) {
     return (
@@ -37,7 +38,7 @@ function TaskTable({
           <tr>
             <th className="w-6">#</th>
             <th>Name</th>
-            <th className="w-10"></th>
+            <th className="w-16 text-right">{showSource ? 'Source' : ''}</th>
           </tr>
         </thead>
         <tbody>
@@ -54,19 +55,27 @@ function TaskTable({
                 </p>
               </td>
               <td className="text-right">
-                {task.priority && (
-                  <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
-                    {PRIORITY_LABEL[task.priority]}
-                  </span>
-                )}
-                {task.screen && !task.priority && (
-                  <Link
-                    href="/onboarding"
-                    className="badge badge-outline badge-sm hover:badge-primary transition-colors"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    Onb
-                  </Link>
+                {showSource ? (
+                  task.auto_suggested && (
+                    <span className="badge badge-outline badge-sm text-xs">IT Buddy</span>
+                  )
+                ) : (
+                  <>
+                    {task.priority && (
+                      <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
+                        {PRIORITY_LABEL[task.priority]}
+                      </span>
+                    )}
+                    {task.screen && !task.priority && (
+                      <Link
+                        href="/onboarding"
+                        className="badge badge-outline badge-sm hover:badge-primary transition-colors"
+                        onClick={e => e.stopPropagation()}
+                      >
+                        Onb
+                      </Link>
+                    )}
+                  </>
                 )}
               </td>
             </tr>
@@ -90,6 +99,7 @@ export default function DashboardPage() {
   const [customer, setCustomer] = useState('');
   const [screen, setScreen] = useState('');
   const [status, setStatus] = useState<'pending' | 'in_progress' | 'resolved'>('pending');
+  const [dateDue, setDateDue] = useState('');
   const [note, setNote] = useState('');
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
   const [saving, setSaving] = useState(false);
@@ -119,10 +129,14 @@ export default function DashboardPage() {
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
 
-  const inProgress = useMemo(
-    () => tasks.filter(t => t.status === 'in_progress').sort((a, b) => a.task_number - b.task_number),
-    [tasks]
-  );
+  const inProgress = useMemo(() => {
+    const priorityOrder = (t: Incident) => t.priority === 'high' ? 0 : t.priority === null ? 1 : 2;
+    const byDue = (t: Incident) => t.date_due ? new Date(t.date_due).getTime() : Infinity;
+    return tasks
+      .filter(t => t.status === 'in_progress')
+      .sort((a, b) => priorityOrder(a) - priorityOrder(b) || byDue(a) - byDue(b));
+  }, [tasks]);
+
   const queue = useMemo(
     () => tasks.filter(t => t.status === 'pending' || t.status === 'open').sort((a, b) => a.task_number - b.task_number),
     [tasks]
@@ -136,6 +150,7 @@ export default function DashboardPage() {
     setCustomer('');
     setScreen('');
     setStatus('pending');
+    setDateDue('');
     setNote('');
     setSelectedTask(null);
   }
@@ -148,6 +163,7 @@ export default function DashboardPage() {
     setCustomer(task.reported_by || '');
     const s = task.status === 'open' ? 'pending' : task.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
+    setDateDue(task.date_due || '');
     setNote('');
     setSelectedTask(task);
   }
@@ -214,6 +230,7 @@ export default function DashboardPage() {
             priority:    priority || null,
             screen:      screen   || null,
             status,
+            date_due:    dateDue  || null,
           }),
         });
         if (!res.ok) throw new Error();
@@ -236,6 +253,7 @@ export default function DashboardPage() {
             reported_by: customer.trim() || null,
             priority:    priority || null,
             status,
+            date_due:    dateDue  || null,
           }),
         });
         if (note.trim()) {
@@ -323,7 +341,7 @@ export default function DashboardPage() {
               <div className="stat-value text-2xl text-info">{queue.length}</div>
             </div>
           </div>
-          <TaskTable tasks={queue} onRowClick={loadTask} />
+          <TaskTable tasks={queue} onRowClick={loadTask} showSource />
           {tasks.length === 0 && (
             <button
               className="btn btn-outline btn-sm w-full mt-2"
@@ -405,10 +423,12 @@ export default function DashboardPage() {
                   <span className="label-text text-xs font-semibold">Priority</span>
                 </label>
                 <div className="flex gap-1">
-                  {(['high', 'medium', 'low'] as const).map(p => (
+                  {(['high', 'low'] as const).map(p => (
                     <button
                       key={p}
-                      className={`btn btn-xs flex-1 capitalize ${priority === p ? 'btn-primary' : 'btn-outline'}`}
+                      className={`btn btn-xs flex-1 capitalize ${priority === p
+                        ? p === 'high' ? 'btn-error' : 'btn-success'
+                        : 'btn-outline'}`}
                       onClick={() => setPriority(prev => prev === p ? '' : p)}
                     >
                       {p}
@@ -474,6 +494,19 @@ export default function DashboardPage() {
                     </button>
                   )}
                 </div>
+              </div>
+
+              {/* Date Due */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">Date Due</span>
+                </label>
+                <input
+                  type="date"
+                  className="input input-bordered input-sm w-full"
+                  value={dateDue}
+                  onChange={e => setDateDue(e.target.value)}
+                />
               </div>
 
               {/* Note */}
