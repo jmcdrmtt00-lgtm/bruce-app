@@ -18,15 +18,15 @@ const PRIORITY_LABEL: Record<string, string> = {
 function TaskTable({
   tasks,
   onRowClick,
-  showSource = false,
+  variant,
 }: {
   tasks: Incident[];
   onRowClick: (task: Incident) => void;
-  showSource?: boolean;
+  variant: 'inProgress' | 'queue';
 }) {
   if (tasks.length === 0) {
     return (
-      <div className="card bg-base-100 shadow p-4 text-center text-base-content/40 text-sm">
+      <div className="bg-base-100 rounded-box shadow p-4 text-center text-base-content/40 text-sm">
         No tasks
       </div>
     );
@@ -36,9 +36,10 @@ function TaskTable({
       <table className="table table-sm bg-base-100 w-full">
         <thead>
           <tr>
-            <th className="w-6">#</th>
-            <th>Name</th>
-            <th className="w-16 text-right">{showSource ? 'Source' : ''}</th>
+            <th className="w-8">#</th>
+            <th>Task Name</th>
+            <th className="w-20 text-center">{variant === 'inProgress' ? 'Priority' : 'Source'}</th>
+            <th className="w-20 text-center">Screen</th>
           </tr>
         </thead>
         <tbody>
@@ -54,28 +55,28 @@ function TaskTable({
                   {task.title || task.description.slice(0, 60)}
                 </p>
               </td>
-              <td className="text-right">
-                {showSource ? (
+              <td className="text-center">
+                {variant === 'inProgress' ? (
+                  task.priority && (
+                    <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
+                      {PRIORITY_LABEL[task.priority]}
+                    </span>
+                  )
+                ) : (
                   task.auto_suggested && (
                     <span className="badge badge-outline badge-sm text-xs">IT Buddy</span>
                   )
-                ) : (
-                  <>
-                    {task.priority && (
-                      <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
-                        {PRIORITY_LABEL[task.priority]}
-                      </span>
-                    )}
-                    {task.screen && !task.priority && (
-                      <Link
-                        href="/onboarding"
-                        className="badge badge-outline badge-sm hover:badge-primary transition-colors"
-                        onClick={e => e.stopPropagation()}
-                      >
-                        Onb
-                      </Link>
-                    )}
-                  </>
+                )}
+              </td>
+              <td className="text-center">
+                {task.screen && (
+                  <Link
+                    href="/onboarding"
+                    className="badge badge-outline badge-sm hover:badge-primary transition-colors"
+                    onClick={e => e.stopPropagation()}
+                  >
+                    Onb
+                  </Link>
                 )}
               </td>
             </tr>
@@ -302,38 +303,33 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-base-200 p-4">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr_360px] gap-4 items-start">
+    <main className="min-h-screen bg-base-200 px-8 py-4">
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
 
-        {/* In Progress */}
-        <div>
-          <div className="stats bg-base-100 shadow w-full mb-3">
-            <div className="stat py-3">
-              <div className="stat-title text-sm">In Progress</div>
-              <div className="stat-value text-2xl text-warning">{inProgress.length}</div>
-            </div>
-          </div>
-          <TaskTable tasks={inProgress} onRowClick={loadTask} />
-        </div>
+        {/* Tables column */}
+        <div className="space-y-6">
 
-        {/* Queue */}
-        <div>
-          <div className="stats bg-base-100 shadow w-full mb-3">
-            <div className="stat py-3">
-              <div className="stat-title text-sm">Queue</div>
-              <div className="stat-value text-2xl text-info">{queue.length}</div>
-            </div>
+          {/* In Progress */}
+          <div>
+            <h2 className="text-lg font-bold mb-2">Tasks in process</h2>
+            <TaskTable tasks={inProgress} onRowClick={loadTask} variant="inProgress" />
           </div>
-          <TaskTable tasks={queue} onRowClick={loadTask} showSource />
-          {tasks.length === 0 && (
-            <button
-              className="btn btn-outline btn-sm w-full mt-2"
-              onClick={handleSeedData}
-              disabled={seeding}
-            >
-              {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
-            </button>
-          )}
+
+          {/* Queue */}
+          <div>
+            <h2 className="text-lg font-bold mb-2">Tasks in the queue</h2>
+            <TaskTable tasks={queue} onRowClick={loadTask} variant="queue" />
+            {tasks.length === 0 && (
+              <button
+                className="btn btn-outline btn-sm w-full mt-2"
+                onClick={handleSeedData}
+                disabled={seeding}
+              >
+                {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
+              </button>
+            )}
+          </div>
+
         </div>
 
         {/* Add / Update Panel */}
