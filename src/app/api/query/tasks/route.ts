@@ -39,7 +39,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Substitute the real user_id into the generated SQL
-  const safeSql = generatedSql.replace(/\{user_id\}/g, user.id);
+  const safeSql = generatedSql.replace(/\{user_id\}/g, user.id).replace(/;+$/, '');
 
   // Execute via Postgres function (SELECT only, restricted schemas blocked)
   const { data, error } = await supabase.rpc('execute_select_query', {

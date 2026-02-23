@@ -37,7 +37,7 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const safeSql = generatedSql.replace(/\{user_id\}/g, user.id);
+  const safeSql = generatedSql.replace(/\{user_id\}/g, user.id).replace(/;+$/, '');
 
   const { data, error } = await supabase.rpc('execute_select_query', {
     query_sql: safeSql,
