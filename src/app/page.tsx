@@ -39,7 +39,7 @@ function TaskTable({
             <th className="w-8">#</th>
             <th>Task Name</th>
             <th className="w-20 text-center">{variant === 'inProgress' ? 'Priority' : 'Source'}</th>
-            <th className="w-20 text-center">Screen</th>
+            <th className="w-28 text-center">Screen</th>
           </tr>
         </thead>
         <tbody>
@@ -64,7 +64,7 @@ function TaskTable({
                   )
                 ) : (
                   task.auto_suggested && (
-                    <span className="badge badge-outline badge-sm text-xs">IT Buddy</span>
+                    <span className="text-xs text-base-content/60 whitespace-nowrap">IT Buddy</span>
                   )
                 )}
               </td>
@@ -72,10 +72,10 @@ function TaskTable({
                 {task.screen && (
                   <Link
                     href="/onboarding"
-                    className="badge badge-outline badge-sm hover:badge-primary transition-colors"
+                    className="badge badge-outline badge-sm hover:badge-primary transition-colors whitespace-nowrap"
                     onClick={e => e.stopPropagation()}
                   >
-                    Onb
+                    {task.screen}
                   </Link>
                 )}
               </td>
@@ -304,7 +304,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-base-200 px-8 py-4">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_360px] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[420px_1fr] gap-6 items-start">
 
         {/* Tables column */}
         <div className="space-y-6">
