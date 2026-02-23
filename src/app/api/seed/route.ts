@@ -90,9 +90,10 @@ export async function POST() {
     reported_by: t.reported_by,
     priority:   t.priority,
     screen:     t.screen,
-    status:     'in_progress',
-    source:     'issue',
-    date_due:   t.date_due,
+    status:         'in_progress',
+    source:         'issue',
+    date_due:       t.date_due,
+    auto_suggested: false,
   }));
 
   // Insert queue tasks
@@ -119,6 +120,7 @@ export async function POST() {
     status:         'resolved',
     source:         'issue',
     date_completed: t.date_completed,
+    auto_suggested: false,
   }));
 
   const allRows = [...inProgressRows, ...queueRows, ...resolvedRows];
