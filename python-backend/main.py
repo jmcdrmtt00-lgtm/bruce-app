@@ -20,19 +20,23 @@ app.add_middleware(
 class AskRequest(BaseModel):
     prompt: str
     system: str = ""
+    user_email: str = ""
 
 
 class SummarizeRequest(BaseModel):
     description: str
+    user_email: str = ""
 
 
 class GenerateSqlRequest(BaseModel):
     question: str
-    target: str  # "tasks" or "computers"
+    target: str  # "tasks" or "assets"
+    user_email: str = ""
 
 
 class CheckSuggestionsRequest(BaseModel):
     completed_tasks: list[dict]
+    user_email: str = ""
 
 
 @app.get("/health")
@@ -42,23 +46,23 @@ def health():
 
 @app.post("/api/ask")
 async def ask(request: AskRequest):
-    text = await ai_service.ask(request.prompt, request.system)
+    text = await ai_service.ask(request.prompt, request.system, request.user_email)
     return {"text": text}
 
 
 @app.post("/api/summarize")
 async def summarize(request: SummarizeRequest):
-    title = await ai_service.summarize_incident(request.description)
+    title = await ai_service.summarize_incident(request.description, request.user_email)
     return {"title": title}
 
 
 @app.post("/api/generate-sql")
 async def generate_sql(request: GenerateSqlRequest):
-    sql = await ai_service.generate_sql(request.question, request.target)
+    sql = await ai_service.generate_sql(request.question, request.target, request.user_email)
     return {"sql": sql}
 
 
 @app.post("/api/check-suggestions")
 async def check_suggestions(request: CheckSuggestionsRequest):
-    suggestions = await ai_service.check_suggestions(request.completed_tasks)
+    suggestions = await ai_service.check_suggestions(request.completed_tasks, request.user_email)
     return {"suggestions": suggestions}

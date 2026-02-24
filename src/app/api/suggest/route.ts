@@ -55,7 +55,7 @@ export async function POST() {
     const res = await fetch(`${backendUrl}/api/check-suggestions`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ completed_tasks: taskData }),
+      body: JSON.stringify({ completed_tasks: taskData, user_email: user.email ?? '' }),
     });
     if (!res.ok) throw new Error();
     const json = await res.json();

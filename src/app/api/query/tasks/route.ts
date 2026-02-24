@@ -26,7 +26,7 @@ export async function POST(request: NextRequest) {
     const res = await fetch(`${backendUrl}/api/generate-sql`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question: question.trim(), target: 'tasks' }),
+      body: JSON.stringify({ question: question.trim(), target: 'tasks', user_email: user.email ?? '' }),
     });
     if (!res.ok) throw new Error('Backend unavailable');
     const json = await res.json();
