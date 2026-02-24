@@ -1,0 +1,381 @@
+'use client';
+
+import { useRef, useState } from 'react';
+import * as XLSX from 'xlsx';
+import { Upload, FileSpreadsheet, CheckCircle } from 'lucide-react';
+import toast from 'react-hot-toast';
+
+const CATEGORIES = ['Computer', 'Printer', 'Phone', 'iPad', 'Camera', 'Network', 'Other'];
+
+interface AssetRow {
+  category: string;
+  name: string | null;
+  site: string | null;
+  status: 'active' | 'retired';
+  make: string | null;
+  model: string | null;
+  os: string | null;
+  ram: string | null;
+  serial_number: string | null;
+  asset_number: string | null;
+  purchased: string | null;
+  price: number | null;
+  install_date: string | null;
+  warranty_expires: string | null;
+  notes: string | null;
+  extra: Record<string, unknown> | null;
+}
+
+interface SheetInfo {
+  name: string;
+  category: string | null;  // null = skip
+  site: string | null;
+  rows: AssetRow[];
+  selected: boolean;
+}
+
+// ── Detection helpers ─────────────────────────────────────────────────────────
+
+function detectCategory(sheetName: string): string | null {
+  const n = sheetName.toLowerCase();
+  if (n === 'computer os data' || n === 'data') return null;
+  if (n.includes('splashtop')) return null;
+  if (n.includes('desk phone') || (n.includes('resident') && n.includes('phone'))) return null;
+  if (n.includes('printer')) return 'Printer';
+  if (n.includes('ipad') || n.includes('tablet')) return 'iPad';
+  if (n.includes('camera')) return 'Camera';
+  if (n.includes('network')) return 'Network';
+  if (n.includes('cell') || (n.includes('phone') && !n.includes('resident'))) return 'Phone';
+  return 'Computer';
+}
+
+function detectSite(sheetName: string): string | null {
+  const n = sheetName.toLowerCase();
+  if (n.includes('holden') || n.includes('hrsnc')) return 'Holden';
+  if (n.includes('oakdale') || n.includes('orsnc')) return 'Oakdale';
+  if (n.includes('business office')) return 'Business Office';
+  if (n.includes('it office')) return 'IT Office';
+  return null;
+}
+
+function detectStatus(sheetName: string): 'active' | 'retired' {
+  return sheetName.toLowerCase().includes('retired') ? 'retired' : 'active';
+}
+
+// ── Row mapping ───────────────────────────────────────────────────────────────
+
+const KNOWN_COLUMNS = [
+  'notes', 'user', 'previous owner', 'location',
+  'machine brand', 'brand', 'make',
+  'type', 'machine type', 'model',
+  'os', 'ram',
+  'serial number', 'serial',
+  'asset number',
+  'purchased', 'price', 'install date', 'warranty expires',
+  'computer name',
+];
+
+function getVal(row: Record<string, unknown>, ...keys: string[]): unknown {
+  for (const key of keys) {
+    for (const rowKey of Object.keys(row)) {
+      if (rowKey.toLowerCase().trim() === key.toLowerCase()) {
+        const val = row[rowKey];
+        if (val !== null && val !== undefined && String(val).trim() !== '') return val;
+      }
+    }
+  }
+  return null;
+}
+
+function getString(row: Record<string, unknown>, ...keys: string[]): string | null {
+  const val = getVal(row, ...keys);
+  if (val === null || val === undefined) return null;
+  if (val instanceof Date) return val.toISOString().split('T')[0];
+  const s = String(val).trim();
+  return s || null;
+}
+
+function formatDate(val: unknown): string | null {
+  if (val === null || val === undefined) return null;
+  if (val instanceof Date) {
+    if (isNaN(val.getTime())) return null;
+    return val.toISOString().split('T')[0];
+  }
+  const s = String(val).trim();
+  if (!s) return null;
+  const d = new Date(s);
+  return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+}
+
+function parsePrice(val: unknown): number | null {
+  if (val === null || val === undefined || val === '') return null;
+  if (typeof val === 'number') return val;
+  const n = parseFloat(String(val).replace(/[$,]/g, ''));
+  return isNaN(n) ? null : n;
+}
+
+function mapRow(
+  row: Record<string, unknown>,
+  category: string,
+  site: string | null,
+  status: 'active' | 'retired'
+): AssetRow {
+  // Collect unrecognized columns into extra
+  const extra: Record<string, unknown> = {};
+  for (const key of Object.keys(row)) {
+    const lk = key.toLowerCase().trim();
+    if (!KNOWN_COLUMNS.includes(lk)) {
+      const val = row[key];
+      if (val !== null && val !== undefined && String(val).trim() !== '') {
+        extra[key] = val instanceof Date ? val.toISOString().split('T')[0] : val;
+      }
+    }
+  }
+  // Computer Name → extra
+  const computerName = getString(row, 'Computer Name');
+  if (computerName) extra['Computer Name'] = computerName;
+
+  return {
+    category,
+    name: getString(row, 'User', 'Location', 'Notes', 'Previous Owner'),
+    site,
+    status,
+    make: getString(row, 'Machine Brand', 'Brand', 'Make'),
+    model: getString(row, 'Type', 'Machine Type', 'Model'),
+    os: getString(row, 'OS'),
+    ram: getString(row, 'RAM'),
+    serial_number: getString(row, 'Serial Number', 'Serial'),
+    asset_number: getString(row, 'Asset Number'),
+    purchased: formatDate(getVal(row, 'Purchased')),
+    price: parsePrice(getVal(row, 'Price')),
+    install_date: formatDate(getVal(row, 'Install Date')),
+    warranty_expires: formatDate(getVal(row, 'Warranty Expires')),
+    notes: null,
+    extra: Object.keys(extra).length > 0 ? extra : null,
+  };
+}
+
+// ── Parse Excel file ──────────────────────────────────────────────────────────
+
+function parseFile(file: File): Promise<SheetInfo[]> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const data = new Uint8Array(e.target!.result as ArrayBuffer);
+        const wb = XLSX.read(data, { type: 'array', cellDates: true });
+        const sheets: SheetInfo[] = [];
+
+        for (const sheetName of wb.SheetNames) {
+          const category = detectCategory(sheetName);
+          const site = detectSite(sheetName);
+          const status = detectStatus(sheetName);
+          const ws = wb.Sheets[sheetName];
+          const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+            defval: null,
+            raw: false,
+            dateNF: 'yyyy-mm-dd',
+          });
+
+          // Skip completely empty sheets
+          if (rawRows.length === 0) continue;
+
+          const rows = category
+            ? rawRows
+                .map(r => mapRow(r, category, site, status))
+                .filter(r => r.name || r.serial_number || r.make) // skip blank rows
+            : [];
+
+          sheets.push({ name: sheetName, category, site, rows, selected: category !== null });
+        }
+        resolve(sheets);
+      } catch (err) {
+        reject(err);
+      }
+    };
+    reader.onerror = reject;
+    reader.readAsArrayBuffer(file);
+  });
+}
+
+// ── Component ─────────────────────────────────────────────────────────────────
+
+export default function UploadInventoryPage() {
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [sheets, setSheets] = useState<SheetInfo[]>([]);
+  const [fileName, setFileName] = useState('');
+  const [uploading, setUploading] = useState(false);
+  const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
+
+  async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setFileName(file.name);
+    setResult(null);
+    try {
+      const detected = await parseFile(file);
+      setSheets(detected);
+    } catch {
+      toast.error('Could not parse file. Make sure it is an Excel (.xlsx) file.');
+    }
+  }
+
+  function toggleSheet(i: number) {
+    setSheets(prev => prev.map((s, idx) => idx === i ? { ...s, selected: !s.selected } : s));
+  }
+
+  function changeCategory(i: number, cat: string) {
+    setSheets(prev => prev.map((s, idx) => idx === i
+      ? { ...s, category: cat, rows: s.rows.map(r => ({ ...r, category: cat })) }
+      : s
+    ));
+  }
+
+  async function handleUpload() {
+    const selected = sheets.filter(s => s.selected && s.category && s.rows.length > 0);
+    if (selected.length === 0) { toast.error('No sheets selected.'); return; }
+
+    const allRows = selected.flatMap(s => s.rows);
+    setUploading(true);
+    try {
+      const res = await fetch('/api/assets/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assets: allRows }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        toast.error(data.error || 'Upload failed.');
+      } else {
+        setResult(data);
+        toast.success(`Uploaded ${data.inserted} assets.`);
+      }
+    } catch {
+      toast.error('Upload failed.');
+    }
+    setUploading(false);
+  }
+
+  const selectedCount = sheets.filter(s => s.selected).reduce((n, s) => n + s.rows.length, 0);
+
+  return (
+    <main className="min-h-screen bg-base-200 py-8 px-4">
+      <div className="max-w-2xl mx-auto space-y-4">
+
+        <div className="card bg-base-100 shadow">
+          <div className="card-body p-5 space-y-4">
+            <h1 className="text-2xl font-bold">Upload Inventory</h1>
+            <p className="text-base-content/60 text-sm">
+              Select an Excel (.xlsx) file. IT Buddy will detect each sheet&apos;s asset type
+              and let you choose which sheets to import.
+            </p>
+
+            {/* File picker */}
+            <div
+              className="border-2 border-dashed border-base-300 rounded-box p-8 text-center cursor-pointer hover:border-primary transition-colors"
+              onClick={() => fileRef.current?.click()}
+            >
+              {fileName ? (
+                <div className="flex items-center justify-center gap-2 text-base-content/70">
+                  <FileSpreadsheet className="w-5 h-5 text-success" />
+                  <span className="font-medium">{fileName}</span>
+                </div>
+              ) : (
+                <div className="space-y-2 text-base-content/40">
+                  <Upload className="w-8 h-8 mx-auto" />
+                  <p className="text-sm">Click to select an Excel file</p>
+                </div>
+              )}
+            </div>
+            <input
+              ref={fileRef}
+              type="file"
+              accept=".xlsx,.xls"
+              className="hidden"
+              onChange={handleFileChange}
+            />
+          </div>
+        </div>
+
+        {/* Sheet list */}
+        {sheets.length > 0 && (
+          <div className="card bg-base-100 shadow">
+            <div className="card-body p-5 space-y-3">
+              <h2 className="font-semibold">Detected sheets</h2>
+              <div className="space-y-2">
+                {sheets.map((s, i) => (
+                  <div
+                    key={s.name}
+                    className={`flex items-center gap-3 p-3 rounded-box border ${
+                      s.category ? 'border-base-300' : 'border-base-200 opacity-40'
+                    }`}
+                  >
+                    <input
+                      type="checkbox"
+                      className="checkbox checkbox-sm"
+                      checked={s.selected}
+                      disabled={!s.category}
+                      onChange={() => toggleSheet(i)}
+                    />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate">{s.name}</p>
+                      {s.site && <p className="text-xs text-base-content/50">{s.site}</p>}
+                    </div>
+                    {s.category ? (
+                      <select
+                        className="select select-bordered select-xs w-28"
+                        value={s.category}
+                        onChange={e => changeCategory(i, e.target.value)}
+                        onClick={e => e.stopPropagation()}
+                      >
+                        {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                      </select>
+                    ) : (
+                      <span className="text-xs text-base-content/40 w-28 text-center">skip</span>
+                    )}
+                    <span className="text-xs text-base-content/50 w-16 text-right">
+                      {s.category ? `${s.rows.length} rows` : ''}
+                    </span>
+                  </div>
+                ))}
+              </div>
+
+              <div className="flex items-center justify-between pt-2">
+                <p className="text-sm text-base-content/60">
+                  {selectedCount} assets selected
+                </p>
+                <button
+                  className="btn btn-primary btn-sm"
+                  onClick={handleUpload}
+                  disabled={uploading || selectedCount === 0}
+                >
+                  {uploading
+                    ? <span className="loading loading-spinner loading-sm" />
+                    : <><Upload className="w-4 h-4" /> Upload</>
+                  }
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Result */}
+        {result && (
+          <div className="card bg-base-100 shadow">
+            <div className="card-body p-5">
+              <div className="flex items-center gap-2 text-success font-semibold">
+                <CheckCircle className="w-5 h-5" />
+                Upload complete
+              </div>
+              <p className="text-sm text-base-content/70 mt-1">
+                {result.inserted} assets added
+                {result.skipped > 0 && `, ${result.skipped} skipped (already existed)`}.
+              </p>
+            </div>
+          </div>
+        )}
+
+      </div>
+    </main>
+  );
+}
