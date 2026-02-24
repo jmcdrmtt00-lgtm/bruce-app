@@ -55,6 +55,7 @@ Respond with only the JSON array, no other text.`;
       body: JSON.stringify({
         prompt,
         system: 'You are a helpful IT assistant. Respond only with the requested JSON array.',
+        user_email: user.email ?? '',
       }),
     });
 
