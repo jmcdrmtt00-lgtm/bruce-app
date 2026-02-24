@@ -15,6 +15,7 @@ async def ask(prompt: str, system: str = "", user_email: str = "") -> str:
         messages=[{"role": "user", "content": prompt}],
     )
     headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+    headlights_tracker.track_activity(user_email, sessions=1)
     return message.content[0].text
 
 

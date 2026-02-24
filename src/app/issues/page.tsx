@@ -17,6 +17,7 @@ function formatDate(iso: string) {
 }
 
 export default function IssuesPage() {
+  useEffect(() => { fetch("/api/track-click", { method: "POST" }).catch(() => {}); }, []);
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'active' | 'all'>('active');

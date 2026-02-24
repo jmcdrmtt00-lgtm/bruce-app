@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useRef, useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 
@@ -28,6 +28,7 @@ function formatDate(d?: string) {
 }
 
 export default function QueryInventoryPage() {
+  useEffect(() => { fetch("/api/track-click", { method: "POST" }).catch(() => {}); }, []);
   const [question, setQuestion]   = useState('');
   const [loading, setLoading]     = useState(false);
   const [results, setResults]     = useState<AssetResult[]>([]);

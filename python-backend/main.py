@@ -39,9 +39,22 @@ class CheckSuggestionsRequest(BaseModel):
     user_email: str = ""
 
 
+class TrackClickRequest(BaseModel):
+    user_email: str = ""
+
+
 @app.get("/health")
 def health():
     return {"status": "ok"}
+
+
+@app.post("/api/track-click")
+async def track_click(request: TrackClickRequest):
+    """Increment the click counter for a user — called from the frontend on page navigation."""
+    if request.user_email:
+        from services.headlights_tracker import track_activity
+        track_activity(request.user_email, clicks=1)
+    return {"ok": True}
 
 
 @app.post("/api/ask")

@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import NewHireForm from '@/components/NewHireForm';
 import LoginInfoSheet from '@/components/LoginInfoSheet';
 import OnboardingChecklist from '@/components/OnboardingChecklist';
@@ -8,6 +8,7 @@ import { NewHire, GeneratedOutput } from '@/types';
 import { ROLES } from '@/data/roles';
 
 export default function OnboardingPage() {
+  useEffect(() => { fetch("/api/track-click", { method: "POST" }).catch(() => {}); }, []);
   const [output, setOutput] = useState<GeneratedOutput | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
