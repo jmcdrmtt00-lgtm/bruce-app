@@ -131,6 +131,9 @@ export default function DashboardPage() {
       .catch(() => setLoading(false));
   }, []);
 
+  // Track page view on mount
+  useEffect(() => { fetch('/api/track-click', { method: 'POST' }).catch(() => {}); }, []);
+
   // On load: fetch tasks, then run suggestion check
   useEffect(() => {
     loadTasks();

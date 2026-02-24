@@ -57,6 +57,15 @@ async def track_click(request: TrackClickRequest):
     return {"ok": True}
 
 
+@app.post("/api/track-upload")
+async def track_upload(request: TrackClickRequest):
+    """Increment the uploads counter for a user — called after a successful inventory upload."""
+    if request.user_email:
+        from services.headlights_tracker import track_activity
+        track_activity(request.user_email, uploads=1)
+    return {"ok": True}
+
+
 @app.post("/api/ask")
 async def ask(request: AskRequest):
     text = await ai_service.ask(request.prompt, request.system, request.user_email)

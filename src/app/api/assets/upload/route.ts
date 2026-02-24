@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
+const BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
+
 async function getClient() {
   const cookieStore = await cookies();
   return createServerClient(
@@ -48,6 +50,15 @@ export async function POST(request: NextRequest) {
 
   const { error } = await supabase.from('assets').insert(toInsert);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  // Track the upload in Headlights (fire-and-forget)
+  if (user.email) {
+    fetch(`${BACKEND_URL}/api/track-upload`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ user_email: user.email }),
+    }).catch(() => {});
+  }
 
   return NextResponse.json({ inserted: toInsert.length, skipped });
 }
