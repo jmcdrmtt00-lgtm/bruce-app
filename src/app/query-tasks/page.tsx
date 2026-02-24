@@ -2,7 +2,7 @@
 
 import { useRef, useState } from 'react';
 import Link from 'next/link';
-import { Mic, MicOff, ChevronDown, ChevronUp } from 'lucide-react';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface TaskResult {
@@ -140,11 +140,10 @@ export default function QueryTasksPage() {
                 onKeyDown={e => e.key === 'Enter' && handleQuery()}
               />
               <button
-                className={`btn ${listening ? 'btn-error' : 'btn-outline'}`}
+                className={`btn btn-xs text-xs whitespace-nowrap shrink-0 ${listening ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                 onClick={() => listening ? stopVoice() : startVoice(t => setQuestion(t))}
-                title={listening ? 'Stop' : 'Speak your question'}
               >
-                {listening ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+                {listening ? 'listening' : 'not listening'}
               </button>
               <button
                 className="btn btn-primary"

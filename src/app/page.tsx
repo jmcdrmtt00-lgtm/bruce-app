@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import Link from 'next/link';
-import { Mic, MicOff, ExternalLink } from 'lucide-react';
+import { ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
 
@@ -410,8 +410,7 @@ export default function DashboardPage() {
                     onChange={e => handleTaskNumberInput(e.target.value)}
                   />
                   <button
-                    className={`btn btn-sm ${listeningNum ? 'btn-error' : 'btn-outline'}`}
-                    title="Say task number"
+                    className={`btn btn-xs text-xs whitespace-nowrap shrink-0 ${listeningNum ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                     onClick={() => listeningNum
                       ? stopVoice(numRecRef as React.MutableRefObject<unknown>, setListeningNum)
                       : startVoice(
@@ -425,7 +424,7 @@ export default function DashboardPage() {
                         )
                     }
                   >
-                    {listeningNum ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                    {listeningNum ? 'listening' : 'not listening'}
                   </button>
                 </div>
               )}
@@ -445,8 +444,7 @@ export default function DashboardPage() {
                     placeholder={mode === 'add' ? 'Describe the task...' : ''}
                   />
                   <button
-                    className={`btn btn-sm ${listeningName ? 'btn-error' : 'btn-outline'}`}
-                    title="Speak task name"
+                    className={`btn btn-xs text-xs whitespace-nowrap shrink-0 ${listeningName ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                     onClick={() => listeningName
                       ? stopVoice(nameRecRef as React.MutableRefObject<unknown>, setListeningName)
                       : startVoice(
@@ -460,7 +458,7 @@ export default function DashboardPage() {
                         )
                     }
                   >
-                    {listeningName ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                    {listeningName ? 'listening' : 'not listening'}
                   </button>
                 </div>
               </div>
@@ -498,8 +496,7 @@ export default function DashboardPage() {
                     placeholder="Who is this for?"
                   />
                   <button
-                    className={`btn btn-sm ${listeningCustomer ? 'btn-error' : 'btn-outline'}`}
-                    title="Speak customer name"
+                    className={`btn btn-xs text-xs whitespace-nowrap shrink-0 ${listeningCustomer ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                     onClick={() => listeningCustomer
                       ? stopVoice(customerRecRef as React.MutableRefObject<unknown>, setListeningCustomer)
                       : startVoice(
@@ -513,7 +510,7 @@ export default function DashboardPage() {
                         )
                     }
                   >
-                    {listeningCustomer ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                    {listeningCustomer ? 'listening' : 'not listening'}
                   </button>
                 </div>
               </div>
@@ -577,8 +574,7 @@ export default function DashboardPage() {
                     onChange={e => setDateDue(e.target.value)}
                   />
                   <button
-                    className={`btn btn-sm ${listeningDate ? 'btn-error' : 'btn-outline'}`}
-                    title="Speak due date"
+                    className={`btn btn-xs text-xs whitespace-nowrap shrink-0 ${listeningDate ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                     onClick={() => listeningDate
                       ? stopVoice(dateRecRef as React.MutableRefObject<unknown>, setListeningDate)
                       : startVoice(
@@ -592,7 +588,7 @@ export default function DashboardPage() {
                         )
                     }
                   >
-                    {listeningDate ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                    {listeningDate ? 'listening' : 'not listening'}
                   </button>
                 </div>
               </div>
@@ -611,8 +607,7 @@ export default function DashboardPage() {
                       placeholder="Type or speak an update..."
                     />
                     <button
-                      className={`btn btn-sm ${listeningNote ? 'btn-error' : 'btn-outline'}`}
-                      title={listeningNote ? 'Stop' : 'Speak'}
+                      className={`btn btn-xs text-xs whitespace-nowrap shrink-0 ${listeningNote ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                       onClick={() => listeningNote
                         ? stopVoice(noteRecRef as React.MutableRefObject<unknown>, setListeningNote)
                         : startVoice(
@@ -626,7 +621,7 @@ export default function DashboardPage() {
                           )
                       }
                     >
-                      {listeningNote ? <MicOff className="w-3 h-3" /> : <Mic className="w-3 h-3" />}
+                      {listeningNote ? 'listening' : 'not listening'}
                     </button>
                   </div>
               </div>
