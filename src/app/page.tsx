@@ -410,7 +410,7 @@ export default function DashboardPage() {
                     onChange={e => handleTaskNumberInput(e.target.value)}
                   />
                   <button
-                    className={`btn btn-xs text-[10px] whitespace-nowrap shrink-0 ${listeningNum ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
+                    className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningNum ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                     onClick={() => listeningNum
                       ? stopVoice(numRecRef as React.MutableRefObject<unknown>, setListeningNum)
                       : startVoice(
@@ -444,7 +444,7 @@ export default function DashboardPage() {
                     placeholder={mode === 'add' ? 'Describe the task...' : ''}
                   />
                   <button
-                    className={`btn btn-xs text-[10px] whitespace-nowrap shrink-0 ${listeningName ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
+                    className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningName ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                     onClick={() => listeningName
                       ? stopVoice(nameRecRef as React.MutableRefObject<unknown>, setListeningName)
                       : startVoice(
@@ -496,7 +496,7 @@ export default function DashboardPage() {
                     placeholder="Who is this for?"
                   />
                   <button
-                    className={`btn btn-xs text-[10px] whitespace-nowrap shrink-0 ${listeningCustomer ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
+                    className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningCustomer ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                     onClick={() => listeningCustomer
                       ? stopVoice(customerRecRef as React.MutableRefObject<unknown>, setListeningCustomer)
                       : startVoice(
@@ -574,7 +574,7 @@ export default function DashboardPage() {
                     onChange={e => setDateDue(e.target.value)}
                   />
                   <button
-                    className={`btn btn-xs text-[10px] whitespace-nowrap shrink-0 ${listeningDate ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
+                    className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningDate ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                     onClick={() => listeningDate
                       ? stopVoice(dateRecRef as React.MutableRefObject<unknown>, setListeningDate)
                       : startVoice(
@@ -607,7 +607,7 @@ export default function DashboardPage() {
                       placeholder="Type or speak an update..."
                     />
                     <button
-                      className={`btn btn-xs text-[10px] whitespace-nowrap shrink-0 ${listeningNote ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
+                      className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningNote ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                       onClick={() => listeningNote
                         ? stopVoice(noteRecRef as React.MutableRefObject<unknown>, setListeningNote)
                         : startVoice(

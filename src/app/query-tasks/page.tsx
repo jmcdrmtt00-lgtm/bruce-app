@@ -140,7 +140,7 @@ export default function QueryTasksPage() {
                 onKeyDown={e => e.key === 'Enter' && handleQuery()}
               />
               <button
-                className={`btn btn-xs text-[10px] whitespace-nowrap shrink-0 ${listening ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
+                className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listening ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
                 onClick={() => listening ? stopVoice() : startVoice(t => setQuestion(t))}
               >
                 {listening ? 'listening' : 'not listening'}
