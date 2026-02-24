@@ -39,6 +39,28 @@ export interface Incident {
   updated_at: string;
 }
 
+export interface Asset {
+  id: string;
+  user_id: string;
+  category: string;
+  name: string | null;
+  site: string | null;
+  status: 'active' | 'retired';
+  make: string | null;
+  model: string | null;
+  serial_number: string | null;
+  asset_number: string | null;
+  os: string | null;
+  ram: string | null;
+  purchased: string | null;
+  price: number | null;
+  install_date: string | null;
+  warranty_expires: string | null;
+  notes: string | null;
+  extra: Record<string, unknown> | null;
+  created_at: string;
+}
+
 export interface IncidentUpdate {
   id: string;
   incident_id: string;

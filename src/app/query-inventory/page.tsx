@@ -4,17 +4,19 @@ import { useRef, useState } from 'react';
 import { Mic, MicOff, ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-interface ComputerResult {
+interface AssetResult {
   id?: string;
-  user_name?: string;
+  category?: string;
+  name?: string;
   notes?: string;
-  machine_brand?: string;
-  machine_type?: string;
+  make?: string;
+  model?: string;
   os?: string;
   serial_number?: string;
   asset_number?: string;
   ram?: string;
   purchased?: string;
+  warranty_expires?: string;
   site?: string;
   status?: string;
   [key: string]: unknown;
@@ -28,7 +30,7 @@ function formatDate(d?: string) {
 export default function QueryInventoryPage() {
   const [question, setQuestion]   = useState('');
   const [loading, setLoading]     = useState(false);
-  const [results, setResults]     = useState<ComputerResult[]>([]);
+  const [results, setResults]     = useState<AssetResult[]>([]);
   const [sql, setSql]             = useState('');
   const [showSql, setShowSql]     = useState(false);
   const [message, setMessage]     = useState('');
@@ -64,7 +66,7 @@ export default function QueryInventoryPage() {
     setSql('');
     setMessage('');
     try {
-      const res = await fetch('/api/query/computers', {
+      const res = await fetch('/api/query/assets', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: question.trim() }),
@@ -146,8 +148,9 @@ export default function QueryInventoryPage() {
                 <table className="table table-sm bg-base-100 w-full">
                   <thead>
                     <tr>
-                      <th>User / Location</th>
-                      <th>Machine</th>
+                      <th>Name / Location</th>
+                      <th>Category</th>
+                      <th>Make / Model</th>
                       <th>OS</th>
                       <th>Site</th>
                       <th>Purchased</th>
@@ -157,13 +160,14 @@ export default function QueryInventoryPage() {
                     {results.map((r, i) => (
                       <tr key={r.id ?? i} className="hover">
                         <td>
-                          <p className="font-medium text-sm">{r.user_name ?? '—'}</p>
-                          {r.notes && r.notes !== r.user_name && (
+                          <p className="font-medium text-sm">{r.name ?? '—'}</p>
+                          {r.notes && r.notes !== r.name && (
                             <p className="text-xs text-base-content/50">{r.notes}</p>
                           )}
                         </td>
+                        <td className="text-xs text-base-content/50">{r.category ?? '—'}</td>
                         <td className="text-sm">
-                          {[r.machine_brand, r.machine_type].filter(Boolean).join(' ')}
+                          {[r.make, r.model].filter(Boolean).join(' ')}
                           {r.ram && <span className="text-xs text-base-content/50 ml-1">· {r.ram}</span>}
                         </td>
                         <td className="text-sm">{r.os ?? '—'}</td>

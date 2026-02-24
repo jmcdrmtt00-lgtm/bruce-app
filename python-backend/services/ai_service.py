@@ -50,29 +50,32 @@ Table: incident_updates (timestamped notes on a task)
 - created_at: TIMESTAMPTZ
 """
 
-COMPUTERS_SCHEMA = """
-Table: computers (IT asset inventory)
+ASSETS_SCHEMA = """
+Table: assets (IT asset inventory — computers, printers, phones, tablets, cameras, etc.)
 - id: UUID
 - user_id: UUID  <-- always filter: WHERE user_id = '{user_id}'
-- user_name: TEXT (person's name, role, or desk location)
-- notes: TEXT (role or location description, nullable)
-- machine_brand: TEXT (e.g. ThinkCentre, Lenovo, HP)
-- machine_type: TEXT (e.g. Mini, Tower, Laptop, Chromebook)
-- os: TEXT (e.g. Win 11 Pro, Win 10 Pro, ChromeOS)
+- category: TEXT (e.g. 'Computer', 'Printer', 'Phone', 'iPad', 'Camera', 'Network')
+- name: TEXT (person's name, role, or desk/location label, nullable)
+- site: TEXT ('Holden', 'Oakdale', 'Business Office', 'IT Office', 'Shared')
+- status: TEXT ('active', 'retired')
+- make: TEXT (brand, e.g. ThinkCentre, Lenovo, HP, Polycom, nullable)
+- model: TEXT (model name or type, e.g. Mini, Tower, Laptop, nullable)
+- os: TEXT (e.g. Win 11 Pro, Win 10 Pro, ChromeOS — mainly for computers/tablets, nullable)
+- ram: TEXT (e.g. '8 GB', '16 GB' — mainly for computers, nullable)
 - serial_number: TEXT (nullable)
 - asset_number: TEXT (nullable)
-- ram: TEXT (e.g. '8 GB', '16 GB', nullable)
 - purchased: DATE (nullable)
 - price: NUMERIC (nullable)
 - install_date: DATE (nullable)
-- site: TEXT ('Holden', 'Oakdale', 'Business Office', 'IT Office', 'Shared', 'Retired')
-- status: TEXT ('active', 'retired')
+- warranty_expires: DATE (nullable)
+- notes: TEXT (nullable)
+- extra: JSONB (additional asset-type-specific fields, nullable)
 """
 
 
 async def generate_sql(question: str, target: str) -> str:
     """Generate a safe SELECT SQL query from a natural language question."""
-    schema = TASKS_SCHEMA if target == "tasks" else COMPUTERS_SCHEMA
+    schema = TASKS_SCHEMA if target == "tasks" else ASSETS_SCHEMA
     message = client.messages.create(
         model="claude-sonnet-4-6",
         max_tokens=512,
