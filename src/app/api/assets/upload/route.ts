@@ -13,6 +13,19 @@ async function getClient() {
   );
 }
 
+const DATE_FIELDS = ['purchased', 'install_date', 'warranty_expires'];
+
+function cleanDates(asset: Record<string, unknown>): Record<string, unknown> {
+  const cleaned = { ...asset };
+  for (const field of DATE_FIELDS) {
+    const v = cleaned[field];
+    if (typeof v === 'string' && (v.startsWith('+') || v.startsWith('-'))) {
+      cleaned[field] = null;
+    }
+  }
+  return cleaned;
+}
+
 export async function POST(request: NextRequest) {
   const supabase = await getClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -23,44 +36,39 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'No assets provided' }, { status: 400 });
   }
 
-  // Fetch existing serial numbers for this user to avoid duplicates
+  // Fetch existing assets that have serial numbers so we can match them for updates
   const { data: existing } = await supabase
     .from('assets')
-    .select('serial_number')
+    .select('id, serial_number')
     .eq('user_id', user.id)
     .not('serial_number', 'is', null);
 
-  const existingSerials = new Set((existing ?? []).map((r: { serial_number: string }) => r.serial_number));
+  const serialToId = new Map<string, string>(
+    (existing ?? []).map((r: { id: string; serial_number: string }) => [r.serial_number, r.id])
+  );
 
-  // Split into new (insert) vs duplicate (skip)
-  const toInsert = [];
-  let skipped = 0;
-
-  const DATE_FIELDS = ['purchased', 'install_date', 'warranty_expires'];
+  const toInsert: Record<string, unknown>[] = [];
+  const toUpdate: Record<string, unknown>[] = [];
 
   for (const asset of assets) {
-    if (asset.serial_number && existingSerials.has(asset.serial_number)) {
-      skipped++;
+    const cleaned = cleanDates({ ...asset, user_id: user.id });
+    if (asset.serial_number && serialToId.has(asset.serial_number)) {
+      // Existing record — carry its id so upsert knows which row to overwrite
+      toUpdate.push({ ...cleaned, id: serialToId.get(asset.serial_number) });
     } else {
-      // Strip any extended-year date strings (e.g. "+045670-01-01") that
-      // PostgreSQL misreads as timezone offsets and rejects.
-      const cleaned: Record<string, unknown> = { ...asset, user_id: user.id };
-      for (const field of DATE_FIELDS) {
-        const v = cleaned[field];
-        if (typeof v === 'string' && (v.startsWith('+') || v.startsWith('-'))) {
-          cleaned[field] = null;
-        }
-      }
       toInsert.push(cleaned);
     }
   }
 
-  if (toInsert.length === 0) {
-    return NextResponse.json({ inserted: 0, skipped });
+  if (toInsert.length > 0) {
+    const { error } = await supabase.from('assets').insert(toInsert);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const { error } = await supabase.from('assets').insert(toInsert);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (toUpdate.length > 0) {
+    const { error } = await supabase.from('assets').upsert(toUpdate, { onConflict: 'id' });
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  }
 
   // Track the upload in Headlights (fire-and-forget)
   if (user.email) {
@@ -71,5 +79,5 @@ export async function POST(request: NextRequest) {
     }).catch(() => {});
   }
 
-  return NextResponse.json({ inserted: toInsert.length, skipped });
+  return NextResponse.json({ inserted: toInsert.length, updated: toUpdate.length });
 }

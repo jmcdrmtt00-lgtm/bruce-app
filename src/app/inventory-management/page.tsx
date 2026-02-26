@@ -324,7 +324,7 @@ export default function InventoryManagementPage() {
   const [sheets, setSheets] = useState<SheetInfo[]>([]);
   const [fileName, setFileName] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const [uploadResult, setUploadResult] = useState<{ inserted: number; updated: number } | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   async function handleDownload() {
@@ -381,7 +381,7 @@ export default function InventoryManagementPage() {
         setErrorDetails(data.error || 'Upload failed — no error detail returned.');
       } else {
         setUploadResult(data);
-        toast.success(`Uploaded ${data.inserted} assets.`);
+        toast.success(`${data.inserted} added, ${data.updated} updated.`);
       }
     } catch (err) {
       setErrorDetails('Network error: ' + (err instanceof Error ? err.message : String(err)));
@@ -526,8 +526,7 @@ export default function InventoryManagementPage() {
                 Upload complete
               </div>
               <p className="text-sm text-base-content/70 mt-1">
-                {uploadResult.inserted} assets added
-                {uploadResult.skipped > 0 && `, ${uploadResult.skipped} skipped (already existed)`}.
+                {uploadResult.inserted} added, {uploadResult.updated} updated.
               </p>
             </div>
           </div>
