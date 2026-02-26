@@ -2,10 +2,12 @@
 
 import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
-import { Upload, FileSpreadsheet, CheckCircle } from 'lucide-react';
+import { Upload, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const CATEGORIES = ['Computer', 'Printer', 'Phone', 'iPad', 'Camera', 'Network', 'Other'];
+
+// ── Shared types ───────────────────────────────────────────────────────────────
 
 interface AssetRow {
   category: string;
@@ -28,24 +30,22 @@ interface AssetRow {
 
 interface SheetInfo {
   name: string;
-  category: string | null;  // null = skip
+  category: string;
   site: string | null;
   rows: AssetRow[];
   selected: boolean;
 }
 
-// ── Detection helpers ─────────────────────────────────────────────────────────
+// ── Detection helpers ──────────────────────────────────────────────────────────
 
-function detectCategory(sheetName: string): string | null {
+function detectCategory(sheetName: string): string {
   const n = sheetName.toLowerCase();
-  if (n === 'computer os data' || n === 'data') return null;
-  if (n.includes('splashtop')) return null;
-  if (n.includes('desk phone') || (n.includes('resident') && n.includes('phone'))) return null;
   if (n.includes('printer')) return 'Printer';
   if (n.includes('ipad') || n.includes('tablet')) return 'iPad';
   if (n.includes('camera')) return 'Camera';
   if (n.includes('network')) return 'Network';
-  if (n.includes('cell') || (n.includes('phone') && !n.includes('resident'))) return 'Phone';
+  if (n.includes('phone')) return 'Phone';
+  if (n.includes('splashtop')) return 'Other';
   return 'Computer';
 }
 
@@ -62,7 +62,7 @@ function detectStatus(sheetName: string): 'active' | 'retired' {
   return sheetName.toLowerCase().includes('retired') ? 'retired' : 'active';
 }
 
-// ── Row mapping ───────────────────────────────────────────────────────────────
+// ── Row mapping ────────────────────────────────────────────────────────────────
 
 const KNOWN_COLUMNS = [
   'notes', 'user', 'previous owner', 'location',
@@ -74,6 +74,33 @@ const KNOWN_COLUMNS = [
   'purchased', 'price', 'install date', 'warranty expires',
   'computer name',
 ];
+
+const HEADER_CLUES = [
+  'notes', 'user', 'previous owner', 'location', 'name',
+  'machine brand', 'brand', 'make', 'type', 'machine type', 'model',
+  'os', 'ram', 'serial number', 'serial', 'asset number',
+  'purchased', 'price', 'install date', 'warranty expires',
+  'computer name', 'first', 'last',
+  'number', 'phone number', 'mac address', 'switch', 'port', 'ip',
+  'cost', 'date received', 'device id', 'model number', 'room',
+];
+
+function findHeaderRow(ws: XLSX.WorkSheet): number {
+  const raw = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1 });
+  let bestRow = 0;
+  let bestScore = 0;
+  for (let i = 0; i < Math.min(4, raw.length); i++) {
+    const row = raw[i];
+    if (!Array.isArray(row)) continue;
+    const score = row.filter((cell) => {
+      if (cell === null || cell === undefined) return false;
+      const s = String(cell).toLowerCase().trim();
+      return HEADER_CLUES.some(clue => s === clue || s.includes(clue));
+    }).length;
+    if (score > bestScore) { bestScore = score; bestRow = i; }
+  }
+  return bestRow;
+}
 
 function getVal(row: Record<string, unknown>, ...keys: string[]): unknown {
   for (const key of keys) {
@@ -97,14 +124,18 @@ function getString(row: Record<string, unknown>, ...keys: string[]): string | nu
 
 function formatDate(val: unknown): string | null {
   if (val === null || val === undefined) return null;
+  let d: Date;
   if (val instanceof Date) {
-    if (isNaN(val.getTime())) return null;
-    return val.toISOString().split('T')[0];
+    d = val;
+  } else if (typeof val === 'number') {
+    d = new Date(Math.round((val - 25569) * 86400 * 1000));
+  } else {
+    d = new Date(String(val).trim());
   }
-  const s = String(val).trim();
-  if (!s) return null;
-  const d = new Date(s);
-  return isNaN(d.getTime()) ? null : d.toISOString().split('T')[0];
+  if (isNaN(d.getTime())) return null;
+  const iso = d.toISOString();
+  if (iso.startsWith('+') || iso.startsWith('-')) return null;
+  return iso.split('T')[0];
 }
 
 function parsePrice(val: unknown): number | null {
@@ -120,7 +151,6 @@ function mapRow(
   site: string | null,
   status: 'active' | 'retired'
 ): AssetRow {
-  // Collect unrecognized columns into extra
   const extra: Record<string, unknown> = {};
   for (const key of Object.keys(row)) {
     const lk = key.toLowerCase().trim();
@@ -131,7 +161,6 @@ function mapRow(
       }
     }
   }
-  // Computer Name → extra
   const computerName = getString(row, 'Computer Name');
   if (computerName) extra['Computer Name'] = computerName;
 
@@ -155,7 +184,16 @@ function mapRow(
   };
 }
 
-// ── Parse Excel file ──────────────────────────────────────────────────────────
+function hasData(r: AssetRow): boolean {
+  return !!(
+    r.name || r.serial_number || r.make || r.model ||
+    r.os || r.ram || r.asset_number || r.price ||
+    r.purchased || r.install_date || r.warranty_expires || r.notes ||
+    (r.extra && Object.keys(r.extra).length > 0)
+  );
+}
+
+// ── Parse Excel file ───────────────────────────────────────────────────────────
 
 function parseFile(file: File): Promise<SheetInfo[]> {
   return new Promise((resolve, reject) => {
@@ -163,30 +201,33 @@ function parseFile(file: File): Promise<SheetInfo[]> {
     reader.onload = (e) => {
       try {
         const data = new Uint8Array(e.target!.result as ArrayBuffer);
-        const wb = XLSX.read(data, { type: 'array', cellDates: true });
+        let wb: XLSX.WorkBook;
+        try {
+          wb = XLSX.read(data, { type: 'array', cellText: false });
+        } catch (readErr) {
+          reject(new Error('XLSX read failed: ' + (readErr instanceof Error ? readErr.message : String(readErr))));
+          return;
+        }
         const sheets: SheetInfo[] = [];
-
         for (const sheetName of wb.SheetNames) {
           const category = detectCategory(sheetName);
           const site = detectSite(sheetName);
           const status = detectStatus(sheetName);
           const ws = wb.Sheets[sheetName];
-          const rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
-            defval: null,
-            raw: false,
-            dateNF: 'yyyy-mm-dd',
-          });
-
-          // Skip completely empty sheets
+          const headerRow = findHeaderRow(ws);
+          let rawRows: Record<string, unknown>[];
+          try {
+            rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
+              defval: null,
+              range: headerRow,
+            });
+          } catch {
+            rawRows = [];
+          }
           if (rawRows.length === 0) continue;
-
-          const rows = category
-            ? rawRows
-                .map(r => mapRow(r, category, site, status))
-                .filter(r => r.name || r.serial_number || r.make) // skip blank rows
-            : [];
-
-          sheets.push({ name: sheetName, category, site, rows, selected: category !== null });
+          const rows = rawRows.map(r => mapRow(r, category, site, status)).filter(hasData);
+          if (rows.length === 0) continue;
+          sheets.push({ name: sheetName, category, site, rows, selected: true });
         }
         resolve(sheets);
       } catch (err) {
@@ -198,25 +239,116 @@ function parseFile(file: File): Promise<SheetInfo[]> {
   });
 }
 
-// ── Component ─────────────────────────────────────────────────────────────────
+// ── Download: write database contents to Excel ────────────────────────────────
 
-export default function UploadInventoryPage() {
+const STANDARD_FIELDS: { key: keyof AssetRow; label: string }[] = [
+  { key: 'name',             label: 'Name'             },
+  { key: 'site',             label: 'Site'             },
+  { key: 'status',           label: 'Status'           },
+  { key: 'make',             label: 'Make'             },
+  { key: 'model',            label: 'Model'            },
+  { key: 'os',               label: 'OS'               },
+  { key: 'ram',              label: 'RAM'              },
+  { key: 'serial_number',    label: 'Serial Number'    },
+  { key: 'asset_number',     label: 'Asset Number'     },
+  { key: 'purchased',        label: 'Purchased'        },
+  { key: 'price',            label: 'Price'            },
+  { key: 'install_date',     label: 'Install Date'     },
+  { key: 'warranty_expires', label: 'Warranty Expires' },
+  { key: 'notes',            label: 'Notes'            },
+];
+
+async function buildAndDownload() {
+  const res = await fetch('/api/assets/download');
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Download failed');
+
+  const assets: AssetRow[] = data.assets;
+  if (assets.length === 0) throw new Error('No assets in database yet.');
+
+  // Group by category
+  const byCategory = new Map<string, AssetRow[]>();
+  for (const asset of assets) {
+    const cat = asset.category || 'Other';
+    if (!byCategory.has(cat)) byCategory.set(cat, []);
+    byCategory.get(cat)!.push(asset);
+  }
+
+  const wb = XLSX.utils.book_new();
+
+  for (const [category, rows] of byCategory) {
+    // Collect all extra-field keys that appear in this category
+    const extraKeys: string[] = [];
+    const seen = new Set<string>();
+    for (const row of rows) {
+      if (row.extra) {
+        for (const k of Object.keys(row.extra)) {
+          if (!seen.has(k)) { seen.add(k); extraKeys.push(k); }
+        }
+      }
+    }
+
+    // Build header row
+    const headers = [
+      ...STANDARD_FIELDS.map(f => f.label),
+      ...extraKeys,
+    ];
+
+    // Build data rows
+    const sheetData: unknown[][] = [headers];
+    for (const row of rows) {
+      sheetData.push([
+        ...STANDARD_FIELDS.map(f => row[f.key] ?? ''),
+        ...extraKeys.map(k => row.extra?.[k] ?? ''),
+      ]);
+    }
+
+    const ws = XLSX.utils.aoa_to_sheet(sheetData);
+    // Truncate sheet name to Excel's 31-char limit
+    XLSX.utils.book_append_sheet(wb, ws, category.slice(0, 31));
+  }
+
+  const date = new Date().toISOString().split('T')[0];
+  XLSX.writeFile(wb, `IT_Buddy_Inventory_${date}.xlsx`);
+  return assets.length;
+}
+
+// ── Component ──────────────────────────────────────────────────────────────────
+
+export default function InventoryManagementPage() {
+  // Download state
+  const [downloading, setDownloading] = useState(false);
+
+  // Upload state
   const fileRef = useRef<HTMLInputElement>(null);
   const [sheets, setSheets] = useState<SheetInfo[]>([]);
   const [fileName, setFileName] = useState('');
   const [uploading, setUploading] = useState(false);
-  const [result, setResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const [uploadResult, setUploadResult] = useState<{ inserted: number; skipped: number } | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
+
+  async function handleDownload() {
+    setDownloading(true);
+    try {
+      const count = await buildAndDownload();
+      toast.success(`Downloaded ${count} assets.`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Download failed.');
+    }
+    setDownloading(false);
+  }
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (!file) return;
     setFileName(file.name);
-    setResult(null);
+    setUploadResult(null);
+    setErrorDetails(null);
     try {
       const detected = await parseFile(file);
       setSheets(detected);
-    } catch {
-      toast.error('Could not parse file. Make sure it is an Excel (.xlsx) file.');
+    } catch (err) {
+      setErrorDetails('File parse error: ' + (err instanceof Error ? err.message : String(err)));
     }
   }
 
@@ -232,11 +364,12 @@ export default function UploadInventoryPage() {
   }
 
   async function handleUpload() {
-    const selected = sheets.filter(s => s.selected && s.category && s.rows.length > 0);
+    const selected = sheets.filter(s => s.selected && s.rows.length > 0);
     if (selected.length === 0) { toast.error('No sheets selected.'); return; }
-
     const allRows = selected.flatMap(s => s.rows);
     setUploading(true);
+    setErrorDetails(null);
+    setUploadResult(null);
     try {
       const res = await fetch('/api/assets/upload', {
         method: 'POST',
@@ -245,13 +378,13 @@ export default function UploadInventoryPage() {
       });
       const data = await res.json();
       if (!res.ok) {
-        toast.error(data.error || 'Upload failed.');
+        setErrorDetails(data.error || 'Upload failed — no error detail returned.');
       } else {
-        setResult(data);
+        setUploadResult(data);
         toast.success(`Uploaded ${data.inserted} assets.`);
       }
-    } catch {
-      toast.error('Upload failed.');
+    } catch (err) {
+      setErrorDetails('Network error: ' + (err instanceof Error ? err.message : String(err)));
     }
     setUploading(false);
   }
@@ -262,15 +395,39 @@ export default function UploadInventoryPage() {
     <main className="min-h-screen bg-base-200 py-8 px-4">
       <div className="max-w-2xl mx-auto space-y-4">
 
+        {/* ── Download ── */}
+        <div className="card bg-base-100 shadow">
+          <div className="card-body p-5 space-y-3">
+            <h1 className="text-2xl font-bold">Download Inventory</h1>
+            <p className="text-base-content/60 text-sm">
+              Export everything in the database to an Excel file — one sheet per asset
+              category (Computer, Printer, Phone, etc.), with a Site column on every sheet
+              so you can compare against your original spreadsheet.
+            </p>
+            <button
+              className="btn btn-success btn-sm w-fit"
+              onClick={handleDownload}
+              disabled={downloading}
+            >
+              {downloading
+                ? <span className="loading loading-spinner loading-sm" />
+                : <><Download className="w-4 h-4" /> Download to Excel</>
+              }
+            </button>
+          </div>
+        </div>
+
+        <div className="divider text-base-content/30 text-xs">UPLOAD</div>
+
+        {/* ── Upload ── */}
         <div className="card bg-base-100 shadow">
           <div className="card-body p-5 space-y-4">
-            <h1 className="text-2xl font-bold">Upload Inventory</h1>
+            <h2 className="text-xl font-bold">Upload Inventory</h2>
             <p className="text-base-content/60 text-sm">
               Select an Excel (.xlsx) file. IT Buddy will detect each sheet&apos;s asset type
               and let you choose which sheets to import.
             </p>
 
-            {/* File picker */}
             <div
               className="border-2 border-dashed border-base-300 rounded-box p-8 text-center cursor-pointer hover:border-primary transition-colors"
               onClick={() => fileRef.current?.click()}
@@ -306,44 +463,35 @@ export default function UploadInventoryPage() {
                 {sheets.map((s, i) => (
                   <div
                     key={s.name}
-                    className={`flex items-center gap-3 p-3 rounded-box border ${
-                      s.category ? 'border-base-300' : 'border-base-200 opacity-40'
-                    }`}
+                    className="flex items-center gap-3 p-3 rounded-box border border-base-300"
                   >
                     <input
                       type="checkbox"
                       className="checkbox checkbox-sm"
                       checked={s.selected}
-                      disabled={!s.category}
                       onChange={() => toggleSheet(i)}
                     />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium truncate">{s.name}</p>
                       {s.site && <p className="text-xs text-base-content/50">{s.site}</p>}
                     </div>
-                    {s.category ? (
-                      <select
-                        className="select select-bordered select-xs w-28"
-                        value={s.category}
-                        onChange={e => changeCategory(i, e.target.value)}
-                        onClick={e => e.stopPropagation()}
-                      >
-                        {CATEGORIES.map(c => <option key={c}>{c}</option>)}
-                      </select>
-                    ) : (
-                      <span className="text-xs text-base-content/40 w-28 text-center">skip</span>
-                    )}
+                    <select
+                      className="select select-bordered select-xs w-28"
+                      value={s.category}
+                      onChange={e => changeCategory(i, e.target.value)}
+                      onClick={e => e.stopPropagation()}
+                    >
+                      {CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                    </select>
                     <span className="text-xs text-base-content/50 w-16 text-right">
-                      {s.category ? `${s.rows.length} rows` : ''}
+                      {s.rows.length} rows
                     </span>
                   </div>
                 ))}
               </div>
 
               <div className="flex items-center justify-between pt-2">
-                <p className="text-sm text-base-content/60">
-                  {selectedCount} assets selected
-                </p>
+                <p className="text-sm text-base-content/60">{selectedCount} assets selected</p>
                 <button
                   className="btn btn-primary btn-sm"
                   onClick={handleUpload}
@@ -359,8 +507,18 @@ export default function UploadInventoryPage() {
           </div>
         )}
 
-        {/* Result */}
-        {result && (
+        {/* Error */}
+        {errorDetails && (
+          <div className="card bg-base-100 border border-error shadow">
+            <div className="card-body p-5 space-y-2">
+              <p className="font-semibold text-error">Upload failed</p>
+              <p className="text-sm text-base-content/70">{errorDetails}</p>
+            </div>
+          </div>
+        )}
+
+        {/* Upload result */}
+        {uploadResult && (
           <div className="card bg-base-100 shadow">
             <div className="card-body p-5">
               <div className="flex items-center gap-2 text-success font-semibold">
@@ -368,8 +526,8 @@ export default function UploadInventoryPage() {
                 Upload complete
               </div>
               <p className="text-sm text-base-content/70 mt-1">
-                {result.inserted} assets added
-                {result.skipped > 0 && `, ${result.skipped} skipped (already existed)`}.
+                {uploadResult.inserted} assets added
+                {uploadResult.skipped > 0 && `, ${uploadResult.skipped} skipped (already existed)`}.
               </p>
             </div>
           </div>

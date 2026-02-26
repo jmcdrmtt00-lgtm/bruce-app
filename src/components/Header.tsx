@@ -12,8 +12,11 @@ const NAV = [
   { href: '/',                   label: 'Dashboard'            },
   { href: '/query-tasks',        label: 'Query Completed Tasks' },
   { href: '/query-inventory',    label: 'Query Inventory'       },
-  { href: '/upload-inventory',   label: 'Upload Inventory'      },
+  { href: '/inventory-management', label: 'Inventory Management'  },
 ];
+
+// Auth pages are public — hide the nav on these routes
+const AUTH_PATHS = ['/auth/'];
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
@@ -32,13 +35,17 @@ export default function Header() {
     return pathname.startsWith(href);
   }
 
+  // Show nav on all protected pages immediately — middleware already blocks
+  // unauthenticated access, so we don't need to wait for the async user check.
+  const showNav = !AUTH_PATHS.some(p => pathname.startsWith(p));
+
   return (
     <header className="navbar bg-base-100 shadow-sm px-4">
       <div className="flex-1 flex items-center gap-2">
         <MonitorCheck className="w-6 h-6 text-primary" />
         <span className="font-bold text-lg">IT Buddy</span>
       </div>
-      {user && (
+      {showNav && (
         <div className="flex-none flex items-center gap-1 mr-2">
           {NAV.map(({ href, label }) => (
             <Link

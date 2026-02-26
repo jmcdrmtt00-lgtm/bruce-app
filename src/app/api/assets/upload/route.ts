@@ -36,11 +36,22 @@ export async function POST(request: NextRequest) {
   const toInsert = [];
   let skipped = 0;
 
+  const DATE_FIELDS = ['purchased', 'install_date', 'warranty_expires'];
+
   for (const asset of assets) {
     if (asset.serial_number && existingSerials.has(asset.serial_number)) {
       skipped++;
     } else {
-      toInsert.push({ ...asset, user_id: user.id });
+      // Strip any extended-year date strings (e.g. "+045670-01-01") that
+      // PostgreSQL misreads as timezone offsets and rejects.
+      const cleaned: Record<string, unknown> = { ...asset, user_id: user.id };
+      for (const field of DATE_FIELDS) {
+        const v = cleaned[field];
+        if (typeof v === 'string' && (v.startsWith('+') || v.startsWith('-'))) {
+          cleaned[field] = null;
+        }
+      }
+      toInsert.push(cleaned);
     }
   }
 
