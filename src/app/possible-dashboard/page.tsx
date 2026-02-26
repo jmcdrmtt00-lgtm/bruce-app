@@ -372,13 +372,34 @@ Return only the JSON object, no explanation, no markdown fences.`,
       });
       const data = await res.json();
       const hire = JSON.parse(data.text);
-      if (hire.firstName)       setHireFirstName(hire.firstName);
-      if (hire.lastName)        setHireLastName(hire.lastName);
-      if (hire.role && ROLES[hire.role as keyof typeof ROLES]) setHireRole(hire.role as keyof typeof ROLES);
-      if (hire.site && SITES[hire.site as keyof typeof SITES]) setHireSite(hire.site as keyof typeof SITES);
-      if (hire.startDate)       setHireStartDate(hire.startDate);
-      if (hire.nextAssetNumber) setHireNextAsset(hire.nextAssetNumber);
-      if (hire.notes)           setHireNotes(hire.notes);
+      const fn   = hire.firstName  || '';
+      const ln   = hire.lastName   || '';
+      const role = (hire.role && ROLES[hire.role as keyof typeof ROLES]) ? hire.role as keyof typeof ROLES : 'business_office';
+      const site = (hire.site && SITES[hire.site as keyof typeof SITES]) ? hire.site as keyof typeof SITES : 'holden';
+      const comp = generateComputerName(site, role, fn, ln);
+
+      setHireFirstName(fn);
+      setHireLastName(ln);
+      setHireRole(role);
+      setHireSite(site);
+      setHireStartDate(hire.startDate       || '');
+      setHireNextAsset(hire.nextAssetNumber  || '');
+      setHireComputer(comp);
+      setHireNotes(hire.notes               || '');
+
+      // Replace the free-form text with a structured summary
+      const lines = [
+        fn                    && `First name: ${fn}`,
+        ln                    && `Last name: ${ln}`,
+        ROLES[role]           && `Role: ${ROLES[role].label}`,
+        SITES[site]           && `Site: ${SITES[site].label}`,
+        hire.startDate        && `Start date: ${hire.startDate}`,
+        hire.nextAssetNumber  && `Next asset #: ${hire.nextAssetNumber}`,
+        comp                  && `Computer name: ${comp}`,
+        hire.notes            && `Notes: ${hire.notes}`,
+      ].filter(Boolean);
+      setInfoDone(lines.join('\n'));
+
       setHireStructured(true);
     } catch {
       toast.error('Could not structure the text — try again or fill in the fields manually.');
