@@ -845,7 +845,11 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   />
                   <button
                     className="btn btn-outline btn-sm w-full"
-                    onClick={() => { setInfoDone(structuredText); setPasted(true); }}
+                    onClick={() => {
+                      setInfoDone(structuredText);
+                      setPasted(true);
+                      saveUpdate('progress', structuredText, savedInfoDoneRef);
+                    }}
                   >
                     Paste into Information gotten or what was done
                   </button>
