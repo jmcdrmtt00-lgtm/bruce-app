@@ -156,15 +156,17 @@ export default function PossibleDashboardPage() {
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Hire form fields (used when checklist = Onboarding)
-  const [hireFirstName, setHireFirstName] = useState('');
-  const [hireLastName,  setHireLastName]  = useState('');
-  const [hireRole,      setHireRole]      = useState<keyof typeof ROLES>('business_office');
-  const [hireSite,      setHireSite]      = useState<keyof typeof SITES>('holden');
-  const [hireStartDate, setHireStartDate] = useState('');
-  const [hireNextAsset, setHireNextAsset] = useState('');
-  const [hireComputer,  setHireComputer]  = useState('');
-  const [hireNotes,     setHireNotes]     = useState('');
+  // Hire form fields (populated by AI when "Structure it" is clicked)
+  const [hireFirstName,  setHireFirstName]  = useState('');
+  const [hireLastName,   setHireLastName]   = useState('');
+  const [hireRole,       setHireRole]       = useState<keyof typeof ROLES>('business_office');
+  const [hireSite,       setHireSite]       = useState<keyof typeof SITES>('holden');
+  const [hireStartDate,  setHireStartDate]  = useState('');
+  const [hireNextAsset,  setHireNextAsset]  = useState('');
+  const [hireComputer,   setHireComputer]   = useState('');
+  const [hireNotes,      setHireNotes]      = useState('');
+  const [hireStructured, setHireStructured] = useState(false);
+  const [structuring,    setStructuring]    = useState(false);
 
   // Voice state + refs
   const [listeningNum,         setListeningNum]         = useState(false);
@@ -246,6 +248,7 @@ export default function PossibleDashboardPage() {
     setHireRole('business_office'); setHireSite('holden');
     setHireStartDate(''); setHireNextAsset('');
     setHireComputer(''); setHireNotes('');
+    setHireStructured(false);
   }
 
   function loadTask(task: Incident) {
@@ -343,6 +346,45 @@ export default function PossibleDashboardPage() {
         clearLastVoiceFieldRef.current = clearFn;
       }
     };
+  }
+
+  async function handleStructureIt() {
+    if (!infoDone.trim()) return;
+    setStructuring(true);
+    try {
+      const roles = Object.keys(ROLES).join(', ');
+      const sites = 'holden, oakdale, business';
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `Extract new hire information from this text: "${infoDone.trim()}"`,
+          system: `You extract new hire information from free-form text. Return ONLY a valid JSON object with exactly these fields:
+- firstName: string
+- lastName: string
+- role: one of [${roles}]
+- site: one of [${sites}]
+- startDate: YYYY-MM-DD string (or empty string if not mentioned)
+- nextAssetNumber: string (or empty string if not mentioned)
+- notes: string (any other info not captured above, or empty string)
+Return only the JSON object, no explanation, no markdown fences.`,
+        }),
+      });
+      const data = await res.json();
+      const hire = JSON.parse(data.text);
+      if (hire.firstName)       setHireFirstName(hire.firstName);
+      if (hire.lastName)        setHireLastName(hire.lastName);
+      if (hire.role && ROLES[hire.role as keyof typeof ROLES]) setHireRole(hire.role as keyof typeof ROLES);
+      if (hire.site && SITES[hire.site as keyof typeof SITES]) setHireSite(hire.site as keyof typeof SITES);
+      if (hire.startDate)       setHireStartDate(hire.startDate);
+      if (hire.nextAssetNumber) setHireNextAsset(hire.nextAssetNumber);
+      if (hire.notes)           setHireNotes(hire.notes);
+      setHireStructured(true);
+    } catch {
+      toast.error('Could not structure the text — try again or fill in the fields manually.');
+      setHireStructured(true); // show fields so user can fill manually
+    }
+    setStructuring(false);
   }
 
   function goToOnboarding() {
@@ -728,14 +770,57 @@ export default function PossibleDashboardPage() {
                 </div>
               </div>
 
-              {/* Information gotten or what was done — hire form when Onboarding, textarea otherwise */}
-              {checklist === 'Onboarding' ? (
+              {/* Information gotten or what was done */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">Information gotten or what was done</span>
+                </label>
+                <div className="flex gap-1 items-start">
+                  <textarea
+                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                    rows={3}
+                    value={infoDone}
+                    onChange={e => setInfoDone(e.target.value)}
+                    placeholder="What information was gathered or what actions were taken..."
+                  />
+                  <VoiceButton
+                    listening={listeningInfoDone}
+                    onToggle={() => listeningInfoDone
+                      ? stopVoice(infoDoneRecRef as React.MutableRefObject<unknown>, setListeningInfoDone)
+                      : startVoice(
+                          wrapVoiceResult(
+                            text => setInfoDone(prev => prev ? `${prev} ${text}` : text),
+                            () => setInfoDone('')
+                          ),
+                          setListeningInfoDone,
+                          infoDoneRecRef as React.MutableRefObject<unknown>,
+                          true
+                        )
+                    }
+                  />
+                </div>
+
+                {/* Structure it — only shown for Onboarding when textarea has text */}
+                {checklist === 'Onboarding' && infoDone.trim() && (
+                  <button
+                    className="btn btn-outline btn-sm mt-2 w-full"
+                    onClick={handleStructureIt}
+                    disabled={structuring}
+                  >
+                    {structuring ? <span className="loading loading-spinner loading-xs" /> : null}
+                    {structuring ? 'Structuring…' : 'Structure it'}
+                  </button>
+                )}
+              </div>
+
+              {/* Editable structured fields — appear after AI runs */}
+              {checklist === 'Onboarding' && hireStructured && (
                 <div className="space-y-2 border border-base-300 rounded-box p-3">
-                  <p className="text-xs font-semibold text-base-content/70">New hire information</p>
+                  <p className="text-xs font-semibold text-base-content/70">Structured — edit if needed</p>
 
                   <div className="grid grid-cols-2 gap-2">
                     <input className="input input-bordered input-sm" placeholder="First name" value={hireFirstName} onChange={e => setHireFirstName(e.target.value)} />
-                    <input className="input input-bordered input-sm" placeholder="Last name"  value={hireLastName}  onChange={e => setHireLastName(e.target.value)}  />
+                    <input className="input input-bordered input-sm" placeholder="Last name"  value={hireLastName}  onChange={e => setHireLastName(e.target.value)} />
                   </div>
 
                   <div className="grid grid-cols-2 gap-2">
@@ -765,41 +850,9 @@ export default function PossibleDashboardPage() {
 
                   <textarea className="textarea textarea-bordered textarea-sm w-full text-sm" rows={2} placeholder="Notes" value={hireNotes} onChange={e => setHireNotes(e.target.value)} />
 
-                  {(hireFirstName || hireLastName) && (
-                    <button className="btn btn-primary btn-sm w-full gap-1" onClick={goToOnboarding}>
-                      Go to Onboarding <ExternalLink className="w-3 h-3" />
-                    </button>
-                  )}
-                </div>
-              ) : (
-                <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Information gotten or what was done</span>
-                  </label>
-                  <div className="flex gap-1 items-start">
-                    <textarea
-                      className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                      rows={3}
-                      value={infoDone}
-                      onChange={e => setInfoDone(e.target.value)}
-                      placeholder="What information was gathered or what actions were taken..."
-                    />
-                    <VoiceButton
-                      listening={listeningInfoDone}
-                      onToggle={() => listeningInfoDone
-                        ? stopVoice(infoDoneRecRef as React.MutableRefObject<unknown>, setListeningInfoDone)
-                        : startVoice(
-                            wrapVoiceResult(
-                              text => setInfoDone(prev => prev ? `${prev} ${text}` : text),
-                              () => setInfoDone('')
-                            ),
-                            setListeningInfoDone,
-                            infoDoneRecRef as React.MutableRefObject<unknown>,
-                            true
-                          )
-                      }
-                    />
-                  </div>
+                  <button className="btn btn-primary btn-sm w-full gap-1" onClick={goToOnboarding}>
+                    Go to Onboarding <ExternalLink className="w-3 h-3" />
+                  </button>
                 </div>
               )}
 
