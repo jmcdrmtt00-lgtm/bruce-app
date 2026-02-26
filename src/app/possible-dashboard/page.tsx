@@ -362,6 +362,20 @@ export default function PossibleDashboardPage() {
     setSelectedTask(task);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
+
+    // Load the most recent update of each type into the textareas
+    fetch(`/api/issues/${task.id}/updates`)
+      .then(r => r.json())
+      .then(({ updates }: { updates: { type: string; note: string }[] }) => {
+        const latest = (type: string) => updates.find(u => u.type === type)?.note ?? '';
+        const approach = latest('approach');
+        const progress = latest('progress');
+        setInfoRequired(approach);
+        setInfoDone(progress);
+        savedInfoReqRef.current  = approach;
+        savedInfoDoneRef.current = progress;
+      })
+      .catch(() => {});
   }
 
   function handleTaskNumberInput(val: string) {
