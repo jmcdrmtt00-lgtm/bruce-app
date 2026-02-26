@@ -21,6 +21,11 @@ const CHECKLIST_OPTIONS = [
   { value: 'Offboarding', label: 'Offboarding' },
 ];
 
+const CHECKLIST_ROUTES: Record<string, string> = {
+  Onboarding:  '/onboarding',
+  Offboarding: '/offboarding',
+};
+
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -631,6 +636,15 @@ export default function PossibleDashboardPage() {
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Information required or checklist</span>
                 </label>
+                {checklist && CHECKLIST_ROUTES[checklist] && (
+                  <Link
+                    href={CHECKLIST_ROUTES[checklist]}
+                    className="inline-flex items-center gap-1 text-sm underline text-primary hover:text-primary-focus mb-1 w-fit"
+                  >
+                    {checklist}
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                )}
                 <div className="flex gap-1 items-start">
                   <textarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
