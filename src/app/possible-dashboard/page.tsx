@@ -26,6 +26,10 @@ const CHECKLIST_ROUTES: Record<string, string> = {
   Offboarding: '/offboarding',
 };
 
+const CHECKLIST_FIELDS: Record<string, string> = {
+  Onboarding: 'First name, Last name, Role, Site, Start date, Next asset, Computer name, Notes',
+};
+
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
   const d = new Date(dateStr);
@@ -177,6 +181,11 @@ export default function PossibleDashboardPage() {
       })
       .catch(() => {});
   }, [loadTasks]);
+
+  // Auto-populate the info-required textarea with field names when a checklist is chosen
+  useEffect(() => {
+    setInfoRequired(CHECKLIST_FIELDS[checklist] ?? '');
+  }, [checklist]);
 
   const inProgress = useMemo(() => {
     const priorityOrder = (t: Incident) => t.priority === 'high' ? 0 : t.priority === null ? 1 : 2;
@@ -676,6 +685,15 @@ export default function PossibleDashboardPage() {
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Information gotten or what was done</span>
                 </label>
+                {checklist && CHECKLIST_ROUTES[checklist] && infoDone.trim() && (
+                  <Link
+                    href={CHECKLIST_ROUTES[checklist]}
+                    className="inline-flex items-center gap-1 text-sm underline text-primary hover:text-primary-focus mb-1 w-fit ml-2"
+                  >
+                    Go to {checklist}
+                    <ExternalLink className="w-3 h-3" />
+                  </Link>
+                )}
                 <div className="flex gap-1 items-start">
                   <textarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
