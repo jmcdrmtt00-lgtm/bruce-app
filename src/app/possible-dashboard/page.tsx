@@ -115,6 +115,36 @@ function TaskTable({
   );
 }
 
+function AutoTextarea({
+  value, onChange, onBlur, placeholder, className,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onBlur?: () => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      onChange={onChange}
+      onBlur={onBlur}
+      placeholder={placeholder}
+      className={className}
+      style={{ resize: 'none', overflow: 'hidden', minHeight: '2.25rem' }}
+    />
+  );
+}
+
 function VoiceButton({
   listening,
   onToggle,
@@ -154,7 +184,14 @@ export default function PossibleDashboardPage() {
   const [infoDone, setInfoDone]         = useState('');
   const [issues, setIssues]             = useState('');
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+
+  // Autosave bookkeeping
+  const panelDirtyRef     = useRef(false);
+  const saveTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedInfoReqRef   = useRef('');   // last-saved value for each update textarea
+  const savedInfoDoneRef  = useRef('');
+  const savedIssuesRef    = useRef('');
 
   // Hire fields — populated by AI, used for localStorage navigation
   const [hireFirstName,  setHireFirstName]  = useState('');
@@ -215,6 +252,62 @@ export default function PossibleDashboardPage() {
     setInfoRequired(CHECKLIST_FIELDS[checklist] ?? '');
   }, [checklist]);
 
+  // ── Autosave main fields ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!panelDirtyRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      setSaveStatus('saving');
+      try {
+        if (mode === 'add') {
+          if (taskName.trim().length < 2) { setSaveStatus('idle'); return; }
+          const res = await fetch('/api/issues', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: taskName.trim(), priority: priority || null, screen: checklist || null, status, date_due: dateDue || null }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setSelectedTask(data.incident);
+            setTaskNumber(String(data.incident.task_number));
+            setMode('update');
+            loadTasks();
+          }
+        } else if (selectedTask) {
+          await fetch(`/api/issues/${selectedTask.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: checklist || null, status, date_due: dateDue || null }),
+          });
+          loadTasks();
+        }
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch { setSaveStatus('idle'); }
+    }, 1500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskName, priority, dateDue, status, checklist]);
+
+  // Save a textarea as an incident_update on blur (only if changed since last save)
+  async function saveUpdate(type: string, note: string, lastRef: React.MutableRefObject<string>) {
+    const trimmed = note.trim();
+    if (!trimmed || trimmed === lastRef.current || !selectedTask) return;
+    setSaveStatus('saving');
+    try {
+      await fetch(`/api/issues/${selectedTask.id}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, note: trimmed }),
+      });
+      lastRef.current = trimmed;
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch { setSaveStatus('idle'); }
+  }
+
+  function markDirty() { panelDirtyRef.current = true; }
+
   // Auto-generate computer name from hire fields
   useEffect(() => {
     setHireComputer(generateComputerName(hireSite, hireRole, hireFirstName, hireLastName));
@@ -250,6 +343,8 @@ export default function PossibleDashboardPage() {
     setHireStartDate(''); setHireNextAsset('');
     setHireComputer(''); setHireNotes('');
     setStructuredText(''); setPasted(false);
+    panelDirtyRef.current = false;
+    savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
   }
 
   function loadTask(task: Incident) {
@@ -265,6 +360,8 @@ export default function PossibleDashboardPage() {
     setInfoDone('');
     setIssues('');
     setSelectedTask(task);
+    panelDirtyRef.current = false;
+    savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
   }
 
   function handleTaskNumberInput(val: string) {
@@ -329,8 +426,6 @@ export default function PossibleDashboardPage() {
     if (cmd.includes('clear') || cmd.includes('remove') || cmd.includes('erase') || cmd.includes('delete')) {
       clearLastVoiceFieldRef.current();
       toast('Field cleared');
-    } else if (cmd.includes('save')) {
-      handleSave();
     } else {
       toast(`Hey Buddy didn't understand: "${command}"`);
     }
@@ -419,106 +514,6 @@ Return only the JSON object, no explanation, no markdown fences.`,
       notes:           hireNotes,
     }));
     router.push('/onboarding');
-  }
-
-  async function handleSave() {
-    if (mode === 'add') {
-      if (!taskName.trim()) { toast.error('Task name is required'); return; }
-      setSaving(true);
-      try {
-        const res = await fetch('/api/issues', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title:    taskName.trim(),
-            priority: priority || null,
-            screen:   checklist || null,
-            status,
-            date_due: dateDue || null,
-          }),
-        });
-        if (!res.ok) throw new Error();
-        const data = await res.json();
-        const newId = data.incident?.id;
-
-        // Post any non-empty text areas as updates on the new task
-        if (newId) {
-          if (infoRequired.trim()) {
-            await fetch(`/api/issues/${newId}/updates`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'approach', note: infoRequired.trim() }),
-            });
-          }
-          if (infoDone.trim()) {
-            await fetch(`/api/issues/${newId}/updates`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'progress', note: infoDone.trim() }),
-            });
-          }
-          if (issues.trim()) {
-            await fetch(`/api/issues/${newId}/updates`, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ type: 'progress', note: `Issues/Comments: ${issues.trim()}` }),
-            });
-          }
-        }
-
-        toast.success('Task added!');
-        resetPanel();
-        loadTasks();
-      } catch {
-        toast.error('Failed to add task.');
-      }
-      setSaving(false);
-    } else {
-      if (!selectedTask) { toast.error('Select a task first (click a row or enter a task #).'); return; }
-      setSaving(true);
-      try {
-        await fetch(`/api/issues/${selectedTask.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title:    taskName.trim() || null,
-            priority: priority || null,
-            screen:   checklist || null,
-            status,
-            date_due: dateDue || null,
-          }),
-        });
-
-        if (infoRequired.trim()) {
-          await fetch(`/api/issues/${selectedTask.id}/updates`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'approach', note: infoRequired.trim() }),
-          });
-        }
-        if (infoDone.trim()) {
-          await fetch(`/api/issues/${selectedTask.id}/updates`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'progress', note: infoDone.trim() }),
-          });
-        }
-        if (issues.trim()) {
-          await fetch(`/api/issues/${selectedTask.id}/updates`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: 'progress', note: `Issues/Comments: ${issues.trim()}` }),
-          });
-        }
-
-        toast.success('Task updated!');
-        resetPanel();
-        loadTasks();
-      } catch {
-        toast.error('Failed to update task.');
-      }
-      setSaving(false);
-    }
   }
 
   async function handleSeedData() {
@@ -632,7 +627,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   <input
                     className="input input-bordered input-sm flex-1"
                     value={taskName}
-                    onChange={e => setTaskName(e.target.value)}
+                    onChange={e => { setTaskName(e.target.value); markDirty(); }}
                     placeholder={mode === 'add' ? 'Describe the task...' : ''}
                   />
                   <VoiceButton
@@ -666,7 +661,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
                         className={`btn btn-xs flex-1 capitalize ${priority === p
                           ? p === 'high' ? 'btn-error' : 'btn-success'
                           : 'btn-outline'}`}
-                        onClick={() => setPriority(prev => prev === p ? '' : p)}
+                        onClick={() => { setPriority(prev => prev === p ? '' : p); markDirty(); }}
                       >
                         {p}
                       </button>
@@ -683,7 +678,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
                       type="date"
                       className="input input-bordered input-sm flex-1 min-w-0"
                       value={dateDue}
-                      onChange={e => setDateDue(e.target.value)}
+                      onChange={e => { setDateDue(e.target.value); markDirty(); }}
                     />
                     <VoiceButton
                       listening={listeningDate}
@@ -713,20 +708,20 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   <div className="flex gap-1">
                     <button
                       className={`btn btn-xs flex-1 ${status === 'pending' ? 'btn-primary' : 'btn-outline'}`}
-                      onClick={() => setStatus('pending')}
+                      onClick={() => { setStatus('pending'); markDirty(); }}
                     >
                       Queue
                     </button>
                     <button
                       className={`btn btn-xs flex-1 ${status === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
-                      onClick={() => setStatus('in_progress')}
+                      onClick={() => { setStatus('in_progress'); markDirty(); }}
                     >
                       In&nbsp;Progress
                     </button>
                     {mode === 'update' && (
                       <button
                         className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
-                        onClick={() => setStatus('resolved')}
+                        onClick={() => { setStatus('resolved'); markDirty(); }}
                       >
                         Complete
                       </button>
@@ -741,7 +736,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   <select
                     className="select select-bordered select-sm w-full"
                     value={checklist}
-                    onChange={e => setChecklist(e.target.value)}
+                    onChange={e => { setChecklist(e.target.value); markDirty(); }}
                   >
                     {CHECKLIST_OPTIONS.map(opt => (
                       <option key={opt.value} value={opt.value}>{opt.label}</option>
@@ -765,11 +760,11 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   </Link>
                 )}
                 <div className="flex gap-1 items-start">
-                  <textarea
+                  <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    rows={3}
                     value={infoRequired}
                     onChange={e => setInfoRequired(e.target.value)}
+                    onBlur={() => saveUpdate('approach', infoRequired, savedInfoReqRef)}
                     placeholder="What information is needed or what does the checklist say..."
                   />
                   <VoiceButton
@@ -796,11 +791,11 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   <span className="label-text text-xs font-semibold">Information gotten or what was done</span>
                 </label>
                 <div className="flex gap-1 items-start">
-                  <textarea
+                  <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    rows={3}
                     value={infoDone}
                     onChange={e => setInfoDone(e.target.value)}
+                    onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
                     placeholder="What information was gathered or what actions were taken..."
                   />
                   <VoiceButton
@@ -843,9 +838,8 @@ Return only the JSON object, no explanation, no markdown fences.`,
               {/* Structured text textarea — appears after AI runs, before paste */}
               {checklist === 'Onboarding' && structuredText && !pasted && (
                 <div className="space-y-2">
-                  <textarea
+                  <AutoTextarea
                     className="textarea textarea-bordered textarea-sm w-full text-sm font-mono"
-                    rows={8}
                     value={structuredText}
                     onChange={e => setStructuredText(e.target.value)}
                   />
@@ -864,11 +858,11 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   <span className="label-text text-xs font-semibold">Issues / Comments</span>
                 </label>
                 <div className="flex gap-1 items-start">
-                  <textarea
+                  <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    rows={3}
                     value={issues}
                     onChange={e => setIssues(e.target.value)}
+                    onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
                     placeholder="Any issues or comments..."
                   />
                   <VoiceButton
@@ -899,14 +893,11 @@ Return only the JSON object, no explanation, no markdown fences.`,
                 </Link>
               )}
 
-              {/* Save */}
-              <button
-                className="btn btn-primary btn-sm w-full"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? <span className="loading loading-spinner loading-sm" /> : 'Save'}
-              </button>
+              {/* Autosave status */}
+              <div className="h-4 text-right">
+                {saveStatus === 'saving' && <span className="text-xs text-base-content/40">Saving…</span>}
+                {saveStatus === 'saved'  && <span className="text-xs text-success">Saved ✓</span>}
+              </div>
 
               {/* Load demo data (only when no tasks exist) */}
               {tasks.length === 0 && (
