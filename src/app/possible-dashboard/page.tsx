@@ -29,9 +29,8 @@ const CHECKLIST_ROUTES: Record<string, string> = {
   Offboarding: '/offboarding',
 };
 
-const CHECKLIST_FIELDS: Record<string, string> = {
-  Onboarding: 'First name, Last name, Role, Site, Start date, Next asset, Computer name, Notes',
-};
+// Onboarding fields are built dynamically (next asset # comes from the DB)
+const ONBOARDING_FIELDS_BASE = 'First name, Last name, Role, Site, Start date';
 
 function generateComputerName(
   site: keyof typeof SITES,
@@ -247,9 +246,23 @@ export default function PossibleDashboardPage() {
       .catch(() => {});
   }, [loadTasks]);
 
-  // Auto-populate the info-required textarea with field names when a checklist is chosen
+  // Auto-populate the info-required textarea when a checklist is chosen
   useEffect(() => {
-    setInfoRequired(CHECKLIST_FIELDS[checklist] ?? '');
+    if (checklist !== 'Onboarding') { setInfoRequired(''); return; }
+    // Fetch assets to suggest the next asset number
+    fetch('/api/assets/download')
+      .then(r => r.json())
+      .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
+        const nums = assets
+          .map(a => parseInt(a.asset_number ?? ''))
+          .filter(n => !isNaN(n));
+        const next = nums.length > 0
+          ? String(Math.max(...nums) + 1).padStart(4, '0')
+          : null;
+        const assetField = next ? `Next asset #${next}?` : 'Next asset #';
+        setInfoRequired(`${ONBOARDING_FIELDS_BASE}, ${assetField}, Notes`);
+      })
+      .catch(() => setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Notes`));
   }, [checklist]);
 
   // ── Autosave main fields ──────────────────────────────────────────────────
@@ -764,15 +777,6 @@ Return only the JSON object, no explanation, no markdown fences.`,
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Information required or checklist</span>
                 </label>
-                {checklist && CHECKLIST_ROUTES[checklist] && (
-                  <Link
-                    href={CHECKLIST_ROUTES[checklist]}
-                    className="inline-flex items-center gap-1 text-sm underline text-primary hover:text-primary-focus mb-1 w-fit ml-2"
-                  >
-                    {checklist}
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
-                )}
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
