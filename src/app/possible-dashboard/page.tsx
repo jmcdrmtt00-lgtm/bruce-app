@@ -639,7 +639,7 @@ export default function PossibleDashboardPage() {
                 {checklist && CHECKLIST_ROUTES[checklist] && (
                   <Link
                     href={CHECKLIST_ROUTES[checklist]}
-                    className="inline-flex items-center gap-1 text-sm underline text-primary hover:text-primary-focus mb-1 w-fit"
+                    className="inline-flex items-center gap-1 text-sm underline text-primary hover:text-primary-focus mb-1 w-fit ml-2"
                   >
                     {checklist}
                     <ExternalLink className="w-3 h-3" />
