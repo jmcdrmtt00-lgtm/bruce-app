@@ -449,8 +449,8 @@ export default function PossibleDashboardPage() {
     const r = new SR();
     r.continuous = continuous;
     r.interimResults = false;
-    r.onresult = (e: { results: SpeechRecognitionResultList }) => {
-      const text = Array.from(e.results).map((res: SpeechRecognitionResult) => res[0].transcript).join(' ');
+    r.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
+      const text = e.results[e.resultIndex][0].transcript;
       onResult(text);
     };
     r.onend = () => setActive(false);
