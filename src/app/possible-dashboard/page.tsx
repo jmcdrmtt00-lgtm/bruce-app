@@ -156,7 +156,7 @@ export default function PossibleDashboardPage() {
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
   const [saving, setSaving] = useState(false);
 
-  // Hire form fields (populated by AI when "Structure it" is clicked)
+  // Hire fields — populated by AI, used for localStorage navigation
   const [hireFirstName,  setHireFirstName]  = useState('');
   const [hireLastName,   setHireLastName]   = useState('');
   const [hireRole,       setHireRole]       = useState<keyof typeof ROLES>('business_office');
@@ -165,7 +165,8 @@ export default function PossibleDashboardPage() {
   const [hireNextAsset,  setHireNextAsset]  = useState('');
   const [hireComputer,   setHireComputer]   = useState('');
   const [hireNotes,      setHireNotes]      = useState('');
-  const [hireStructured, setHireStructured] = useState(false);
+  const [structuredText, setStructuredText] = useState('');  // AI output textarea
+  const [pasted,         setPasted]         = useState(false);
   const [structuring,    setStructuring]    = useState(false);
 
   // Voice state + refs
@@ -248,7 +249,7 @@ export default function PossibleDashboardPage() {
     setHireRole('business_office'); setHireSite('holden');
     setHireStartDate(''); setHireNextAsset('');
     setHireComputer(''); setHireNotes('');
-    setHireStructured(false);
+    setStructuredText(''); setPasted(false);
   }
 
   function loadTask(task: Incident) {
@@ -387,7 +388,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
       setHireComputer(comp);
       setHireNotes(hire.notes               || '');
 
-      // Replace the free-form text with a structured summary
+      // Put the structured summary into its own textarea (not the original)
       const lines = [
         fn                    && `First name: ${fn}`,
         ln                    && `Last name: ${ln}`,
@@ -398,12 +399,10 @@ Return only the JSON object, no explanation, no markdown fences.`,
         comp                  && `Computer name: ${comp}`,
         hire.notes            && `Notes: ${hire.notes}`,
       ].filter(Boolean);
-      setInfoDone(lines.join('\n'));
-
-      setHireStructured(true);
+      setStructuredText(lines.join('\n'));
+      setPasted(false);
     } catch {
-      toast.error('Could not structure the text — try again or fill in the fields manually.');
-      setHireStructured(true); // show fields so user can fill manually
+      toast.error('Could not structure the text — try again.');
     }
     setStructuring(false);
   }
@@ -828,51 +827,33 @@ Return only the JSON object, no explanation, no markdown fences.`,
                     onClick={handleStructureIt}
                     disabled={structuring}
                   >
-                    {structuring ? <span className="loading loading-spinner loading-xs" /> : null}
+                    {structuring && <span className="loading loading-spinner loading-xs" />}
                     {structuring ? 'Structuring…' : 'Structure it'}
+                  </button>
+                )}
+
+                {/* Go to Onboarding Checklist — appears after user pastes structured text */}
+                {checklist === 'Onboarding' && pasted && (
+                  <button className="btn btn-primary btn-sm mt-2 w-full gap-1" onClick={goToOnboarding}>
+                    Go to Onboarding Checklist <ExternalLink className="w-3 h-3" />
                   </button>
                 )}
               </div>
 
-              {/* Editable structured fields — appear after AI runs */}
-              {checklist === 'Onboarding' && hireStructured && (
-                <div className="space-y-2 border border-base-300 rounded-box p-3">
-                  <p className="text-xs font-semibold text-base-content/70">Structured — edit if needed</p>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <input className="input input-bordered input-sm" placeholder="First name" value={hireFirstName} onChange={e => setHireFirstName(e.target.value)} />
-                    <input className="input input-bordered input-sm" placeholder="Last name"  value={hireLastName}  onChange={e => setHireLastName(e.target.value)} />
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <select className="select select-bordered select-sm" value={hireRole} onChange={e => setHireRole(e.target.value as keyof typeof ROLES)}>
-                      {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                    </select>
-                    <select className="select select-bordered select-sm" value={hireSite} onChange={e => setHireSite(e.target.value as keyof typeof SITES)}>
-                      {Object.entries(SITES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
-                    </select>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-2">
-                    <div>
-                      <p className="text-xs text-base-content/50 mb-0.5">Start date</p>
-                      <input type="date" className="input input-bordered input-sm w-full" value={hireStartDate} onChange={e => setHireStartDate(e.target.value)} />
-                    </div>
-                    <div>
-                      <p className="text-xs text-base-content/50 mb-0.5">Next asset #</p>
-                      <input className="input input-bordered input-sm w-full" placeholder="e.g. 0314" value={hireNextAsset} onChange={e => setHireNextAsset(e.target.value)} />
-                    </div>
-                  </div>
-
-                  <div>
-                    <p className="text-xs text-base-content/50 mb-0.5">Computer name (auto-generated)</p>
-                    <input className="input input-bordered input-sm w-full" value={hireComputer} onChange={e => setHireComputer(e.target.value)} />
-                  </div>
-
-                  <textarea className="textarea textarea-bordered textarea-sm w-full text-sm" rows={2} placeholder="Notes" value={hireNotes} onChange={e => setHireNotes(e.target.value)} />
-
-                  <button className="btn btn-primary btn-sm w-full gap-1" onClick={goToOnboarding}>
-                    Go to Onboarding <ExternalLink className="w-3 h-3" />
+              {/* Structured text textarea — appears after AI runs, before paste */}
+              {checklist === 'Onboarding' && structuredText && !pasted && (
+                <div className="space-y-2">
+                  <textarea
+                    className="textarea textarea-bordered textarea-sm w-full text-sm font-mono"
+                    rows={8}
+                    value={structuredText}
+                    onChange={e => setStructuredText(e.target.value)}
+                  />
+                  <button
+                    className="btn btn-outline btn-sm w-full"
+                    onClick={() => { setInfoDone(structuredText); setPasted(true); }}
+                  >
+                    Paste into Information gotten or what was done
                   </button>
                 </div>
               )}
