@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
+import { ROLES } from '@/data/roles';
+import { SITES } from '@/data/sites';
 
 const PRIORITY_BADGE: Record<string, string> = {
   high: 'badge-error',
@@ -29,6 +32,17 @@ const CHECKLIST_ROUTES: Record<string, string> = {
 const CHECKLIST_FIELDS: Record<string, string> = {
   Onboarding: 'First name, Last name, Role, Site, Start date, Next asset, Computer name, Notes',
 };
+
+function generateComputerName(
+  site: keyof typeof SITES,
+  role: keyof typeof ROLES,
+  firstName: string,
+  lastName: string
+): string {
+  const siteCode = SITES[site]?.code ?? '';
+  const initials = `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
+  return initials ? `${siteCode}-${initials}` : '';
+}
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
@@ -123,6 +137,7 @@ function VoiceButton({
 }
 
 export default function PossibleDashboardPage() {
+  const router = useRouter();
   const [tasks, setTasks]   = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
@@ -140,6 +155,16 @@ export default function PossibleDashboardPage() {
   const [issues, setIssues]             = useState('');
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
   const [saving, setSaving] = useState(false);
+
+  // Hire form fields (used when checklist = Onboarding)
+  const [hireFirstName, setHireFirstName] = useState('');
+  const [hireLastName,  setHireLastName]  = useState('');
+  const [hireRole,      setHireRole]      = useState<keyof typeof ROLES>('business_office');
+  const [hireSite,      setHireSite]      = useState<keyof typeof SITES>('holden');
+  const [hireStartDate, setHireStartDate] = useState('');
+  const [hireNextAsset, setHireNextAsset] = useState('');
+  const [hireComputer,  setHireComputer]  = useState('');
+  const [hireNotes,     setHireNotes]     = useState('');
 
   // Voice state + refs
   const [listeningNum,         setListeningNum]         = useState(false);
@@ -187,6 +212,11 @@ export default function PossibleDashboardPage() {
     setInfoRequired(CHECKLIST_FIELDS[checklist] ?? '');
   }, [checklist]);
 
+  // Auto-generate computer name from hire fields
+  useEffect(() => {
+    setHireComputer(generateComputerName(hireSite, hireRole, hireFirstName, hireLastName));
+  }, [hireFirstName, hireLastName, hireSite, hireRole]);
+
   const inProgress = useMemo(() => {
     const priorityOrder = (t: Incident) => t.priority === 'high' ? 0 : t.priority === null ? 1 : 2;
     const byDue = (t: Incident) => t.date_due ? new Date(t.date_due).getTime() : Infinity;
@@ -212,6 +242,10 @@ export default function PossibleDashboardPage() {
     setInfoDone('');
     setIssues('');
     setSelectedTask(null);
+    setHireFirstName(''); setHireLastName('');
+    setHireRole('business_office'); setHireSite('holden');
+    setHireStartDate(''); setHireNextAsset('');
+    setHireComputer(''); setHireNotes('');
   }
 
   function loadTask(task: Incident) {
@@ -309,6 +343,20 @@ export default function PossibleDashboardPage() {
         clearLastVoiceFieldRef.current = clearFn;
       }
     };
+  }
+
+  function goToOnboarding() {
+    localStorage.setItem('onboarding_prefill', JSON.stringify({
+      firstName:       hireFirstName,
+      lastName:        hireLastName,
+      role:            hireRole,
+      site:            hireSite,
+      startDate:       hireStartDate,
+      nextAssetNumber: hireNextAsset,
+      computerName:    hireComputer,
+      notes:           hireNotes,
+    }));
+    router.push('/onboarding');
   }
 
   async function handleSave() {
@@ -680,45 +728,80 @@ export default function PossibleDashboardPage() {
                 </div>
               </div>
 
-              {/* Information gotten or what was done */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Information gotten or what was done</span>
-                </label>
-                {checklist && CHECKLIST_ROUTES[checklist] && infoDone.trim() && (
-                  <Link
-                    href={CHECKLIST_ROUTES[checklist]}
-                    className="inline-flex items-center gap-1 text-sm underline text-primary hover:text-primary-focus mb-1 w-fit ml-2"
-                  >
-                    Go to {checklist}
-                    <ExternalLink className="w-3 h-3" />
-                  </Link>
-                )}
-                <div className="flex gap-1 items-start">
-                  <textarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    rows={3}
-                    value={infoDone}
-                    onChange={e => setInfoDone(e.target.value)}
-                    placeholder="What information was gathered or what actions were taken..."
-                  />
-                  <VoiceButton
-                    listening={listeningInfoDone}
-                    onToggle={() => listeningInfoDone
-                      ? stopVoice(infoDoneRecRef as React.MutableRefObject<unknown>, setListeningInfoDone)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setInfoDone(prev => prev ? `${prev} ${text}` : text),
-                            () => setInfoDone('')
-                          ),
-                          setListeningInfoDone,
-                          infoDoneRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
+              {/* Information gotten or what was done — hire form when Onboarding, textarea otherwise */}
+              {checklist === 'Onboarding' ? (
+                <div className="space-y-2 border border-base-300 rounded-box p-3">
+                  <p className="text-xs font-semibold text-base-content/70">New hire information</p>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <input className="input input-bordered input-sm" placeholder="First name" value={hireFirstName} onChange={e => setHireFirstName(e.target.value)} />
+                    <input className="input input-bordered input-sm" placeholder="Last name"  value={hireLastName}  onChange={e => setHireLastName(e.target.value)}  />
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <select className="select select-bordered select-sm" value={hireRole} onChange={e => setHireRole(e.target.value as keyof typeof ROLES)}>
+                      {Object.entries(ROLES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                    <select className="select select-bordered select-sm" value={hireSite} onChange={e => setHireSite(e.target.value as keyof typeof SITES)}>
+                      {Object.entries(SITES).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+                    </select>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <p className="text-xs text-base-content/50 mb-0.5">Start date</p>
+                      <input type="date" className="input input-bordered input-sm w-full" value={hireStartDate} onChange={e => setHireStartDate(e.target.value)} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-base-content/50 mb-0.5">Next asset #</p>
+                      <input className="input input-bordered input-sm w-full" placeholder="e.g. 0314" value={hireNextAsset} onChange={e => setHireNextAsset(e.target.value)} />
+                    </div>
+                  </div>
+
+                  <div>
+                    <p className="text-xs text-base-content/50 mb-0.5">Computer name (auto-generated)</p>
+                    <input className="input input-bordered input-sm w-full" value={hireComputer} onChange={e => setHireComputer(e.target.value)} />
+                  </div>
+
+                  <textarea className="textarea textarea-bordered textarea-sm w-full text-sm" rows={2} placeholder="Notes" value={hireNotes} onChange={e => setHireNotes(e.target.value)} />
+
+                  {(hireFirstName || hireLastName) && (
+                    <button className="btn btn-primary btn-sm w-full gap-1" onClick={goToOnboarding}>
+                      Go to Onboarding <ExternalLink className="w-3 h-3" />
+                    </button>
+                  )}
                 </div>
-              </div>
+              ) : (
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Information gotten or what was done</span>
+                  </label>
+                  <div className="flex gap-1 items-start">
+                    <textarea
+                      className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                      rows={3}
+                      value={infoDone}
+                      onChange={e => setInfoDone(e.target.value)}
+                      placeholder="What information was gathered or what actions were taken..."
+                    />
+                    <VoiceButton
+                      listening={listeningInfoDone}
+                      onToggle={() => listeningInfoDone
+                        ? stopVoice(infoDoneRecRef as React.MutableRefObject<unknown>, setListeningInfoDone)
+                        : startVoice(
+                            wrapVoiceResult(
+                              text => setInfoDone(prev => prev ? `${prev} ${text}` : text),
+                              () => setInfoDone('')
+                            ),
+                            setListeningInfoDone,
+                            infoDoneRecRef as React.MutableRefObject<unknown>,
+                            true
+                          )
+                      }
+                    />
+                  </div>
+                </div>
+              )}
 
               {/* Issues / Comments */}
               <div className="form-control">

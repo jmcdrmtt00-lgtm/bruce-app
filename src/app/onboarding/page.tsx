@@ -12,6 +12,19 @@ export default function OnboardingPage() {
   const [output, setOutput] = useState<GeneratedOutput | null>(null);
   const [sessionId, setSessionId] = useState<string | null>(null);
 
+  // If the dashboard pre-filled hire data, skip the form and go straight to output
+  useEffect(() => {
+    const prefill = localStorage.getItem('onboarding_prefill');
+    if (prefill) {
+      localStorage.removeItem('onboarding_prefill');
+      try {
+        const hire = JSON.parse(prefill) as NewHire;
+        handleFormSubmit(hire);
+      } catch { /* ignore bad data */ }
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   async function handleFormSubmit(hire: NewHire) {
     const loginId = `ohc.${hire.firstName[0].toLowerCase()}${hire.lastName.toLowerCase()}`;
     const role = ROLES[hire.role];
