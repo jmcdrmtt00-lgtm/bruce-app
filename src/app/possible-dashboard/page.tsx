@@ -827,7 +827,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
                     value={infoDone}
-                    onChange={e => setInfoDone(e.target.value)}
+                    onChange={e => { setInfoDone(e.target.value); setPasted(false); }}
                     onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
                     placeholder="What information was gathered or what actions were taken..."
                   />
@@ -848,8 +848,8 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   />
                 </div>
 
-                {/* Structure it — only shown for Onboarding when textarea has text */}
-                {checklist === 'Onboarding' && infoDone.trim() && (
+                {/* Structure it — hidden once text has been pasted (until user edits again) */}
+                {checklist === 'Onboarding' && infoDone.trim() && !pasted && (
                   <button
                     className="btn btn-outline btn-sm mt-2 w-full"
                     onClick={handleStructureIt}
