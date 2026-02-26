@@ -191,6 +191,7 @@ export default function PossibleDashboardPage() {
   const savedInfoReqRef   = useRef('');   // last-saved value for each update textarea
   const savedInfoDoneRef  = useRef('');
   const savedIssuesRef    = useRef('');
+  const isLoadingTaskRef  = useRef(false); // suppress checklist auto-fill while loading
 
   // Hire fields — populated by AI, used for localStorage navigation
   const [hireFirstName,  setHireFirstName]  = useState('');
@@ -248,6 +249,7 @@ export default function PossibleDashboardPage() {
 
   // Auto-populate the info-required textarea when a checklist is chosen
   useEffect(() => {
+    if (isLoadingTaskRef.current) return; // task load will set infoRequired from saved updates
     if (checklist !== 'Onboarding') { setInfoRequired(''); return; }
     // Fetch assets to suggest the next asset number
     fetch('/api/assets/download')
@@ -305,7 +307,7 @@ export default function PossibleDashboardPage() {
   // Save a textarea as an incident_update on blur (only if changed since last save)
   async function saveUpdate(type: string, note: string, lastRef: React.MutableRefObject<string>) {
     const trimmed = note.trim();
-    if (!trimmed || trimmed === lastRef.current || !selectedTask) return;
+    if (trimmed === lastRef.current || !selectedTask) return; // allow empty to persist clears
     setSaveStatus('saving');
     try {
       await fetch(`/api/issues/${selectedTask.id}/updates`, {
@@ -361,6 +363,7 @@ export default function PossibleDashboardPage() {
   }
 
   function loadTask(task: Incident) {
+    isLoadingTaskRef.current = true;
     setMode('update');
     setTaskNumber(String(task.task_number));
     setTaskName(task.title || task.description);
@@ -387,8 +390,9 @@ export default function PossibleDashboardPage() {
         setInfoDone(progress);
         savedInfoReqRef.current  = approach;
         savedInfoDoneRef.current = progress;
+        isLoadingTaskRef.current = false;
       })
-      .catch(() => {});
+      .catch(() => { isLoadingTaskRef.current = false; });
   }
 
   function handleTaskNumberInput(val: string) {
