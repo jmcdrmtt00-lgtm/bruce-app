@@ -191,7 +191,6 @@ export default function PossibleDashboardPage() {
   const savedInfoReqRef   = useRef('');   // last-saved value for each update textarea
   const savedInfoDoneRef  = useRef('');
   const savedIssuesRef    = useRef('');
-  const isLoadingTaskRef  = useRef(false); // suppress checklist auto-fill while loading
 
   // Hire fields — populated by AI, used for localStorage navigation
   const [hireFirstName,  setHireFirstName]  = useState('');
@@ -247,25 +246,25 @@ export default function PossibleDashboardPage() {
       .catch(() => {});
   }, [loadTasks]);
 
-  // Auto-populate the info-required textarea when a checklist is chosen
+  // Auto-populate the info-required textarea whenever checklist or selected task changes.
+  // (infoRequired is always a generated template — never saved to or loaded from the DB)
   useEffect(() => {
-    if (isLoadingTaskRef.current) return; // task load will set infoRequired from saved updates
     if (checklist !== 'Onboarding') { setInfoRequired(''); return; }
-    // Fetch assets to suggest the next asset number
+    setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Notes`);
     fetch('/api/assets/download')
       .then(r => r.json())
       .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
-        const nums = assets
-          .map(a => parseInt(a.asset_number ?? ''))
-          .filter(n => !isNaN(n));
-        const next = nums.length > 0
-          ? String(Math.max(...nums) + 1).padStart(4, '0')
-          : null;
-        const assetField = next ? `Next asset #${next}?` : 'Next asset #';
-        setInfoRequired(`${ONBOARDING_FIELDS_BASE}, ${assetField}, Notes`);
+        const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
+        if (nums.length > 0) {
+          const next = String(Math.max(...nums) + 1).padStart(4, '0');
+          setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Notes`);
+        }
       })
-      .catch(() => setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Notes`));
-  }, [checklist]);
+      .catch(() => {});
+  // selectedTask in deps ensures this re-runs when a new task is loaded,
+  // even if the checklist value didn't change between tasks.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checklist, selectedTask]);
 
   // ── Autosave main fields ──────────────────────────────────────────────────
   useEffect(() => {
@@ -363,7 +362,6 @@ export default function PossibleDashboardPage() {
   }
 
   function loadTask(task: Incident) {
-    isLoadingTaskRef.current = true;
     setMode('update');
     setTaskNumber(String(task.task_number));
     setTaskName(task.title || task.description);
@@ -371,28 +369,42 @@ export default function PossibleDashboardPage() {
     setDateDue(task.date_due || '');
     const s = task.status === 'open' ? 'pending' : task.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
-    setChecklist(task.screen || '');
-    setInfoRequired('');
+    const newChecklist = task.screen || '';
+    setChecklist(newChecklist);
     setInfoDone('');
     setIssues('');
     setSelectedTask(task);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
 
-    // Load the most recent update of each type into the textareas
+    // Set the infoRequired template immediately (synchronous) so it always appears.
+    // Then refine with the actual next asset number once the fetch resolves.
+    if (newChecklist === 'Onboarding') {
+      setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Notes`);
+      fetch('/api/assets/download')
+        .then(r => r.json())
+        .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
+          const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
+          if (nums.length > 0) {
+            const next = String(Math.max(...nums) + 1).padStart(4, '0');
+            setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Notes`);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setInfoRequired('');
+    }
+
+    // Load the most recent progress update into infoDone
     fetch(`/api/issues/${task.id}/updates`)
       .then(r => r.json())
       .then(({ updates }: { updates: { type: string; note: string }[] }) => {
         const latest = (type: string) => updates.find(u => u.type === type)?.note ?? '';
-        const approach = latest('approach');
         const progress = latest('progress');
-        setInfoRequired(approach);
         setInfoDone(progress);
-        savedInfoReqRef.current  = approach;
         savedInfoDoneRef.current = progress;
-        isLoadingTaskRef.current = false;
       })
-      .catch(() => { isLoadingTaskRef.current = false; });
+      .catch(() => {});
   }
 
   function handleTaskNumberInput(val: string) {
@@ -786,7 +798,6 @@ Return only the JSON object, no explanation, no markdown fences.`,
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
                     value={infoRequired}
                     onChange={e => setInfoRequired(e.target.value)}
-                    onBlur={() => saveUpdate('approach', infoRequired, savedInfoReqRef)}
                     placeholder="What information is needed or what does the checklist say..."
                   />
                   <VoiceButton
