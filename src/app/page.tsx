@@ -254,14 +254,14 @@ export default function DashboardPage() {
   // (infoRequired is always a generated template — never saved to or loaded from the DB)
   useEffect(() => {
     if (checklist !== 'Onboarding') { setInfoRequired(''); return; }
-    setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Notes`);
+    setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Computer name, Notes`);
     fetch('/api/assets/download')
       .then(r => r.json())
       .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
         const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
         if (nums.length > 0) {
           const next = String(Math.max(...nums) + 1).padStart(4, '0');
-          setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Notes`);
+          setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Computer name, Notes`);
         }
       })
       .catch(() => {});
@@ -369,14 +369,14 @@ export default function DashboardPage() {
     // Set the infoRequired template immediately (synchronous) so it always appears.
     // Then refine with the actual next asset number once the fetch resolves.
     if (newChecklist === 'Onboarding') {
-      setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Notes`);
+      setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Computer name, Notes`);
       fetch('/api/assets/download')
         .then(r => r.json())
         .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
           const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
           if (nums.length > 0) {
             const next = String(Math.max(...nums) + 1).padStart(4, '0');
-            setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Notes`);
+            setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Computer name, Notes`);
           }
         })
         .catch(() => {});
@@ -494,6 +494,7 @@ export default function DashboardPage() {
 - site: one of [${sites}]
 - startDate: YYYY-MM-DD string (or empty string if not mentioned)
 - nextAssetNumber: string (or empty string if not mentioned)
+- computerName: string (or empty string if not mentioned)
 - notes: string (any other info not captured above, or empty string)
 Return only the JSON object, no explanation, no markdown fences.`,
         }),
@@ -504,27 +505,31 @@ Return only the JSON object, no explanation, no markdown fences.`,
       const ln   = hire.lastName   || '';
       const role = (hire.role && ROLES[hire.role as keyof typeof ROLES]) ? hire.role as keyof typeof ROLES : 'business_office';
       const site = (hire.site && SITES[hire.site as keyof typeof SITES]) ? hire.site as keyof typeof SITES : 'holden';
-      const comp = generateComputerName(site, role, fn, ln);
+      // Use AI-extracted computer name if provided, otherwise auto-generate
+      const comp = hire.computerName || generateComputerName(site, role, fn, ln);
+      // If AI didn't find an asset number, fall back to the suggested one from the ? hint in infoRequired
+      const suggestedAsset = (() => { const m = infoRequired.match(/Next asset #(\d+)\?/); return m ? m[1] : ''; })();
+      const assetNum = hire.nextAssetNumber || suggestedAsset;
 
       setHireFirstName(fn);
       setHireLastName(ln);
       setHireRole(role);
       setHireSite(site);
-      setHireStartDate(hire.startDate       || '');
-      setHireNextAsset(hire.nextAssetNumber  || '');
+      setHireStartDate(hire.startDate || '');
+      setHireNextAsset(assetNum);
       setHireComputer(comp);
-      setHireNotes(hire.notes               || '');
+      setHireNotes(hire.notes || '');
 
       // Put the structured summary into its own textarea (not the original)
       const lines = [
-        fn                    && `First name: ${fn}`,
-        ln                    && `Last name: ${ln}`,
-        ROLES[role]           && `Role: ${ROLES[role].label}`,
-        SITES[site]           && `Site: ${SITES[site].label}`,
-        hire.startDate        && `Start date: ${hire.startDate}`,
-        hire.nextAssetNumber  && `Next asset #: ${hire.nextAssetNumber}`,
-        comp                  && `Computer name: ${comp}`,
-        hire.notes            && `Notes: ${hire.notes}`,
+        fn             && `First name: ${fn}`,
+        ln             && `Last name: ${ln}`,
+        ROLES[role]    && `Role: ${ROLES[role].label}`,
+        SITES[site]    && `Site: ${SITES[site].label}`,
+        hire.startDate && `Start date: ${hire.startDate}`,
+        assetNum       && `Next asset #: ${assetNum}`,
+        comp           && `Computer name: ${comp}`,
+        hire.notes     && `Notes: ${hire.notes}`,
       ].filter(Boolean);
       setStructuredText(lines.join('\n'));
       setPasted(false);
