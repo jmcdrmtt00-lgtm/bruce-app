@@ -172,13 +172,17 @@ export default function DashboardPage() {
   const [seeding, setSeeding] = useState(false);
 
   // Panel state
-  const [mode, setMode]         = useState<'add' | 'update'>('add');
   const [taskNumber, setTaskNumber] = useState('');
   const [taskName, setTaskName]   = useState('');
   const [priority, setPriority]   = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]     = useState('');
   const [status, setStatus]       = useState<'pending' | 'in_progress' | 'resolved'>('pending');
   const [checklist, setChecklist] = useState('');
+
+  // Add task modal state
+  const [showAddModal,   setShowAddModal]   = useState(false);
+  const [newTaskName,    setNewTaskName]    = useState('');
+  const [newTaskStatus,  setNewTaskStatus]  = useState<'pending' | 'in_progress'>('pending');
   const [infoRequired, setInfoRequired] = useState('');
   const [infoDone, setInfoDone]         = useState('');
   const [issues, setIssues]             = useState('');
@@ -273,21 +277,7 @@ export default function DashboardPage() {
     saveTimerRef.current = setTimeout(async () => {
       setSaveStatus('saving');
       try {
-        if (mode === 'add') {
-          if (taskName.trim().length < 2) { setSaveStatus('idle'); return; }
-          const res = await fetch('/api/issues', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: taskName.trim(), priority: priority || null, screen: checklist || null, status, date_due: dateDue || null }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            setSelectedTask(data.incident);
-            setTaskNumber(String(data.incident.task_number));
-            setMode('update');
-            loadTasks();
-          }
-        } else if (selectedTask) {
+        if (selectedTask) {
           await fetch(`/api/issues/${selectedTask.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
@@ -362,7 +352,6 @@ export default function DashboardPage() {
   }
 
   function loadTask(task: Incident) {
-    setMode('update');
     setTaskNumber(String(task.task_number));
     setTaskName(task.title || task.description);
     setPriority(task.priority || '');
@@ -559,6 +548,27 @@ Return only the JSON object, no explanation, no markdown fences.`,
     router.push('/onboarding');
   }
 
+  async function handleAddTask() {
+    if (!newTaskName.trim()) return;
+    try {
+      const res = await fetch('/api/issues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: newTaskName.trim(), status: newTaskStatus }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setShowAddModal(false);
+        setNewTaskName('');
+        setNewTaskStatus('pending');
+        loadTasks();
+        loadTask(data.incident);
+      }
+    } catch {
+      toast.error('Failed to add task');
+    }
+  }
+
   async function handleDelete() {
     if (!selectedTask) return;
     const res = await fetch(`/api/issues/${selectedTask.id}`, { method: 'DELETE' });
@@ -627,44 +637,45 @@ Return only the JSON object, no explanation, no markdown fences.`,
           <div className="card bg-base-100 shadow">
             <div className="card-body p-4 space-y-2">
 
-              {/* Mode toggle */}
-              <div className="flex gap-2">
+              {/* Add task button */}
+              <div className="flex justify-between items-center">
                 <button
-                  className={`btn btn-sm flex-1 ${mode === 'add' ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => { setMode('add'); resetPanel(); }}
+                  className="btn btn-primary btn-sm"
+                  onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskStatus('pending'); }}
                 >
-                  Add
+                  + Add task
                 </button>
-                <button
-                  className={`btn btn-sm flex-1 ${mode === 'update' ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => { setMode('update'); resetPanel(); }}
-                >
-                  Update
-                </button>
+                {selectedTask && (
+                  <button className="btn btn-ghost btn-xs text-base-content/40" onClick={resetPanel}>
+                    clear
+                  </button>
+                )}
               </div>
 
-              {/* Task # + Task Name on one line */}
+              {/* Empty state hint */}
+              {!selectedTask && (
+                <p className="text-center text-base-content/40 text-sm py-4">Select a task to edit it</p>
+              )}
+
+              {/* Task fields — only shown when a task is selected */}
+              {selectedTask && (<>
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">
-                    Task Name{mode === 'add' ? ' *' : ''}
-                  </span>
+                  <span className="label-text text-xs font-semibold">Task Name</span>
                 </label>
                 <div className="flex gap-1">
-                  {mode === 'update' && (
-                    <input
-                      type="text"
-                      className="input input-bordered input-sm w-12 text-center px-1"
-                      placeholder="#"
-                      value={taskNumber}
-                      onChange={e => handleTaskNumberInput(e.target.value)}
-                    />
-                  )}
+                  <input
+                    type="text"
+                    className="input input-bordered input-sm w-12 text-center px-1"
+                    placeholder="#"
+                    value={taskNumber}
+                    onChange={e => handleTaskNumberInput(e.target.value)}
+                  />
                   <input
                     className="input input-bordered input-sm flex-1"
                     value={taskName}
                     onChange={e => { setTaskName(e.target.value); markDirty(); }}
-                    placeholder={mode === 'add' ? 'Describe the task...' : ''}
+                    placeholder=""
                   />
                   <VoiceButton
                     listening={listeningName}
@@ -754,14 +765,12 @@ Return only the JSON object, no explanation, no markdown fences.`,
                     >
                       In&nbsp;Progress
                     </button>
-                    {mode === 'update' && (
-                      <button
-                        className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
-                        onClick={() => { setStatus('resolved'); markDirty(); }}
-                      >
-                        Complete
-                      </button>
-                    )}
+                    <button
+                      className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
+                      onClick={() => { setStatus('resolved'); markDirty(); }}
+                    >
+                      Complete
+                    </button>
                   </div>
                 </div>
 
@@ -914,23 +923,22 @@ Return only the JSON object, no explanation, no markdown fences.`,
               </div>
 
               {/* View details link + delete */}
-              {mode === 'update' && selectedTask && (
-                <div className="flex items-center gap-2">
-                  <Link
-                    href={`/issues/${selectedTask.id}`}
-                    className="btn btn-ghost btn-xs gap-1 flex-1"
-                  >
-                    <ExternalLink className="w-3 h-3" /> View full details
-                  </Link>
-                  <button
-                    className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
-                    onClick={handleDelete}
-                    title="Delete task"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
+              <div className="flex items-center gap-2">
+                <Link
+                  href={`/issues/${selectedTask.id}`}
+                  className="btn btn-ghost btn-xs gap-1 flex-1"
+                >
+                  <ExternalLink className="w-3 h-3" /> View full details
+                </Link>
+                <button
+                  className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
+                  onClick={handleDelete}
+                  title="Delete task"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                </button>
+              </div>
+              </>)}
 
               {/* Autosave status */}
               <div className="h-4 text-right">
@@ -954,6 +962,41 @@ Return only the JSON object, no explanation, no markdown fences.`,
         </div>
 
       </div>
+      {/* Add task modal */}
+      {showAddModal && (
+        <dialog className="modal modal-open">
+          <div className="modal-box max-w-sm">
+            <h3 className="font-semibold mb-3">Add task</h3>
+            <input
+              className="input input-bordered input-sm w-full mb-3"
+              placeholder="Task name..."
+              value={newTaskName}
+              onChange={e => setNewTaskName(e.target.value)}
+              autoFocus
+              onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+            />
+            <div className="flex gap-1 mb-4">
+              <button
+                className={`btn btn-xs flex-1 ${newTaskStatus === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setNewTaskStatus('pending')}
+              >
+                Queue
+              </button>
+              <button
+                className={`btn btn-xs flex-1 ${newTaskStatus === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
+                onClick={() => setNewTaskStatus('in_progress')}
+              >
+                In Progress
+              </button>
+            </div>
+            <div className="modal-action mt-0">
+              <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal(false)}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={handleAddTask} disabled={!newTaskName.trim()}>Save</button>
+            </div>
+          </div>
+          <div className="modal-backdrop" onClick={() => setShowAddModal(false)} />
+        </dialog>
+      )}
     </main>
   );
 }
