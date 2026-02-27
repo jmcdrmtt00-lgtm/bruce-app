@@ -47,9 +47,12 @@ export async function DELETE(
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  // Delete child updates first to satisfy foreign key constraints
+  await supabase.from('incident_updates').delete().eq('incident_id', id);
+
   const { error } = await supabase
     .from('incidents')
-    .update({ status: 'deleted', updated_at: new Date().toISOString() })
+    .delete()
     .eq('id', id)
     .eq('user_id', user.id);
 
