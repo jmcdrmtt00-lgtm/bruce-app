@@ -561,7 +561,12 @@ Return only the JSON object, no explanation, no markdown fences.`,
 
   async function handleDelete() {
     if (!selectedTask) return;
-    await fetch(`/api/issues/${selectedTask.id}`, { method: 'DELETE' });
+    const res = await fetch(`/api/issues/${selectedTask.id}`, { method: 'DELETE' });
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      toast.error(data.error || 'Failed to delete task');
+      return;
+    }
     resetPanel();
     loadTasks();
   }

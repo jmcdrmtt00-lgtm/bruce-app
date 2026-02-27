@@ -48,7 +48,7 @@ export async function DELETE(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // Delete child updates first to satisfy foreign key constraints
-  await supabase.from('incident_updates').delete().eq('incident_id', id);
+  await supabase.from('incident_updates').delete().eq('incident_id', id).eq('user_id', user.id);
 
   const { error } = await supabase
     .from('incidents')
