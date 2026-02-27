@@ -219,26 +219,27 @@ function parseFile(file: File): Promise<SheetInfo[]> {
           const headerRow = findHeaderRow(ws);
           let rawRows: Record<string, unknown>[];
           try {
-            rawRows = XLSX.utils.sheet_to_json<Record<string, unknown>>(ws, {
-              defval: null,
-              range: headerRow,
-            });
+            // Parse as arrays first so we control the key names for null/empty headers
+            const allArrays = XLSX.utils.sheet_to_json<unknown[]>(ws, { header: 1, defval: null, range: headerRow });
+            if (allArrays.length < 2) { rawRows = []; }
+            else {
+              const headerCells = allArrays[0] as unknown[];
+              rawRows = (allArrays.slice(1) as unknown[][]).map(rowArr => {
+                const obj: Record<string, unknown> = {};
+                headerCells.forEach((h, i) => {
+                  // Null/empty header in column 0 = "Assigned To"; other empty columns use a placeholder
+                  const key = (h === null || h === undefined || String(h).trim() === '')
+                    ? (i === 0 ? 'Assigned To' : `__col_${i}`)
+                    : String(h).trim();
+                  obj[key] = rowArr[i] ?? null;
+                });
+                return obj;
+              });
+            }
           } catch {
             rawRows = [];
           }
           if (rawRows.length === 0) continue;
-          // Normalize the headerless first column (xlsx generates '__EMPTY' or '' for null headers)
-          // Rename it to 'Assigned To' so mapRow can reliably find it
-          const firstEmptyKey = rawRows.length > 0
-            ? Object.keys(rawRows[0]).find(k => k === '__EMPTY' || k === '')
-            : undefined;
-          if (firstEmptyKey !== undefined) {
-            rawRows = rawRows.map(row => {
-              const r = { ...row, 'Assigned To': row[firstEmptyKey] };
-              delete r[firstEmptyKey];
-              return r;
-            });
-          }
           const rows = rawRows.map(r => mapRow(r, category, site, status)).filter(hasData);
           if (rows.length === 0) continue;
           sheets.push({ name: sheetName, category, site, rows, selected: true });
