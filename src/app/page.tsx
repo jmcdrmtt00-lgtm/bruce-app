@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
 import { ROLES } from '@/data/roles';
@@ -559,6 +559,13 @@ Return only the JSON object, no explanation, no markdown fences.`,
     router.push('/onboarding');
   }
 
+  async function handleDelete() {
+    if (!selectedTask) return;
+    await fetch(`/api/issues/${selectedTask.id}`, { method: 'DELETE' });
+    resetPanel();
+    loadTasks();
+  }
+
   async function handleSeedData() {
     setSeeding(true);
     try {
@@ -920,14 +927,23 @@ Return only the JSON object, no explanation, no markdown fences.`,
                 </div>
               </div>
 
-              {/* View details link */}
+              {/* View details link + delete */}
               {mode === 'update' && selectedTask && (
-                <Link
-                  href={`/issues/${selectedTask.id}`}
-                  className="btn btn-ghost btn-xs gap-1 w-full"
-                >
-                  <ExternalLink className="w-3 h-3" /> View full details
-                </Link>
+                <div className="flex items-center gap-2">
+                  <Link
+                    href={`/issues/${selectedTask.id}`}
+                    className="btn btn-ghost btn-xs gap-1 flex-1"
+                  >
+                    <ExternalLink className="w-3 h-3" /> View full details
+                  </Link>
+                  <button
+                    className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
+                    onClick={handleDelete}
+                    title="Delete task"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
               )}
 
               {/* Autosave status */}
