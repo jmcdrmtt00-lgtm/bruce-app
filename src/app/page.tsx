@@ -68,7 +68,7 @@ function TaskTable({
   }
   return (
     <div className="overflow-x-auto rounded-box shadow">
-      <table className="table table-sm table-fixed bg-base-100 w-full">
+      <table className="table table-xs table-fixed bg-base-100 w-full">
         <thead>
           <tr>
             <th className="w-8">#</th>
