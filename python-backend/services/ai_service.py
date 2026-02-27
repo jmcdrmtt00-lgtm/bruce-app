@@ -59,7 +59,8 @@ Table: assets (IT asset inventory — computers, printers, phones, tablets, came
 - id: UUID
 - user_id: UUID  <-- always filter: WHERE user_id = '{user_id}'
 - category: TEXT (e.g. 'Computer', 'Printer', 'Phone', 'iPad', 'Camera', 'Network')
-- name: TEXT (person's name, role, or desk/location label, nullable)
+- assigned_to: TEXT (primary identifier — person's name, department, or location label from the first column of the Excel sheet, nullable)
+- name: TEXT (secondary description — role, desk label, or notes, nullable)
 - site: TEXT ('Holden', 'Oakdale', 'Business Office', 'IT Office', 'Shared')
 - status: TEXT ('active', 'retired')
 - make: TEXT (brand, e.g. ThinkCentre, Lenovo, HP, Polycom, nullable)

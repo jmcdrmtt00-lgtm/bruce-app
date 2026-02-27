@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 interface AssetResult {
   id?: string;
   category?: string;
+  assigned_to?: string;
   name?: string;
   notes?: string;
   make?: string;
@@ -160,8 +161,11 @@ export default function QueryInventoryPage() {
                     {results.map((r, i) => (
                       <tr key={r.id ?? i} className="hover">
                         <td>
-                          <p className="font-medium text-sm">{r.name ?? '—'}</p>
-                          {r.notes && r.notes !== r.name && (
+                          <p className="font-medium text-sm">{r.assigned_to ?? r.name ?? '—'}</p>
+                          {r.assigned_to && r.name && (
+                            <p className="text-xs text-base-content/50">{r.name}</p>
+                          )}
+                          {r.notes && (
                             <p className="text-xs text-base-content/50">{r.notes}</p>
                           )}
                         </td>

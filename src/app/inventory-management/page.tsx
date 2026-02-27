@@ -11,6 +11,7 @@ const CATEGORIES = ['Computer', 'Printer', 'Phone', 'iPad', 'Camera', 'Network',
 
 interface AssetRow {
   category: string;
+  assigned_to: string | null;
   name: string | null;
   site: string | null;
   status: 'active' | 'retired';
@@ -65,7 +66,7 @@ function detectStatus(sheetName: string): 'active' | 'retired' {
 // ── Row mapping ────────────────────────────────────────────────────────────────
 
 const KNOWN_COLUMNS = [
-  'notes', 'user', 'previous owner', 'location',
+  'notes', 'user', 'previous owner', 'location', 'assigned to', '__empty',
   'machine brand', 'brand', 'make',
   'type', 'machine type', 'model',
   'os', 'ram',
@@ -166,6 +167,7 @@ function mapRow(
 
   return {
     category,
+    assigned_to: getString(row, '__EMPTY', 'Assigned To'),
     name: getString(row, 'User', 'Location', 'Notes', 'Previous Owner'),
     site,
     status,
@@ -242,6 +244,7 @@ function parseFile(file: File): Promise<SheetInfo[]> {
 // ── Download: write database contents to Excel ────────────────────────────────
 
 const STANDARD_FIELDS: { key: keyof AssetRow; label: string }[] = [
+  { key: 'assigned_to',      label: 'Assigned To'      },
   { key: 'name',             label: 'Name'             },
   { key: 'site',             label: 'Site'             },
   { key: 'status',           label: 'Status'           },

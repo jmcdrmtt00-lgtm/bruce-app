@@ -43,6 +43,7 @@ export interface Asset {
   id: string;
   user_id: string;
   category: string;
+  assigned_to: string | null;
   name: string | null;
   site: string | null;
   status: 'active' | 'retired';
