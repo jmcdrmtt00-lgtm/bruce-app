@@ -48,15 +48,18 @@ export async function DELETE(
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   // Delete child updates first to satisfy foreign key constraints
-  await supabase.from('incident_updates').delete().eq('incident_id', id).eq('user_id', user.id);
+  const { error: updatesError } = await supabase
+    .from('incident_updates').delete().eq('incident_id', id).eq('user_id', user.id);
+  if (updatesError) return NextResponse.json({ error: `Updates delete failed: ${updatesError.message}` }, { status: 500 });
 
-  const { error } = await supabase
+  const { error, count } = await supabase
     .from('incidents')
-    .delete()
+    .delete({ count: 'exact' })
     .eq('id', id)
     .eq('user_id', user.id);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (!count || count === 0) return NextResponse.json({ error: `No rows deleted (id=${id})` }, { status: 404 });
   return NextResponse.json({ success: true });
 }
 
