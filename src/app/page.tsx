@@ -788,10 +788,10 @@ Return only the JSON object, no explanation, no markdown fences.`,
                 </div>
               </div>
 
-              {/* Information required or checklist */}
+              {/* Information needed */}
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Information required or checklist</span>
+                  <span className="label-text text-xs font-semibold">Information needed</span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
@@ -818,10 +818,10 @@ Return only the JSON object, no explanation, no markdown fences.`,
                 </div>
               </div>
 
-              {/* Information gotten or what was done */}
+              {/* Results */}
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Information gotten or what was done</span>
+                  <span className="label-text text-xs font-semibold">Results</span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
@@ -884,7 +884,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
                       saveUpdate('progress', structuredText, savedInfoDoneRef);
                     }}
                   >
-                    Paste into Information gotten or what was done
+                    Paste into Results
                   </button>
                 </div>
               )}
