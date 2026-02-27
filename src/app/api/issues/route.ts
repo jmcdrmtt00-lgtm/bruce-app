@@ -20,6 +20,7 @@ export async function GET() {
     .from('incidents')
     .select('*')
     .eq('user_id', user.id)
+    .neq('status', 'deleted')
     .order('created_at', { ascending: false });
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
