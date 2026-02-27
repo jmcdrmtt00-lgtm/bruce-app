@@ -66,7 +66,12 @@ export async function POST(request: NextRequest) {
   }
 
   if (toUpdate.length > 0) {
-    const { error } = await supabase.from('assets').upsert(toUpdate, { onConflict: 'id' });
+    // Deduplicate by id — duplicate serial numbers in the Excel would otherwise cause
+    // "ON CONFLICT DO UPDATE command cannot affect row a second time"
+    const dedupedUpdate = Array.from(
+      new Map(toUpdate.map(r => [r.id as string, r])).values()
+    );
+    const { error } = await supabase.from('assets').upsert(dedupedUpdate, { onConflict: 'id' });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
