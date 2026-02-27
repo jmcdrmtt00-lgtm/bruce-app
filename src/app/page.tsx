@@ -542,15 +542,33 @@ Return only the JSON object, no explanation, no markdown fences.`,
   }
 
   function goToOnboarding() {
+    // Hire fields are set by handleStructureIt in the current session.
+    // If loading an existing task (fields empty), parse them from the structured text in Results.
+    let fn = hireFirstName, ln = hireLastName;
+    let role = hireRole, site = hireSite;
+    let startDate = hireStartDate, assetNum = hireNextAsset;
+    let comp = hireComputer, notes = hireNotes;
+
+    if (!fn && infoDone) {
+      const get = (label: string) => {
+        const m = infoDone.match(new RegExp(`^${label}:\\s*(.+)$`, 'mi'));
+        return m ? m[1].trim() : '';
+      };
+      fn       = get('First name');
+      ln       = get('Last name');
+      startDate = get('Start date');
+      assetNum = get('Next asset #');
+      comp     = get('Computer name');
+      notes    = get('Notes');
+      const roleLabel = get('Role');
+      const siteLabel = get('Site');
+      role = (Object.entries(ROLES).find(([, v]) => v.label === roleLabel)?.[0] ?? 'business_office') as keyof typeof ROLES;
+      site = (Object.entries(SITES).find(([, v]) => v.label === siteLabel)?.[0] ?? 'holden') as keyof typeof SITES;
+    }
+
     localStorage.setItem('onboarding_prefill', JSON.stringify({
-      firstName:       hireFirstName,
-      lastName:        hireLastName,
-      role:            hireRole,
-      site:            hireSite,
-      startDate:       hireStartDate,
-      nextAssetNumber: hireNextAsset,
-      computerName:    hireComputer,
-      notes:           hireNotes,
+      firstName: fn, lastName: ln, role, site,
+      startDate, nextAssetNumber: assetNum, computerName: comp, notes,
     }));
     router.push('/onboarding');
   }
