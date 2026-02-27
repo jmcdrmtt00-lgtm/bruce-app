@@ -625,7 +625,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
         {/* Add / Update Panel */}
         <div className="lg:sticky lg:top-4">
           <div className="card bg-base-100 shadow">
-            <div className="card-body p-4 space-y-3">
+            <div className="card-body p-4 space-y-2">
 
               {/* Mode toggle */}
               <div className="flex gap-2">
@@ -643,35 +643,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
                 </button>
               </div>
 
-              {/* Task # (update mode) */}
-              {mode === 'update' && (
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    className="input input-bordered input-sm flex-1"
-                    placeholder="Task # (or click a row)"
-                    value={taskNumber}
-                    onChange={e => handleTaskNumberInput(e.target.value)}
-                  />
-                  <VoiceButton
-                    listening={listeningNum}
-                    onToggle={() => listeningNum
-                      ? stopVoice(numRecRef as React.MutableRefObject<unknown>, setListeningNum)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => handleTaskNumberInput(parseSpokenNumber(text)),
-                            () => handleTaskNumberInput('')
-                          ),
-                          setListeningNum,
-                          numRecRef as React.MutableRefObject<unknown>,
-                          false
-                        )
-                    }
-                  />
-                </div>
-              )}
-
-              {/* Task Name */}
+              {/* Task # + Task Name on one line */}
               <div className="form-control">
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">
@@ -679,6 +651,15 @@ Return only the JSON object, no explanation, no markdown fences.`,
                   </span>
                 </label>
                 <div className="flex gap-1">
+                  {mode === 'update' && (
+                    <input
+                      type="text"
+                      className="input input-bordered input-sm w-12 text-center px-1"
+                      placeholder="#"
+                      value={taskNumber}
+                      onChange={e => handleTaskNumberInput(e.target.value)}
+                    />
+                  )}
                   <input
                     className="input input-bordered input-sm flex-1"
                     value={taskName}
