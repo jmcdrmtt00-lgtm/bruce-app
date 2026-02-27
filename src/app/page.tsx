@@ -392,6 +392,8 @@ export default function DashboardPage() {
         const progress = latest('progress');
         setInfoDone(progress);
         savedInfoDoneRef.current = progress;
+        // If results look like structured onboarding data, show "Go to Onboarding Checklist" not "Structure it"
+        setPasted(/^Computer name:/m.test(progress));
       })
       .catch(() => {});
   }
