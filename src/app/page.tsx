@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
+import { ROLES } from '@/data/roles';
+import { SITES } from '@/data/sites';
 
 const PRIORITY_BADGE: Record<string, string> = {
   high: 'badge-error',
@@ -14,6 +17,38 @@ const PRIORITY_BADGE: Record<string, string> = {
 const PRIORITY_LABEL: Record<string, string> = {
   high: 'H', low: 'L',
 };
+
+const CHECKLIST_OPTIONS = [
+  { value: '',            label: 'No checklist' },
+  { value: 'Onboarding', label: 'Onboarding'   },
+  { value: 'Offboarding', label: 'Offboarding' },
+];
+
+const CHECKLIST_ROUTES: Record<string, string> = {
+  Onboarding:  '/onboarding',
+  Offboarding: '/offboarding',
+};
+
+// Onboarding fields are built dynamically (next asset # comes from the DB)
+const ONBOARDING_FIELDS_BASE = 'First name, Last name, Role, Site, Start date';
+
+function generateComputerName(
+  site: keyof typeof SITES,
+  role: keyof typeof ROLES,
+  firstName: string,
+  lastName: string
+): string {
+  const siteCode = SITES[site]?.code ?? '';
+  const initials = `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
+  return initials ? `${siteCode}-${initials}` : '';
+}
+
+function formatDate(dateStr: string | null | undefined): string {
+  if (!dateStr) return '';
+  const d = new Date(dateStr);
+  if (isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+}
 
 function TaskTable({
   tasks,
@@ -39,7 +74,7 @@ function TaskTable({
             <th className="w-8">#</th>
             <th>Task Name</th>
             <th className="w-24 text-center">{variant === 'inProgress' ? 'Priority' : 'Source'}</th>
-            <th className="w-28 text-center">Screen</th>
+            <th className="w-28 text-center">Date Due</th>
           </tr>
         </thead>
         <tbody>
@@ -68,16 +103,8 @@ function TaskTable({
                   )
                 )}
               </td>
-              <td className="text-center">
-                {task.screen && (
-                  <Link
-                    href="/onboarding"
-                    className="badge badge-outline badge-sm hover:badge-primary transition-colors whitespace-nowrap"
-                    onClick={e => e.stopPropagation()}
-                  >
-                    {task.screen}
-                  </Link>
-                )}
+              <td className="text-center text-xs text-base-content/70">
+                {formatDate(task.date_due)}
               </td>
             </tr>
           ))}
@@ -87,41 +114,112 @@ function TaskTable({
   );
 }
 
+function AutoTextarea({
+  value, onChange, onBlur, placeholder, className,
+}: {
+  value: string;
+  onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  onBlur?: () => void;
+  placeholder?: string;
+  className?: string;
+}) {
+  const ref = useRef<HTMLTextAreaElement>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
+  return (
+    <textarea
+      ref={ref}
+      rows={1}
+      value={value}
+      onChange={onChange}
+      onBlur={onBlur}
+      placeholder={placeholder}
+      className={className}
+      style={{ resize: 'none', overflow: 'hidden', minHeight: '2.25rem' }}
+    />
+  );
+}
+
+function VoiceButton({
+  listening,
+  onToggle,
+}: {
+  listening: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <button
+      className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${
+        listening
+          ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200'
+          : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'
+      }`}
+      onClick={onToggle}
+    >
+      {listening ? 'listening' : 'not listening'}
+    </button>
+  );
+}
+
 export default function DashboardPage() {
-  const [tasks, setTasks] = useState<Incident[]>([]);
+  const router = useRouter();
+  const [tasks, setTasks]   = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
 
   // Panel state
-  const [mode, setMode] = useState<'add' | 'update'>('add');
+  const [mode, setMode]         = useState<'add' | 'update'>('add');
   const [taskNumber, setTaskNumber] = useState('');
-  const [taskName, setTaskName] = useState('');
-  const [priority, setPriority] = useState<'high' | 'medium' | 'low' | ''>('');
-  const [customer, setCustomer] = useState('');
-  const [screen, setScreen] = useState('');
-  const [status, setStatus] = useState<'pending' | 'in_progress' | 'resolved'>('pending');
-  const [dateDue, setDateDue] = useState('');
-  const [note, setNote] = useState('');
+  const [taskName, setTaskName]   = useState('');
+  const [priority, setPriority]   = useState<'high' | 'low' | ''>('');
+  const [dateDue, setDateDue]     = useState('');
+  const [status, setStatus]       = useState<'pending' | 'in_progress' | 'resolved'>('pending');
+  const [checklist, setChecklist] = useState('');
+  const [infoRequired, setInfoRequired] = useState('');
+  const [infoDone, setInfoDone]         = useState('');
+  const [issues, setIssues]             = useState('');
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
-  const [saving, setSaving] = useState(false);
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // Voice for note
-  const [listeningNote, setListeningNote] = useState(false);
-  const noteRecRef = useRef<unknown>(null);
+  // Autosave bookkeeping
+  const panelDirtyRef     = useRef(false);
+  const saveTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const savedInfoReqRef   = useRef('');   // last-saved value for each update textarea
+  const savedInfoDoneRef  = useRef('');
+  const savedIssuesRef    = useRef('');
 
-  // Voice for task #
-  const [listeningNum, setListeningNum] = useState(false);
-  const numRecRef = useRef<unknown>(null);
+  // Hire fields — populated by AI, used for localStorage navigation
+  const [hireFirstName,  setHireFirstName]  = useState('');
+  const [hireLastName,   setHireLastName]   = useState('');
+  const [hireRole,       setHireRole]       = useState<keyof typeof ROLES>('business_office');
+  const [hireSite,       setHireSite]       = useState<keyof typeof SITES>('holden');
+  const [hireStartDate,  setHireStartDate]  = useState('');
+  const [hireNextAsset,  setHireNextAsset]  = useState('');
+  const [hireComputer,   setHireComputer]   = useState('');
+  const [hireNotes,      setHireNotes]      = useState('');
+  const [structuredText, setStructuredText] = useState('');  // AI output textarea
+  const [pasted,         setPasted]         = useState(false);
+  const [structuring,    setStructuring]    = useState(false);
 
-  // Voice for other fields
-  const [listeningName, setListeningName] = useState(false);
-  const nameRecRef = useRef<unknown>(null);
-  const [listeningCustomer, setListeningCustomer] = useState(false);
-  const customerRecRef = useRef<unknown>(null);
-  const [listeningDate, setListeningDate] = useState(false);
-  const dateRecRef = useRef<unknown>(null);
+  // Voice state + refs
+  const [listeningNum,         setListeningNum]         = useState(false);
+  const [listeningName,        setListeningName]        = useState(false);
+  const [listeningDate,        setListeningDate]        = useState(false);
+  const [listeningInfoRequired, setListeningInfoRequired] = useState(false);
+  const [listeningInfoDone,    setListeningInfoDone]    = useState(false);
+  const [listeningIssues,      setListeningIssues]      = useState(false);
 
-  // Tracks a function that clears the last voice-populated field (for "Hey Buddy, clear that")
+  const numRecRef           = useRef<unknown>(null);
+  const nameRecRef          = useRef<unknown>(null);
+  const dateRecRef          = useRef<unknown>(null);
+  const infoRequiredRecRef  = useRef<unknown>(null);
+  const infoDoneRecRef      = useRef<unknown>(null);
+  const issuesRecRef        = useRef<unknown>(null);
+
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
 
   const loadTasks = useCallback(() => {
@@ -131,10 +229,8 @@ export default function DashboardPage() {
       .catch(() => setLoading(false));
   }, []);
 
-  // Track page view on mount
   useEffect(() => { fetch('/api/track-click', { method: 'POST' }).catch(() => {}); }, []);
 
-  // On load: fetch tasks, then run suggestion check
   useEffect(() => {
     loadTasks();
     fetch('/api/suggest', { method: 'POST' })
@@ -147,8 +243,89 @@ export default function DashboardPage() {
           loadTasks();
         }
       })
-      .catch(() => {}); // silently ignore if backend unavailable
+      .catch(() => {});
   }, [loadTasks]);
+
+  // Auto-populate the info-required textarea whenever checklist or selected task changes.
+  // (infoRequired is always a generated template — never saved to or loaded from the DB)
+  useEffect(() => {
+    if (checklist !== 'Onboarding') { setInfoRequired(''); return; }
+    setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Notes`);
+    fetch('/api/assets/download')
+      .then(r => r.json())
+      .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
+        const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
+        if (nums.length > 0) {
+          const next = String(Math.max(...nums) + 1).padStart(4, '0');
+          setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Notes`);
+        }
+      })
+      .catch(() => {});
+  // selectedTask in deps ensures this re-runs when a new task is loaded,
+  // even if the checklist value didn't change between tasks.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checklist, selectedTask]);
+
+  // ── Autosave main fields ──────────────────────────────────────────────────
+  useEffect(() => {
+    if (!panelDirtyRef.current) return;
+    if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+    saveTimerRef.current = setTimeout(async () => {
+      setSaveStatus('saving');
+      try {
+        if (mode === 'add') {
+          if (taskName.trim().length < 2) { setSaveStatus('idle'); return; }
+          const res = await fetch('/api/issues', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: taskName.trim(), priority: priority || null, screen: checklist || null, status, date_due: dateDue || null }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setSelectedTask(data.incident);
+            setTaskNumber(String(data.incident.task_number));
+            setMode('update');
+            loadTasks();
+          }
+        } else if (selectedTask) {
+          await fetch(`/api/issues/${selectedTask.id}`, {
+            method: 'PATCH',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: checklist || null, status, date_due: dateDue || null }),
+          });
+          loadTasks();
+        }
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch { setSaveStatus('idle'); }
+    }, 1500);
+    return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [taskName, priority, dateDue, status, checklist]);
+
+  // Save a textarea as an incident_update on blur (only if changed since last save)
+  async function saveUpdate(type: string, note: string, lastRef: React.MutableRefObject<string>) {
+    const trimmed = note.trim();
+    if (trimmed === lastRef.current || !selectedTask) return; // allow empty to persist clears
+    setSaveStatus('saving');
+    try {
+      await fetch(`/api/issues/${selectedTask.id}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, note: trimmed }),
+      });
+      lastRef.current = trimmed;
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch { setSaveStatus('idle'); }
+  }
+
+  function markDirty() { panelDirtyRef.current = true; }
+
+  // Auto-generate computer name from hire fields
+  useEffect(() => {
+    setHireComputer(generateComputerName(hireSite, hireRole, hireFirstName, hireLastName));
+  }, [hireFirstName, hireLastName, hireSite, hireRole]);
 
   const inProgress = useMemo(() => {
     const priorityOrder = (t: Incident) => t.priority === 'high' ? 0 : t.priority === null ? 1 : 2;
@@ -168,12 +345,20 @@ export default function DashboardPage() {
     setTaskNumber('');
     setTaskName('');
     setPriority('');
-    setCustomer('');
-    setScreen('');
-    setStatus('pending');
     setDateDue('');
-    setNote('');
+    setStatus('pending');
+    setChecklist('');
+    setInfoRequired('');
+    setInfoDone('');
+    setIssues('');
     setSelectedTask(null);
+    setHireFirstName(''); setHireLastName('');
+    setHireRole('business_office'); setHireSite('holden');
+    setHireStartDate(''); setHireNextAsset('');
+    setHireComputer(''); setHireNotes('');
+    setStructuredText(''); setPasted(false);
+    panelDirtyRef.current = false;
+    savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
   }
 
   function loadTask(task: Incident) {
@@ -181,12 +366,45 @@ export default function DashboardPage() {
     setTaskNumber(String(task.task_number));
     setTaskName(task.title || task.description);
     setPriority(task.priority || '');
-    setCustomer(task.reported_by || '');
+    setDateDue(task.date_due || '');
     const s = task.status === 'open' ? 'pending' : task.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
-    setDateDue(task.date_due || '');
-    setNote('');
+    const newChecklist = task.screen || '';
+    setChecklist(newChecklist);
+    setInfoDone('');
+    setIssues('');
     setSelectedTask(task);
+    panelDirtyRef.current = false;
+    savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
+
+    // Set the infoRequired template immediately (synchronous) so it always appears.
+    // Then refine with the actual next asset number once the fetch resolves.
+    if (newChecklist === 'Onboarding') {
+      setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Notes`);
+      fetch('/api/assets/download')
+        .then(r => r.json())
+        .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
+          const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
+          if (nums.length > 0) {
+            const next = String(Math.max(...nums) + 1).padStart(4, '0');
+            setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Notes`);
+          }
+        })
+        .catch(() => {});
+    } else {
+      setInfoRequired('');
+    }
+
+    // Load the most recent progress update into infoDone
+    fetch(`/api/issues/${task.id}/updates`)
+      .then(r => r.json())
+      .then(({ updates }: { updates: { type: string; note: string }[] }) => {
+        const latest = (type: string) => updates.find(u => u.type === type)?.note ?? '';
+        const progress = latest('progress');
+        setInfoDone(progress);
+        savedInfoDoneRef.current = progress;
+      })
+      .catch(() => {});
   }
 
   function handleTaskNumberInput(val: string) {
@@ -201,7 +419,6 @@ export default function DashboardPage() {
   function parseSpokenDate(text: string): string {
     const d = new Date(text);
     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
-    // Try prepending current year for "February 28"-style input
     const withYear = new Date(`${text} ${new Date().getFullYear()}`);
     if (!isNaN(withYear.getTime())) return withYear.toISOString().split('T')[0];
     toast.error(`Couldn't parse "${text}" as a date`);
@@ -232,8 +449,8 @@ export default function DashboardPage() {
     const r = new SR();
     r.continuous = continuous;
     r.interimResults = false;
-    r.onresult = (e: { results: SpeechRecognitionResultList }) => {
-      const text = Array.from(e.results).map((res: SpeechRecognitionResult) => res[0].transcript).join(' ');
+    r.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
+      const text = e.results[e.resultIndex][0].transcript;
       onResult(text);
     };
     r.onend = () => setActive(false);
@@ -247,71 +464,11 @@ export default function DashboardPage() {
     setActive(false);
   }
 
-  async function handleSave() {
-    if (mode === 'add') {
-      if (!taskName.trim()) { toast.error('Task name is required'); return; }
-      setSaving(true);
-      try {
-        const res = await fetch('/api/issues', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title:       taskName.trim(),
-            reported_by: customer.trim() || null,
-            priority:    priority || null,
-            screen:      screen   || null,
-            status,
-            date_due:    dateDue  || null,
-          }),
-        });
-        if (!res.ok) throw new Error();
-        toast.success('Task added!');
-        resetPanel();
-        loadTasks();
-      } catch {
-        toast.error('Failed to add task.');
-      }
-      setSaving(false);
-    } else {
-      if (!selectedTask) { toast.error('Select a task first (click a row or enter a task #).'); return; }
-      setSaving(true);
-      try {
-        await fetch(`/api/issues/${selectedTask.id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            title:       taskName.trim() || null,
-            reported_by: customer.trim() || null,
-            priority:    priority || null,
-            status,
-            date_due:    dateDue  || null,
-          }),
-        });
-        if (note.trim()) {
-          const updateType = status === 'resolved' ? 'resolved' : 'progress';
-          await fetch(`/api/issues/${selectedTask.id}/updates`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ type: updateType, note: note.trim() }),
-          });
-        }
-        toast.success('Task updated!');
-        resetPanel();
-        loadTasks();
-      } catch {
-        toast.error('Failed to update task.');
-      }
-      setSaving(false);
-    }
-  }
-
   function handleVoiceCommand(command: string) {
     const cmd = command.toLowerCase().trim().replace(/^[,.]?\s*/, '');
     if (cmd.includes('clear') || cmd.includes('remove') || cmd.includes('erase') || cmd.includes('delete')) {
       clearLastVoiceFieldRef.current();
       toast('Field cleared');
-    } else if (cmd.includes('save')) {
-      handleSave();
     } else {
       toast(`Hey Buddy didn't understand: "${command}"`);
     }
@@ -328,6 +485,78 @@ export default function DashboardPage() {
         clearLastVoiceFieldRef.current = clearFn;
       }
     };
+  }
+
+  async function handleStructureIt() {
+    if (!infoDone.trim()) return;
+    setStructuring(true);
+    try {
+      const roles = Object.keys(ROLES).join(', ');
+      const sites = 'holden, oakdale, business';
+      const res = await fetch('/api/ai', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: `Extract new hire information from this text: "${infoDone.trim()}"`,
+          system: `You extract new hire information from free-form text. Return ONLY a valid JSON object with exactly these fields:
+- firstName: string
+- lastName: string
+- role: one of [${roles}]
+- site: one of [${sites}]
+- startDate: YYYY-MM-DD string (or empty string if not mentioned)
+- nextAssetNumber: string (or empty string if not mentioned)
+- notes: string (any other info not captured above, or empty string)
+Return only the JSON object, no explanation, no markdown fences.`,
+        }),
+      });
+      const data = await res.json();
+      const hire = JSON.parse(data.text);
+      const fn   = hire.firstName  || '';
+      const ln   = hire.lastName   || '';
+      const role = (hire.role && ROLES[hire.role as keyof typeof ROLES]) ? hire.role as keyof typeof ROLES : 'business_office';
+      const site = (hire.site && SITES[hire.site as keyof typeof SITES]) ? hire.site as keyof typeof SITES : 'holden';
+      const comp = generateComputerName(site, role, fn, ln);
+
+      setHireFirstName(fn);
+      setHireLastName(ln);
+      setHireRole(role);
+      setHireSite(site);
+      setHireStartDate(hire.startDate       || '');
+      setHireNextAsset(hire.nextAssetNumber  || '');
+      setHireComputer(comp);
+      setHireNotes(hire.notes               || '');
+
+      // Put the structured summary into its own textarea (not the original)
+      const lines = [
+        fn                    && `First name: ${fn}`,
+        ln                    && `Last name: ${ln}`,
+        ROLES[role]           && `Role: ${ROLES[role].label}`,
+        SITES[site]           && `Site: ${SITES[site].label}`,
+        hire.startDate        && `Start date: ${hire.startDate}`,
+        hire.nextAssetNumber  && `Next asset #: ${hire.nextAssetNumber}`,
+        comp                  && `Computer name: ${comp}`,
+        hire.notes            && `Notes: ${hire.notes}`,
+      ].filter(Boolean);
+      setStructuredText(lines.join('\n'));
+      setPasted(false);
+    } catch {
+      toast.error('Could not structure the text — try again.');
+    }
+    setStructuring(false);
+  }
+
+  function goToOnboarding() {
+    localStorage.setItem('onboarding_prefill', JSON.stringify({
+      firstName:       hireFirstName,
+      lastName:        hireLastName,
+      role:            hireRole,
+      site:            hireSite,
+      startDate:       hireStartDate,
+      nextAssetNumber: hireNextAsset,
+      computerName:    hireComputer,
+      notes:           hireNotes,
+    }));
+    router.push('/onboarding');
   }
 
   async function handleSeedData() {
@@ -412,9 +641,9 @@ export default function DashboardPage() {
                     value={taskNumber}
                     onChange={e => handleTaskNumberInput(e.target.value)}
                   />
-                  <button
-                    className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningNum ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
-                    onClick={() => listeningNum
+                  <VoiceButton
+                    listening={listeningNum}
+                    onToggle={() => listeningNum
                       ? stopVoice(numRecRef as React.MutableRefObject<unknown>, setListeningNum)
                       : startVoice(
                           wrapVoiceResult(
@@ -426,9 +655,7 @@ export default function DashboardPage() {
                           false
                         )
                     }
-                  >
-                    {listeningNum ? 'listening' : 'not listening'}
-                  </button>
+                  />
                 </div>
               )}
 
@@ -443,12 +670,12 @@ export default function DashboardPage() {
                   <input
                     className="input input-bordered input-sm flex-1"
                     value={taskName}
-                    onChange={e => setTaskName(e.target.value)}
+                    onChange={e => { setTaskName(e.target.value); markDirty(); }}
                     placeholder={mode === 'add' ? 'Describe the task...' : ''}
                   />
-                  <button
-                    className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningName ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
-                    onClick={() => listeningName
+                  <VoiceButton
+                    listening={listeningName}
+                    onToggle={() => listeningName
                       ? stopVoice(nameRecRef as React.MutableRefObject<unknown>, setListeningName)
                       : startVoice(
                           wrapVoiceResult(
@@ -460,173 +687,237 @@ export default function DashboardPage() {
                           true
                         )
                     }
-                  >
-                    {listeningName ? 'listening' : 'not listening'}
-                  </button>
-                </div>
-              </div>
-
-              {/* Priority */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Priority</span>
-                </label>
-                <div className="flex gap-1">
-                  {(['high', 'low'] as const).map(p => (
-                    <button
-                      key={p}
-                      className={`btn btn-xs flex-1 capitalize ${priority === p
-                        ? p === 'high' ? 'btn-error' : 'btn-success'
-                        : 'btn-outline'}`}
-                      onClick={() => setPriority(prev => prev === p ? '' : p)}
-                    >
-                      {p}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Customer */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Customer</span>
-                </label>
-                <div className="flex gap-1">
-                  <input
-                    className="input input-bordered input-sm flex-1"
-                    value={customer}
-                    onChange={e => setCustomer(e.target.value)}
-                    placeholder="Who is this for?"
                   />
-                  <button
-                    className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningCustomer ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
-                    onClick={() => listeningCustomer
-                      ? stopVoice(customerRecRef as React.MutableRefObject<unknown>, setListeningCustomer)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setCustomer(text),
-                            () => setCustomer('')
-                          ),
-                          setListeningCustomer,
-                          customerRecRef as React.MutableRefObject<unknown>,
-                          false
-                        )
-                    }
-                  >
-                    {listeningCustomer ? 'listening' : 'not listening'}
-                  </button>
                 </div>
               </div>
 
-              {/* Screen (add mode only) */}
-              {mode === 'add' && (
+              {/* Priority + Date Due (two-column row) */}
+              <div className="grid grid-cols-2 gap-3">
                 <div className="form-control">
                   <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Screen</span>
+                    <span className="label-text text-xs font-semibold">Priority</span>
+                  </label>
+                  <div className="flex gap-1">
+                    {(['high', 'low'] as const).map(p => (
+                      <button
+                        key={p}
+                        className={`btn btn-xs flex-1 capitalize ${priority === p
+                          ? p === 'high' ? 'btn-error' : 'btn-success'
+                          : 'btn-outline'}`}
+                        onClick={() => { setPriority(prev => prev === p ? '' : p); markDirty(); }}
+                      >
+                        {p}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Date Due</span>
+                  </label>
+                  <div className="flex gap-1">
+                    <input
+                      type="date"
+                      className="input input-bordered input-sm flex-1 min-w-0"
+                      value={dateDue}
+                      onChange={e => { setDateDue(e.target.value); markDirty(); }}
+                    />
+                    <VoiceButton
+                      listening={listeningDate}
+                      onToggle={() => listeningDate
+                        ? stopVoice(dateRecRef as React.MutableRefObject<unknown>, setListeningDate)
+                        : startVoice(
+                            wrapVoiceResult(
+                              text => { const d = parseSpokenDate(text); if (d) setDateDue(d); },
+                              () => setDateDue('')
+                            ),
+                            setListeningDate,
+                            dateRecRef as React.MutableRefObject<unknown>,
+                            false
+                          )
+                      }
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Status + Checklist (two-column row) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Status</span>
+                  </label>
+                  <div className="flex gap-1">
+                    <button
+                      className={`btn btn-xs flex-1 ${status === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => { setStatus('pending'); markDirty(); }}
+                    >
+                      Queue
+                    </button>
+                    <button
+                      className={`btn btn-xs flex-1 ${status === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => { setStatus('in_progress'); markDirty(); }}
+                    >
+                      In&nbsp;Progress
+                    </button>
+                    {mode === 'update' && (
+                      <button
+                        className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
+                        onClick={() => { setStatus('resolved'); markDirty(); }}
+                      >
+                        Complete
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Checklist</span>
                   </label>
                   <select
                     className="select select-bordered select-sm w-full"
-                    value={screen}
-                    onChange={e => setScreen(e.target.value)}
+                    value={checklist}
+                    onChange={e => { setChecklist(e.target.value); markDirty(); }}
                   >
-                    <option value="">None</option>
-                    <option value="Onboarding">Onboarding</option>
+                    {CHECKLIST_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
+                    ))}
                   </select>
+                </div>
+              </div>
+
+              {/* Information required or checklist */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">Information required or checklist</span>
+                </label>
+                <div className="flex gap-1 items-start">
+                  <AutoTextarea
+                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                    value={infoRequired}
+                    onChange={e => setInfoRequired(e.target.value)}
+                    placeholder="What information is needed or what does the checklist say..."
+                  />
+                  <VoiceButton
+                    listening={listeningInfoRequired}
+                    onToggle={() => listeningInfoRequired
+                      ? stopVoice(infoRequiredRecRef as React.MutableRefObject<unknown>, setListeningInfoRequired)
+                      : startVoice(
+                          wrapVoiceResult(
+                            text => setInfoRequired(prev => prev ? `${prev} ${text}` : text),
+                            () => setInfoRequired('')
+                          ),
+                          setListeningInfoRequired,
+                          infoRequiredRecRef as React.MutableRefObject<unknown>,
+                          true
+                        )
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Information gotten or what was done */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">Information gotten or what was done</span>
+                </label>
+                <div className="flex gap-1 items-start">
+                  <AutoTextarea
+                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                    value={infoDone}
+                    onChange={e => { setInfoDone(e.target.value); setPasted(false); }}
+                    onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
+                    placeholder="What information was gathered or what actions were taken..."
+                  />
+                  <VoiceButton
+                    listening={listeningInfoDone}
+                    onToggle={() => listeningInfoDone
+                      ? stopVoice(infoDoneRecRef as React.MutableRefObject<unknown>, setListeningInfoDone)
+                      : startVoice(
+                          wrapVoiceResult(
+                            text => setInfoDone(prev => prev ? `${prev} ${text}` : text),
+                            () => setInfoDone('')
+                          ),
+                          setListeningInfoDone,
+                          infoDoneRecRef as React.MutableRefObject<unknown>,
+                          true
+                        )
+                    }
+                  />
+                </div>
+
+                {/* Structure it — hidden once text has been pasted (until user edits again) */}
+                {checklist === 'Onboarding' && infoDone.trim() && !pasted && (
+                  <button
+                    className="btn btn-outline btn-sm mt-2 w-full"
+                    onClick={handleStructureIt}
+                    disabled={structuring}
+                  >
+                    {structuring && <span className="loading loading-spinner loading-xs" />}
+                    {structuring ? 'Structuring…' : 'Structure it'}
+                  </button>
+                )}
+
+                {/* Go to Onboarding Checklist — appears after user pastes structured text */}
+                {checklist === 'Onboarding' && pasted && (
+                  <button className="btn btn-primary btn-sm mt-2 w-full gap-1" onClick={goToOnboarding}>
+                    Go to Onboarding Checklist <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
+              </div>
+
+              {/* Structured text textarea — appears after AI runs, before paste */}
+              {checklist === 'Onboarding' && structuredText && !pasted && (
+                <div className="space-y-2">
+                  <AutoTextarea
+                    className="textarea textarea-bordered textarea-sm w-full text-sm font-mono"
+                    value={structuredText}
+                    onChange={e => setStructuredText(e.target.value)}
+                  />
+                  <button
+                    className="btn btn-outline btn-sm w-full"
+                    onClick={() => {
+                      setInfoDone(structuredText);
+                      setPasted(true);
+                      saveUpdate('progress', structuredText, savedInfoDoneRef);
+                    }}
+                  >
+                    Paste into Information gotten or what was done
+                  </button>
                 </div>
               )}
 
-              {/* Status */}
+              {/* Issues / Comments */}
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Status</span>
+                  <span className="label-text text-xs font-semibold">Issues / Comments</span>
                 </label>
-                <div className="flex gap-1">
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'pending' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => setStatus('pending')}
-                  >
-                    Queue
-                  </button>
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => setStatus('in_progress')}
-                  >
-                    In Progress
-                  </button>
-                  {mode === 'update' && (
-                    <button
-                      className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
-                      onClick={() => setStatus('resolved')}
-                    >
-                      Complete
-                    </button>
-                  )}
-                </div>
-              </div>
-
-              {/* Date Due */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Date Due</span>
-                </label>
-                <div className="flex gap-1">
-                  <input
-                    type="date"
-                    className="input input-bordered input-sm flex-1"
-                    value={dateDue}
-                    onChange={e => setDateDue(e.target.value)}
+                <div className="flex gap-1 items-start">
+                  <AutoTextarea
+                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                    value={issues}
+                    onChange={e => setIssues(e.target.value)}
+                    onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
+                    placeholder="Any issues or comments..."
                   />
-                  <button
-                    className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningDate ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
-                    onClick={() => listeningDate
-                      ? stopVoice(dateRecRef as React.MutableRefObject<unknown>, setListeningDate)
+                  <VoiceButton
+                    listening={listeningIssues}
+                    onToggle={() => listeningIssues
+                      ? stopVoice(issuesRecRef as React.MutableRefObject<unknown>, setListeningIssues)
                       : startVoice(
                           wrapVoiceResult(
-                            text => { const d = parseSpokenDate(text); if (d) setDateDue(d); },
-                            () => setDateDue('')
+                            text => setIssues(prev => prev ? `${prev} ${text}` : text),
+                            () => setIssues('')
                           ),
-                          setListeningDate,
-                          dateRecRef as React.MutableRefObject<unknown>,
-                          false
+                          setListeningIssues,
+                          issuesRecRef as React.MutableRefObject<unknown>,
+                          true
                         )
                     }
-                  >
-                    {listeningDate ? 'listening' : 'not listening'}
-                  </button>
+                  />
                 </div>
-              </div>
-
-              {/* Note */}
-              <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Note</span>
-                  </label>
-                  <div className="flex gap-1 items-start">
-                    <textarea
-                      className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                      rows={3}
-                      value={note}
-                      onChange={e => setNote(e.target.value)}
-                      placeholder="Type or speak an update..."
-                    />
-                    <button
-                      className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listeningNote ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
-                      onClick={() => listeningNote
-                        ? stopVoice(noteRecRef as React.MutableRefObject<unknown>, setListeningNote)
-                        : startVoice(
-                            wrapVoiceResult(
-                              text => setNote(prev => prev ? `${prev} ${text}` : text),
-                              () => setNote('')
-                            ),
-                            setListeningNote,
-                            noteRecRef as React.MutableRefObject<unknown>,
-                            true
-                          )
-                      }
-                    >
-                      {listeningNote ? 'listening' : 'not listening'}
-                    </button>
-                  </div>
               </div>
 
               {/* View details link */}
@@ -639,14 +930,11 @@ export default function DashboardPage() {
                 </Link>
               )}
 
-              {/* Save */}
-              <button
-                className="btn btn-primary btn-sm w-full"
-                onClick={handleSave}
-                disabled={saving}
-              >
-                {saving ? <span className="loading loading-spinner loading-sm" /> : 'Save'}
-              </button>
+              {/* Autosave status */}
+              <div className="h-4 text-right">
+                {saveStatus === 'saving' && <span className="text-xs text-base-content/40">Saving…</span>}
+                {saveStatus === 'saved'  && <span className="text-xs text-success">Saved ✓</span>}
+              </div>
 
               {/* Load demo data (only when no tasks exist) */}
               {tasks.length === 0 && (
