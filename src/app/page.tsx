@@ -81,7 +81,7 @@ function TaskTable({
           {tasks.map(task => (
             <tr
               key={task.id}
-              className="hover cursor-pointer"
+              className="hover cursor-pointer [&>td]:py-0.5"
               onClick={() => onRowClick(task)}
             >
               <td className="text-base-content/40 text-xs">{task.task_number}</td>
