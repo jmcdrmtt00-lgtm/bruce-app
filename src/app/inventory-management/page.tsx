@@ -227,6 +227,18 @@ function parseFile(file: File): Promise<SheetInfo[]> {
             rawRows = [];
           }
           if (rawRows.length === 0) continue;
+          // Normalize the headerless first column (xlsx generates '__EMPTY' or '' for null headers)
+          // Rename it to 'Assigned To' so mapRow can reliably find it
+          const firstEmptyKey = rawRows.length > 0
+            ? Object.keys(rawRows[0]).find(k => k === '__EMPTY' || k === '')
+            : undefined;
+          if (firstEmptyKey !== undefined) {
+            rawRows = rawRows.map(row => {
+              const r = { ...row, 'Assigned To': row[firstEmptyKey] };
+              delete r[firstEmptyKey];
+              return r;
+            });
+          }
           const rows = rawRows.map(r => mapRow(r, category, site, status)).filter(hasData);
           if (rows.length === 0) continue;
           sheets.push({ name: sheetName, category, site, rows, selected: true });
