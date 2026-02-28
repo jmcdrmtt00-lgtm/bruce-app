@@ -141,9 +141,11 @@ export default function OnboardingPage() {
                     </>
                   ) : (
                     <>
-                      <h3 className="font-semibold text-sm text-error">Asset #{output.hire.nextAssetNumber} not found in inventory</h3>
+                      <h3 className="font-semibold text-sm text-error">
+                        Record cannot be updated — asset #{output.hire.nextAssetNumber} does not exist in the inventory database.
+                      </h3>
                       <p className="text-xs text-base-content/50 mt-0.5 mb-3">
-                        Check the asset number — it was not found in the inventory database. Approval is disabled until the record exists.
+                        Please go back to the Dashboard and correct the asset number.
                       </p>
                     </>
                   )}
