@@ -47,7 +47,7 @@ export async function POST(request: NextRequest) {
 
   const { error } = await supabase
     .from('assets')
-    .update({ name: computerName, site: siteLabel, notes: updatedNotes })
+    .update({ assigned_to: `${firstName} ${lastName}`, name: computerName, site: siteLabel, notes: updatedNotes })
     .eq('id', existing.id)
     .eq('user_id', user.id);
 

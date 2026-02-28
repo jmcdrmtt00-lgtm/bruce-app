@@ -106,6 +106,9 @@ export default function OnboardingPage() {
     ? `${currentAsset.notes}\n${assignNote}`
     : assignNote;
 
+  const newSiteLabel = output ? (SITES[output.hire.site]?.label ?? output.hire.site) : '';
+  const siteChanging = !!currentAsset && currentAsset.site !== newSiteLabel;
+
   return (
     <main className="min-h-screen bg-base-200 py-8 px-4">
       <div className="max-w-6xl mx-auto">
@@ -127,7 +130,8 @@ export default function OnboardingPage() {
                     <h3 className="font-semibold text-sm">Proposed change to assets table</h3>
                     <span className="text-xs text-base-content/50">
                       record #{output.hire.nextAssetNumber}
-                      {currentAsset?.assigned_to && ` · currently assigned to ${currentAsset.assigned_to}`}
+                      {currentAsset?.assigned_to && ` · ${currentAsset.assigned_to}`}
+                      {currentAsset?.site && ` · ${currentAsset.site}`}
                       {currentAsset?.make && ` · ${currentAsset.make}${currentAsset.model ? ` ${currentAsset.model}` : ''}`}
                     </span>
                   </div>
@@ -142,15 +146,22 @@ export default function OnboardingPage() {
                     </thead>
                     <tbody>
                       <tr>
+                        <td className="text-base-content/60">Assigned to</td>
+                        <td className="text-base-content/40 italic">{currentAsset?.assigned_to ?? '—'}</td>
+                        <td className="font-medium">{output.hire.firstName} {output.hire.lastName}</td>
+                      </tr>
+                      <tr>
                         <td className="text-base-content/60">Computer name</td>
                         <td className="text-base-content/40 italic">{currentAsset?.name ?? '—'}</td>
                         <td className="font-medium">{output.hire.computerName || '—'}</td>
                       </tr>
-                      <tr>
-                        <td className="text-base-content/60">Site</td>
-                        <td className="text-base-content/40 italic">{currentAsset?.site ?? '—'}</td>
-                        <td className="font-medium">{SITES[output.hire.site]?.label ?? output.hire.site}</td>
-                      </tr>
+                      {siteChanging && (
+                        <tr>
+                          <td className="text-base-content/60">Site</td>
+                          <td className="text-base-content/40 italic">{currentAsset?.site ?? '—'}</td>
+                          <td className="font-medium">{newSiteLabel}</td>
+                        </tr>
+                      )}
                       <tr>
                         <td className="text-base-content/60 align-top pt-1">Notes</td>
                         <td className="text-base-content/40 italic text-xs whitespace-pre-wrap align-top pt-1">
