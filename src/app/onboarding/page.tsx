@@ -107,7 +107,8 @@ export default function OnboardingPage() {
     : assignNote;
 
   const newSiteLabel = output ? (SITES[output.hire.site]?.label ?? output.hire.site) : '';
-  const siteChanging = !!currentAsset && currentAsset.site !== newSiteLabel;
+  // Show Site row whenever site is changing OR when we have no current record (can't tell)
+  const siteChanging = !currentAsset || currentAsset.site !== newSiteLabel;
 
   return (
     <main className="min-h-screen bg-base-200 py-8 px-4">
@@ -130,9 +131,14 @@ export default function OnboardingPage() {
                     <h3 className="font-semibold text-sm">Proposed change to assets table</h3>
                     <span className="text-xs text-base-content/50">
                       record #{output.hire.nextAssetNumber}
-                      {currentAsset?.assigned_to && ` · ${currentAsset.assigned_to}`}
-                      {currentAsset?.site && ` · ${currentAsset.site}`}
-                      {currentAsset?.make && ` · ${currentAsset.make}${currentAsset.model ? ` ${currentAsset.model}` : ''}`}
+                      {currentAsset
+                        ? <>
+                            {currentAsset.assigned_to && ` · ${currentAsset.assigned_to}`}
+                            {currentAsset.site && ` · ${currentAsset.site}`}
+                            {currentAsset.make && ` · ${currentAsset.make}${currentAsset.model ? ` ${currentAsset.model}` : ''}`}
+                          </>
+                        : <span className="text-warning"> · not found in inventory</span>
+                      }
                     </span>
                   </div>
 
