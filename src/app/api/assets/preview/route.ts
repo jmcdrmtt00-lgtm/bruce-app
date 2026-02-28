@@ -19,12 +19,20 @@ export async function GET(request: NextRequest) {
   const assetNumber = request.nextUrl.searchParams.get('asset_number');
   if (!assetNumber) return NextResponse.json({ error: 'asset_number required' }, { status: 400 });
 
-  const { data: asset } = await supabase
-    .from('assets')
-    .select('asset_number, assigned_to, name, site, notes, make, model, category')
-    .eq('asset_number', assetNumber)
-    .eq('user_id', user.id)
-    .single();
+  // Try exact match first; fall back to integer-normalised (strips leading zeros)
+  const normalised = /^\d+$/.test(assetNumber) ? String(parseInt(assetNumber, 10)) : assetNumber;
+  const candidates = [...new Set([assetNumber, normalised])];
 
-  return NextResponse.json({ asset: asset ?? null });
+  let asset = null;
+  for (const candidate of candidates) {
+    const { data } = await supabase
+      .from('assets')
+      .select('asset_number, assigned_to, name, site, notes, make, model, category')
+      .eq('asset_number', candidate)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (data) { asset = data; break; }
+  }
+
+  return NextResponse.json({ asset });
 }

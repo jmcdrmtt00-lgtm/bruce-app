@@ -29,13 +29,20 @@ export async function POST(request: NextRequest) {
   const siteLabel  = SITES[site as keyof typeof SITES]?.label  ?? site;
   const assignNote = `Assigned to ${firstName} ${lastName} (${roleLabel}) — Start date: ${startDate || 'TBD'}`;
 
-  // Fetch existing asset to preserve any existing notes
-  const { data: existing } = await supabase
-    .from('assets')
-    .select('id, notes')
-    .eq('asset_number', nextAssetNumber)
-    .eq('user_id', user.id)
-    .single();
+  // Try exact match then integer-normalised (handles leading-zero differences)
+  const normalised = /^\d+$/.test(nextAssetNumber) ? String(parseInt(nextAssetNumber, 10)) : nextAssetNumber;
+  const candidates = [...new Set([nextAssetNumber, normalised])];
+
+  let existing = null;
+  for (const candidate of candidates) {
+    const { data } = await supabase
+      .from('assets')
+      .select('id, notes')
+      .eq('asset_number', candidate)
+      .eq('user_id', user.id)
+      .maybeSingle();
+    if (data) { existing = data; break; }
+  }
 
   if (!existing) {
     return NextResponse.json({ error: `Asset #${nextAssetNumber} not found` }, { status: 404 });
