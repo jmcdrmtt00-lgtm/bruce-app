@@ -125,23 +125,30 @@ export default function OnboardingPage() {
 
             {/* ── Proposed asset change — top of page, hidden after approval ── */}
             {output.hire.nextAssetNumber && approveStatus !== 'approved' && (
-              <div className="card bg-base-100 shadow border-l-4 border-warning">
+              <div className={`card bg-base-100 shadow border-l-4 ${currentAsset ? 'border-warning' : 'border-error'}`}>
                 <div className="card-body p-4">
-                  <div className="flex items-baseline gap-2 mb-3">
-                    <h3 className="font-semibold text-sm">Proposed change to assets table</h3>
-                    <span className="text-xs text-base-content/50">
-                      record #{output.hire.nextAssetNumber}
-                      {currentAsset
-                        ? <>
-                            {currentAsset.assigned_to && ` · ${currentAsset.assigned_to}`}
-                            {currentAsset.site && ` · ${currentAsset.site}`}
-                            {currentAsset.make && ` · ${currentAsset.make}${currentAsset.model ? ` ${currentAsset.model}` : ''}`}
-                          </>
-                        : <span className="text-warning"> · not found in inventory</span>
-                      }
-                    </span>
-                  </div>
 
+                  {/* Title + orientation */}
+                  {currentAsset ? (
+                    <>
+                      <h3 className="font-semibold text-sm">Record proposed to be updated</h3>
+                      <p className="text-xs text-base-content/50 mt-0.5 mb-3">
+                        record #{output.hire.nextAssetNumber}
+                        {currentAsset.assigned_to && ` · ${currentAsset.assigned_to}`}
+                        {currentAsset.site        && ` · ${currentAsset.site}`}
+                        {currentAsset.make        && ` · ${currentAsset.make}${currentAsset.model ? ` ${currentAsset.model}` : ''}`}
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <h3 className="font-semibold text-sm text-error">Asset #{output.hire.nextAssetNumber} not found in inventory</h3>
+                      <p className="text-xs text-base-content/50 mt-0.5 mb-3">
+                        Check the asset number — it was not found in the inventory database. Approval is disabled until the record exists.
+                      </p>
+                    </>
+                  )}
+
+                  {/* Changes table */}
                   <table className="table table-xs w-full mb-3">
                     <thead>
                       <tr>
@@ -186,10 +193,10 @@ export default function OnboardingPage() {
                     <button
                       className="btn btn-primary btn-sm"
                       onClick={handleApprove}
-                      disabled={approveStatus === 'approving'}
+                      disabled={approveStatus === 'approving' || !currentAsset}
                     >
                       {approveStatus === 'approving' && <span className="loading loading-spinner loading-xs" />}
-                      Approve change to assets table
+                      Approve update to assets table
                     </button>
                   )}
                 </div>
