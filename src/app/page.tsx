@@ -444,10 +444,24 @@ export default function DashboardPage() {
       const text = e.results[e.resultIndex][0].transcript;
       onResult(text);
     };
+    r.onerror = (e: { error: string }) => {
+      setActive(false);
+      if (e.error === 'not-allowed') {
+        toast.error('Microphone access was denied. Check your browser permissions.');
+      } else if (e.error === 'no-speech') {
+        // silence — no speech detected is normal
+      } else {
+        toast.error(`Voice error: ${e.error}`);
+      }
+    };
     r.onend = () => setActive(false);
-    r.start();
-    ref.current = r;
-    setActive(true);
+    try {
+      r.start();
+      ref.current = r;
+      setActive(true);
+    } catch (err) {
+      toast.error(`Could not start voice input: ${err instanceof Error ? err.message : String(err)}`);
+    }
   }
 
   function stopVoice(ref: React.MutableRefObject<unknown>, setActive: (v: boolean) => void) {
