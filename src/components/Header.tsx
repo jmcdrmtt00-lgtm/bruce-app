@@ -7,19 +7,25 @@ import { MonitorCheck } from 'lucide-react';
 import UserMenu from '@/components/UserMenu';
 import { supabase } from '@/libs/supabase';
 import { useDemoUser } from '@/libs/useDemoUser';
+import { useAdminUser } from '@/libs/useAdminUser';
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const NAV = [
   { href: '/',                     label: 'Dashboard'             },
-  { href: '/tasks',                label: 'Tasks'                 },
   { href: '/query-tasks',          label: 'Query Completed Tasks' },
   { href: '/query-inventory',      label: 'Query Inventory'       },
-  { href: '/inventory-management', label: 'Inventory Management'  },
+  { href: '/inventory-management', label: 'Inventory Mgmt'        },
 ];
 
+// DemoITbuddy1 only
 const DEMO_NAV = [
-  { href: '/task-management', label: 'Task Management' },
-  { href: '/demo',            label: 'Demo'            },
+  { href: '/demo', label: 'Demo' },
+];
+
+// jmcdrmtt00 only
+const ADMIN_NAV = [
+  { href: '/task-management',  label: 'Demo Tasks'      },
+  { href: '/demo-scenarios',   label: 'Demo Scenarios'  },
 ];
 
 // Auth pages are public — hide the nav on these routes
@@ -28,6 +34,7 @@ const AUTH_PATHS = ['/auth/'];
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
   const isDemoUser = useDemoUser();
+  const isAdminUser = useAdminUser();
   const pathname = usePathname();
 
   useEffect(() => {
@@ -65,6 +72,15 @@ export default function Header() {
             </Link>
           ))}
           {isDemoUser && DEMO_NAV.map(({ href, label }) => (
+            <Link
+              key={href}
+              href={href}
+              className={`btn btn-sm ${isActive(href) ? 'btn-secondary' : 'btn-ghost text-secondary'}`}
+            >
+              {label}
+            </Link>
+          ))}
+          {isAdminUser && ADMIN_NAV.map(({ href, label }) => (
             <Link
               key={href}
               href={href}

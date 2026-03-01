@@ -4,7 +4,7 @@ import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useDemoUser } from '@/libs/useDemoUser';
+import { useAdminUser } from '@/libs/useAdminUser';
 
 // ── Column mapping ────────────────────────────────────────────────────────────
 
@@ -137,7 +137,7 @@ async function buildAndDownload() {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TaskManagementPage() {
-  const isDemoUser = useDemoUser();
+  const isDemoUser = useAdminUser();
   const [downloading, setDownloading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
