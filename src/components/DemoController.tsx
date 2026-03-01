@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useDemo } from '@/contexts/DemoContext';
+import { useDemoUser } from '@/libs/useDemoUser';
 
 // ── DOM helpers ──────────────────────────────────────────────────────────────
 
@@ -67,6 +68,7 @@ async function clickAction(action: string) {
 
 export default function DemoController() {
   const demo = useDemo();
+  const isDemoUser = useDemoUser();
   const router = useRouter();
   const [expanded, setExpanded] = useState(false);
   const runningRef = useRef(false);
@@ -117,8 +119,8 @@ export default function DemoController() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isRunning, isPaused, currentStep, script]);
 
-  // Not in demo mode — invisible
-  if (!isRunning) return null;
+  // Not a demo user, or not running — invisible
+  if (!isDemoUser || !isRunning) return null;
 
   const progress = totalSteps > 0 ? Math.round((currentStep / totalSteps) * 100) : 0;
 

@@ -2,7 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { useDemo, DemoScript } from '@/contexts/DemoContext';
+import { useDemo } from '@/contexts/DemoContext';
+import { useDemoUser } from '@/libs/useDemoUser';
+import { parseDemoScript } from '@/libs/parseDemoScript';
 
 interface ScriptEntry {
   id: string;
@@ -13,6 +15,7 @@ interface ScriptEntry {
 }
 
 export default function DemoPage() {
+  const isDemoUser = useDemoUser();
   const [entries, setEntries] = useState<ScriptEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [starting, setStarting] = useState<string | null>(null);
@@ -27,11 +30,20 @@ export default function DemoPage() {
       .finally(() => setLoading(false));
   }, []);
 
+  if (!isDemoUser && !loading) {
+    return (
+      <main className="min-h-screen bg-base-200 flex items-center justify-center">
+        <p className="text-base-content/40">Not available for this account.</p>
+      </main>
+    );
+  }
+
   async function handleStart(entry: ScriptEntry) {
     setStarting(entry.id);
     try {
       const res = await fetch(entry.file);
-      const script: DemoScript = await res.json();
+      const md = await res.text();
+      const script = parseDemoScript(md);
       demo.loadScript(script);
       const firstNav = script.steps.find(s => s.type === 'navigate');
       router.push(firstNav?.path ?? '/');
