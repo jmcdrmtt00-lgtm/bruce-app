@@ -32,26 +32,22 @@ async def summarize_incident(description: str, user_email: str = "") -> str:
 
 
 TASKS_SCHEMA = """
-Table: incidents (IT tasks)
+Table: tasks (IT task database)
 - id: UUID
 - user_id: UUID  <-- always filter: WHERE user_id = '{user_id}'
 - task_number: INTEGER
-- title: TEXT (short task description)
-- reported_by: TEXT (person who requested help, nullable)
-- status: TEXT ('in_progress', 'pending', 'resolved')
-- priority: TEXT ('high', 'low', or NULL)
+- task_name: TEXT (description of the task)
+- priority: TEXT (e.g. 'High', 'Medium', 'Low', or NULL)
 - date_due: DATE (nullable)
-- date_completed: DATE (nullable)
-- auto_suggested: BOOLEAN
+- status: TEXT (e.g. 'In Queue', 'In Process', 'Completed')
+- information_needed: TEXT (what info is required to complete the task, nullable)
+- results: TEXT (outcome or resolution notes, nullable)
+- issues_comments: JSONB (array of {timestamp: "YYYY-MM-DD", text: "..."} objects, nullable)
 - created_at: TIMESTAMPTZ
 
-Table: incident_updates (timestamped notes on a task)
-- id: UUID
-- incident_id: UUID (references incidents.id)
-- user_id: UUID  <-- always filter: WHERE user_id = '{user_id}'
-- type: TEXT ('approach', 'progress', 'resolved')
-- note: TEXT
-- created_at: TIMESTAMPTZ
+To search inside issues_comments use jsonb operators, e.g.:
+  issues_comments @> '[{"text": "some keyword"}]'
+  or: EXISTS (SELECT 1 FROM jsonb_array_elements(issues_comments) e WHERE e->>'text' ILIKE '%keyword%')
 """
 
 ASSETS_SCHEMA = """

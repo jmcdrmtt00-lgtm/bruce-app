@@ -1,8 +1,6 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import { useDemoUser } from '@/libs/useDemoUser';
 import { AlertCircle, Clock } from 'lucide-react';
 
 interface IssuesComment {
@@ -83,16 +81,8 @@ function TaskCard({ task }: { task: DemoTask }) {
 }
 
 export default function TasksPage() {
-  const isDemoUser = useDemoUser();
-  const router = useRouter();
   const [tasks, setTasks] = useState<DemoTask[]>([]);
   const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    if (isDemoUser === false) {
-      // useDemoUser starts false until auth resolves — only redirect after we know for sure
-    }
-  }, [isDemoUser, router]);
 
   useEffect(() => {
     fetch('/api/tasks')

@@ -73,12 +73,12 @@ export async function POST(request: NextRequest) {
 
   // Delete all existing tasks for this user, then insert fresh (simplest reset strategy)
   const { error: delErr } = await supabase
-    .from('demo_tasks')
+    .from('tasks')
     .delete()
     .eq('user_id', user.id);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
-  const { error: insErr } = await supabase.from('demo_tasks').insert(rows);
+  const { error: insErr } = await supabase.from('tasks').insert(rows);
   if (insErr) return NextResponse.json({ error: insErr.message }, { status: 500 });
 
   return NextResponse.json({ inserted: rows.length, updated: 0 });

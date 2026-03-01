@@ -11,13 +11,13 @@ import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const NAV = [
   { href: '/',                     label: 'Dashboard'             },
+  { href: '/tasks',                label: 'Tasks'                 },
   { href: '/query-tasks',          label: 'Query Completed Tasks' },
   { href: '/query-inventory',      label: 'Query Inventory'       },
   { href: '/inventory-management', label: 'Inventory Management'  },
 ];
 
 const DEMO_NAV = [
-  { href: '/tasks',           label: 'Tasks'           },
   { href: '/task-management', label: 'Task Management' },
   { href: '/demo',            label: 'Demo'            },
 ];
