@@ -16,7 +16,7 @@ create policy "Demo user can read admin assets"
   using (
     auth.uid() = user_id
     OR (
-      (select raw_user_meta_data->>'is_demo' from auth.users where id = auth.uid()) = 'true'
+      auth.jwt() -> 'user_metadata' ->> 'is_demo' = 'true'
       AND user_id = 'YOUR_JMCDRMTT00_UUID'
     )
   );
@@ -28,10 +28,38 @@ create policy "Demo user can update admin assets"
   using (
     auth.uid() = user_id
     OR (
-      (select raw_user_meta_data->>'is_demo' from auth.users where id = auth.uid()) = 'true'
+      auth.jwt() -> 'user_metadata' ->> 'is_demo' = 'true'
       AND user_id = 'YOUR_JMCDRMTT00_UUID'
     )
   );
+
+-- Allow DemoITbuddy1 to read jmcdrmtt00's incidents (shown on Dashboard)
+drop policy if exists "Demo user can read admin incidents" on incidents;
+create policy "Demo user can read admin incidents"
+  on incidents for select
+  using (
+    auth.uid() = user_id
+    OR (
+      auth.jwt() -> 'user_metadata' ->> 'is_demo' = 'true'
+      AND user_id = 'YOUR_JMCDRMTT00_UUID'
+    )
+  );
+
+-- Allow DemoITbuddy1 to read incident_updates for jmcdrmtt00's incidents
+drop policy if exists "Demo user can read admin incident updates" on incident_updates;
+create policy "Demo user can read admin incident updates"
+  on incident_updates for select
+  using (
+    auth.uid() = user_id
+    OR (
+      auth.jwt() -> 'user_metadata' ->> 'is_demo' = 'true'
+      AND incident_id IN (
+        SELECT id FROM incidents WHERE user_id = 'YOUR_JMCDRMTT00_UUID'
+      )
+    )
+  );
+
+-- ── tasks table policies (kept for reference) ────────────────────────────────
 
 -- Allow DemoITbuddy1 to read jmcdrmtt00's tasks
 drop policy if exists "Demo user can read admin tasks" on tasks;
@@ -40,7 +68,7 @@ create policy "Demo user can read admin tasks"
   using (
     auth.uid() = user_id
     OR (
-      (select raw_user_meta_data->>'is_demo' from auth.users where id = auth.uid()) = 'true'
+      auth.jwt() -> 'user_metadata' ->> 'is_demo' = 'true'
       AND user_id = 'YOUR_JMCDRMTT00_UUID'
     )
   );
