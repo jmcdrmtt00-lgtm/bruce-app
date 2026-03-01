@@ -1,0 +1,18 @@
+{
+  "id": "onboarding-new-hire",
+  "name": "New Hire Onboarding",
+  "description": "Onboards Rebecca Jones as a CNA at Oakdale",
+  "steps": [
+    { "type": "navigate", "path": "/onboarding", "pause": 2 },
+    { "type": "fill",     "field": "firstName",      "value": "Rebecca",        "speed": 90 },
+    { "type": "fill",     "field": "lastName",        "value": "Jones",          "speed": 90 },
+    { "type": "fill",     "field": "role",            "value": "clinical_floor", "pause": 0.8 },
+    { "type": "fill",     "field": "site",            "value": "oakdale",        "pause": 0.8 },
+    { "type": "fill",     "field": "startDate",       "value": "2026-03-15",     "pause": 1 },
+    { "type": "fill",     "field": "nextAssetNumber", "value": "312",            "speed": 120, "pause": 1 },
+    { "type": "pause",   "seconds": 1.5, "message": "Computer name is auto-generated" },
+    { "type": "click",   "action": "submit",          "pause": 3 },
+    { "type": "pause",   "seconds": 2,   "message": "Login sheet and checklist appear..." },
+    { "type": "click",   "action": "approve",         "pause": 2 }
+  ]
+}

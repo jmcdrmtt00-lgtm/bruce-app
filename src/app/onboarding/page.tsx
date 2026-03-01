@@ -196,6 +196,7 @@ export default function OnboardingPage() {
                       className="btn btn-primary btn-sm"
                       onClick={handleApprove}
                       disabled={approveStatus === 'approving' || !currentAsset}
+                      data-demo="approve"
                     >
                       {approveStatus === 'approving' && <span className="loading loading-spinner loading-xs" />}
                       Approve update to assets table

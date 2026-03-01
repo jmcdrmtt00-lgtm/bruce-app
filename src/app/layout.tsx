@@ -1,6 +1,8 @@
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import Header from "@/components/Header";
+import { DemoProvider } from "@/contexts/DemoContext";
+import DemoController from "@/components/DemoController";
 import "./globals.css";
 
 export const metadata: Metadata = {
@@ -16,9 +18,12 @@ export default function RootLayout({
   return (
     <html lang="en" data-theme="light">
       <body>
-        <Header />
-        <Toaster position="top-center" />
-        {children}
+        <DemoProvider>
+          <Header />
+          <Toaster position="top-center" />
+          {children}
+          <DemoController />
+        </DemoProvider>
       </body>
     </html>
   );

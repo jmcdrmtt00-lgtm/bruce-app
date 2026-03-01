@@ -1,0 +1,9 @@
+[
+  {
+    "id": "onboarding-new-hire",
+    "name": "New Hire Onboarding",
+    "description": "Onboards Rebecca Jones as a CNA at Oakdale — fills the form, generates the login sheet and checklist, then approves the asset record update.",
+    "file": "/demo-scripts/onboarding-new-hire.json",
+    "stepCount": 11
+  }
+]
