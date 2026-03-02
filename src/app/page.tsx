@@ -183,6 +183,7 @@ export default function DashboardPage() {
   const [showAddModal,   setShowAddModal]   = useState(false);
   const [newTaskName,    setNewTaskName]    = useState('');
   const [newTaskStatus,  setNewTaskStatus]  = useState<'pending' | 'in_progress'>('pending');
+  const [newTaskDetails, setNewTaskDetails] = useState('');
   const [infoRequired, setInfoRequired] = useState('');
   const [infoDone, setInfoDone]         = useState('');
   const [issues, setIssues]             = useState('');
@@ -195,6 +196,7 @@ export default function DashboardPage() {
   const savedInfoReqRef   = useRef('');   // last-saved value for each update textarea
   const savedInfoDoneRef  = useRef('');
   const savedIssuesRef    = useRef('');
+  const savedDetailsRef   = useRef('');
 
   // Hire fields — populated by AI, used for localStorage navigation
   const [hireFirstName,  setHireFirstName]  = useState('');
@@ -254,14 +256,14 @@ export default function DashboardPage() {
   // (infoRequired is always a generated template — never saved to or loaded from the DB)
   useEffect(() => {
     if (checklist !== 'Onboarding') { setInfoRequired(''); return; }
-    setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Computer name, Notes`);
+    setInfoRequired(`Information needed: ${ONBOARDING_FIELDS_BASE}, Next asset #, Computer name, Notes`);
     fetch('/api/assets/download')
       .then(r => r.json())
       .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
         const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
         if (nums.length > 0) {
           const next = String(Math.max(...nums) + 1).padStart(4, '0');
-          setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Computer name, Notes`);
+          setInfoRequired(`Information needed: ${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Computer name, Notes`);
         }
       })
       .catch(() => {});
@@ -348,7 +350,7 @@ export default function DashboardPage() {
     setHireComputer(''); setHireNotes('');
     setStructuredText(''); setPasted(false);
     panelDirtyRef.current = false;
-    savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
+    savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
 
   function loadTask(task: Incident) {
@@ -364,19 +366,19 @@ export default function DashboardPage() {
     setIssues('');
     setSelectedTask(task);
     panelDirtyRef.current = false;
-    savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
+    savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
 
     // Set the infoRequired template immediately (synchronous) so it always appears.
     // Then refine with the actual next asset number once the fetch resolves.
     if (newChecklist === 'Onboarding') {
-      setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #, Computer name, Notes`);
+      setInfoRequired(`Information needed: ${ONBOARDING_FIELDS_BASE}, Next asset #, Computer name, Notes`);
       fetch('/api/assets/download')
         .then(r => r.json())
         .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
           const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
           if (nums.length > 0) {
             const next = String(Math.max(...nums) + 1).padStart(4, '0');
-            setInfoRequired(`${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Computer name, Notes`);
+            setInfoRequired(`Information needed: ${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Computer name, Notes`);
           }
         })
         .catch(() => {});
@@ -394,6 +396,11 @@ export default function DashboardPage() {
         savedInfoDoneRef.current = progress;
         // If results look like structured onboarding data, show "Go to Onboarding Checklist" not "Structure it"
         setPasted(/^Computer name:/m.test(progress));
+        const details = latest('details');
+        if (details) {
+          setInfoRequired(details);
+          savedDetailsRef.current = details;
+        }
       })
       .catch(() => {});
   }
@@ -597,9 +604,17 @@ Return only the JSON object, no explanation, no markdown fences.`,
       });
       if (res.ok) {
         const data = await res.json();
+        if (newTaskDetails.trim()) {
+          await fetch(`/api/issues/${data.incident.id}/updates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'details', note: newTaskDetails.trim() }),
+          });
+        }
         setShowAddModal(false);
         setNewTaskName('');
         setNewTaskStatus('pending');
+        setNewTaskDetails('');
         loadTasks();
         loadTask(data.incident);
       }
@@ -680,7 +695,7 @@ Return only the JSON object, no explanation, no markdown fences.`,
               <div className="flex justify-between items-center">
                 <button
                   className="btn btn-primary btn-sm"
-                  onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskStatus('pending'); }}
+                  onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskStatus('pending'); setNewTaskDetails(''); }}
                 >
                   + Add task
                 </button>
@@ -832,13 +847,14 @@ Return only the JSON object, no explanation, no markdown fences.`,
               {/* Information needed */}
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Information needed</span>
+                  <span className="label-text text-xs font-semibold">Task details</span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
                     value={infoRequired}
                     onChange={e => setInfoRequired(e.target.value)}
+                    onBlur={() => saveUpdate('details', infoRequired, savedDetailsRef)}
                     placeholder="What information is needed or what does the checklist say..."
                   />
                   <VoiceButton
@@ -1007,12 +1023,18 @@ Return only the JSON object, no explanation, no markdown fences.`,
           <div className="modal-box max-w-sm">
             <h3 className="font-semibold mb-3">Add task</h3>
             <input
-              className="input input-bordered input-sm w-full mb-3"
+              className="input input-bordered input-sm w-full mb-2"
               placeholder="Task name..."
               value={newTaskName}
               onChange={e => setNewTaskName(e.target.value)}
               autoFocus
               onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+            />
+            <AutoTextarea
+              className="textarea textarea-bordered textarea-sm w-full mb-3 text-sm"
+              value={newTaskDetails}
+              onChange={e => setNewTaskDetails(e.target.value)}
+              placeholder="Task details..."
             />
             <div className="flex gap-1 mb-4">
               <button
