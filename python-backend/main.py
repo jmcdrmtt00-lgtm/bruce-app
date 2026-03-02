@@ -39,6 +39,12 @@ class CheckSuggestionsRequest(BaseModel):
     user_email: str = ""
 
 
+class AdviseRequest(BaseModel):
+    question: str
+    in_progress_tasks: list[dict] = []
+    user_email: str = ""
+
+
 class TrackClickRequest(BaseModel):
     user_email: str = ""
 
@@ -82,6 +88,12 @@ async def summarize(request: SummarizeRequest):
 async def generate_sql(request: GenerateSqlRequest):
     sql = await ai_service.generate_sql(request.question, request.target, request.user_email)
     return {"sql": sql}
+
+
+@app.post("/api/advise")
+async def advise(request: AdviseRequest):
+    result = await ai_service.advise(request.question, request.in_progress_tasks, request.user_email)
+    return result
 
 
 @app.post("/api/check-suggestions")

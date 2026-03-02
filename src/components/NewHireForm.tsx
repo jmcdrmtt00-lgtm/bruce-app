@@ -164,7 +164,7 @@ export default function NewHireForm({ onSubmit }: Props) {
           </div>
 
           <div className="card-actions justify-end pt-2">
-            <button type="submit" className="btn btn-primary btn-lg">
+            <button type="submit" className="btn btn-primary btn-lg" data-demo="submit">
               Generate Onboarding Package
             </button>
           </div>
