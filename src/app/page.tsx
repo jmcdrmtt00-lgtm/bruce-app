@@ -509,7 +509,7 @@ export default function DashboardPage() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          prompt: `Extract new hire information from this text: "${infoDone.trim()}"`,
+          prompt: `${infoRequired.trim() ? `The user was collecting the following information: "${infoRequired.trim()}"\n\n` : ''}Extract new hire information from this text: "${infoDone.trim()}"`,
           system: `You extract new hire information from free-form text. Return ONLY a valid JSON object with exactly these fields:
 - firstName: string
 - lastName: string
