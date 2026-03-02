@@ -12,6 +12,7 @@ import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const NAV = [
   { href: '/',                     label: 'Dashboard'             },
+  { href: '/ask-ai',               label: 'Ask the AI'            },
   { href: '/query-tasks',          label: 'Query Completed Tasks' },
   { href: '/query-inventory',      label: 'Query Inventory'       },
   { href: '/inventory-management', label: 'Inventory Mgmt'        },
