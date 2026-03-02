@@ -39,9 +39,17 @@ class CheckSuggestionsRequest(BaseModel):
     user_email: str = ""
 
 
-class AdviseRequest(BaseModel):
+class AdvisePlanRequest(BaseModel):
     question: str
     in_progress_tasks: list[dict] = []
+    user_email: str = ""
+
+
+class AdviseAnswerRequest(BaseModel):
+    question: str
+    in_progress_tasks: list[dict] = []
+    lookup_description: str | None = None
+    sql_results: list[dict] = []
     user_email: str = ""
 
 
@@ -90,10 +98,22 @@ async def generate_sql(request: GenerateSqlRequest):
     return {"sql": sql}
 
 
-@app.post("/api/advise")
-async def advise(request: AdviseRequest):
-    result = await ai_service.advise(request.question, request.in_progress_tasks, request.user_email)
+@app.post("/api/advise/plan")
+async def advise_plan(request: AdvisePlanRequest):
+    result = await ai_service.advise_plan(request.question, request.in_progress_tasks, request.user_email)
     return result
+
+
+@app.post("/api/advise/answer")
+async def advise_answer(request: AdviseAnswerRequest):
+    answer = await ai_service.advise_answer(
+        request.question,
+        request.in_progress_tasks,
+        request.lookup_description,
+        request.sql_results,
+        request.user_email,
+    )
+    return {"answer": answer}
 
 
 @app.post("/api/check-suggestions")

@@ -27,21 +27,23 @@ export async function POST(request: NextRequest) {
     .eq('status', 'in_progress')
     .order('task_number');
 
-  // Call Python backend
   const backendUrl = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
-  let aiResult: { rephrasing: string; answer: string; sql: string | null };
+  const taskContext = inProgressTasks ?? [];
+
+  // ── Pass 1: plan — get rephrasing + optional SQL ──────────────────────────
+  let plan: { rephrasing: string; sql: string | null; lookup_description: string | null };
   try {
-    const res = await fetch(`${backendUrl}/api/advise`, {
+    const res = await fetch(`${backendUrl}/api/advise/plan`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         question: question.trim(),
-        in_progress_tasks: inProgressTasks ?? [],
+        in_progress_tasks: taskContext,
         user_email: user.email ?? '',
       }),
     });
     if (!res.ok) throw new Error('Backend unavailable');
-    aiResult = await res.json();
+    plan = await res.json();
   } catch {
     return NextResponse.json(
       { error: 'AI advisor requires the Python backend to be running.' },
@@ -49,19 +51,44 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // If the AI generated a SQL query, run it for supporting data
-  let supportingData: Record<string, unknown>[] = [];
-  const rawSql = aiResult.sql ?? null;
+  // ── Run SQL if the AI requested additional data ───────────────────────────
+  let sqlResults: Record<string, unknown>[] = [];
+  const rawSql = plan.sql ?? null;
   if (rawSql) {
     const safeSql = rawSql.replace(/\{user_id\}/g, user.id).replace(/;+$/, '');
     const { data } = await supabase.rpc('execute_select_query', { query_sql: safeSql });
-    supportingData = Array.isArray(data) ? data : (data ? [data] : []);
+    sqlResults = Array.isArray(data) ? data : (data ? [data] : []);
+  }
+
+  // ── Pass 2: answer — using in-progress tasks + SQL results ────────────────
+  let answer: string;
+  try {
+    const res = await fetch(`${backendUrl}/api/advise/answer`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        question: question.trim(),
+        in_progress_tasks: taskContext,
+        lookup_description: plan.lookup_description ?? null,
+        sql_results: sqlResults,
+        user_email: user.email ?? '',
+      }),
+    });
+    if (!res.ok) throw new Error('Backend unavailable');
+    const data = await res.json();
+    answer = data.answer;
+  } catch {
+    return NextResponse.json(
+      { error: 'AI advisor requires the Python backend to be running.' },
+      { status: 503 }
+    );
   }
 
   return NextResponse.json({
-    rephrasing:     aiResult.rephrasing,
-    answer:         aiResult.answer,
-    sql:            rawSql,
-    supportingData,
+    rephrasing:        plan.rephrasing,
+    lookupDescription: plan.lookup_description ?? null,
+    sql:               rawSql,
+    supportingData:    sqlResults,
+    answer,
   });
 }

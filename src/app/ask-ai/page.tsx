@@ -5,10 +5,11 @@ import { ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
 
 interface AskResult {
-  rephrasing:     string;
-  answer:         string;
-  sql:            string | null;
-  supportingData: Record<string, unknown>[];
+  rephrasing:        string;
+  lookupDescription: string | null;
+  answer:            string;
+  sql:               string | null;
+  supportingData:    Record<string, unknown>[];
 }
 
 export default function AskAiPage() {
@@ -151,8 +152,10 @@ export default function AskAiPage() {
             {result.supportingData.length > 0 && (
               <div className="card bg-base-100 shadow">
                 <div className="card-body p-5">
-                  <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wide mb-3">
-                    Supporting data
+                  <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wide mb-1">
+                    {result.lookupDescription
+                      ? `I looked up: ${result.lookupDescription}`
+                      : 'Supporting data'}
                   </p>
                   <div className="overflow-x-auto">
                     <table className="table table-sm w-full">

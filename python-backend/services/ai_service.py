@@ -103,37 +103,89 @@ Table: incidents (IT tasks — current and historical)
 """
 
 
-async def advise(question: str, in_progress_tasks: list[dict], user_email: str = "") -> dict:
-    """Answer a free-form IT question with optional SQL for supporting context."""
+def _tasks_text(in_progress_tasks: list[dict]) -> str:
+    if not in_progress_tasks:
+        return "  (none)"
+    return "\n".join(
+        f"  Task #{t.get('task_number', '?')}: {t.get('title', '')}"
+        + (f" [Priority: {t['priority']}]" if t.get('priority') else "")
+        + (f" [Due: {t['date_due']}]" if t.get('date_due') else "")
+        for t in in_progress_tasks
+    )
+
+
+async def advise_plan(question: str, in_progress_tasks: list[dict], user_email: str = "") -> dict:
+    """Pass 1 — decide what data to look up, return rephrasing + optional SQL."""
     import json as _json
 
-    if in_progress_tasks:
-        tasks_text = "\n".join(
-            f"  Task #{t.get('task_number', '?')}: {t.get('title', '')}"
-            + (f" [Priority: {t['priority']}]" if t.get('priority') else "")
-            + (f" [Due: {t['date_due']}]" if t.get('date_due') else "")
-            for t in in_progress_tasks
-        )
-    else:
-        tasks_text = "  (none)"
-
-    system = f"""You are IT Buddy, an AI assistant for an IT professional at Oriol Healthcare — \
+    system = f"""You are IT Buddy, an IT advisor for an IT professional at Oriol Healthcare — \
 a nursing facility operator with three sites: Holden, Oakdale, and Business Office.
 
-The user currently has these tasks in progress:
-{tasks_text}
+Current in-progress tasks:
+{_tasks_text(in_progress_tasks)}
 
-Answer the user's question. Return a JSON object with exactly these fields:
+Review the user's question. Return a JSON object with exactly these fields:
 - "rephrasing": one sentence starting with "You're asking..." confirming what you understood
-- "answer": practical, concise advice in plain text (no markdown symbols)
-- "sql": a single SELECT query if additional database data would support your answer, \
-otherwise null. Use {{user_id}} as a placeholder for the user's id.
+- "sql": a single SELECT query if database data would help you give a better answer, \
+otherwise null. Use {{user_id}} as a placeholder.
+- "lookup_description": a short phrase describing what you are looking up (e.g. \
+"warranty expiration dates for your computers"), or null if sql is null.
+
+Only generate SQL if it would let you give a meaningfully better answer. \
+For questions answerable from the in-progress tasks alone, set sql to null.
 
 You may query:
 {INCIDENTS_SCHEMA}
 {ASSETS_SCHEMA}
 
 Return only the JSON object with no markdown fences."""
+
+    message = client.messages.create(
+        model="claude-sonnet-4-6",
+        max_tokens=512,
+        system=system,
+        messages=[{"role": "user", "content": question}],
+    )
+    headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+
+    text = message.content[0].text.strip()
+    try:
+        return _json.loads(text)
+    except Exception:
+        return {"rephrasing": "I understood your question.", "sql": None, "lookup_description": None}
+
+
+async def advise_answer(
+    question: str,
+    in_progress_tasks: list[dict],
+    lookup_description: str | None,
+    sql_results: list[dict],
+    user_email: str = "",
+) -> str:
+    """Pass 2 — answer the question using in-progress tasks + any SQL results."""
+
+    # Format SQL results as readable text (cap at 30 rows)
+    data_section = ""
+    if lookup_description and sql_results:
+        rows = sql_results[:30]
+        formatted = "\n".join(
+            "  " + ", ".join(f"{k}: {v}" for k, v in row.items() if v is not None)
+            for row in rows
+        )
+        suffix = f"\n  ... ({len(sql_results) - 30} more rows)" if len(sql_results) > 30 else ""
+        data_section = f"\nAdditional data you looked up ({lookup_description}):\n{formatted}{suffix}\n"
+    elif lookup_description:
+        data_section = f"\nYou tried to look up {lookup_description} but the query returned no results.\n"
+
+    system = f"""You are IT Buddy, an IT advisor for an IT professional at Oriol Healthcare — \
+a nursing facility operator with three sites: Holden, Oakdale, and Business Office.
+
+Current in-progress tasks:
+{_tasks_text(in_progress_tasks)}
+{data_section}
+Answer the user's question directly and helpfully. Be specific — reference task names, \
+equipment names, or data points from the lookup where relevant. \
+Plain text only, no markdown symbols."""
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
@@ -144,11 +196,7 @@ Return only the JSON object with no markdown fences."""
     headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
     headlights_tracker.track_activity(user_email, sessions=1)
 
-    text = message.content[0].text.strip()
-    try:
-        return _json.loads(text)
-    except Exception:
-        return {"rephrasing": "I understood your question.", "answer": text, "sql": None}
+    return message.content[0].text.strip()
 
 
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:
