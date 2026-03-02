@@ -1,3 +1,5 @@
+from __future__ import annotations
+
 import os
 import anthropic
 from services import prompt_loader
