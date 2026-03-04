@@ -882,7 +882,7 @@ export default function DashboardPage() {
               {/* Problem type */}
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Problem type</span>
+                  <span className="label-text text-xs font-semibold">Task type</span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
