@@ -27,6 +27,7 @@ export default function OnboardingPage() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [approveStatus, setApproveStatus] = useState<'idle' | 'approving' | 'approved' | 'error'>('idle');
   const [currentAsset, setCurrentAsset] = useState<AssetPreview | null>(null);
+  const [prefillError, setPrefillError] = useState<string | null>(null);
 
   // Load prefill from Dashboard → AI → structured data
   useEffect(() => {
@@ -35,8 +36,12 @@ export default function OnboardingPage() {
       localStorage.removeItem('onboarding_prefill');
       try {
         const hire = JSON.parse(prefill) as NewHire;
+        if (!hire.firstName) throw new Error('Missing firstName');
+        if (!ROLES[hire.role]) throw new Error(`Unknown role: ${hire.role}`);
         handleFormSubmit(hire);
-      } catch { /* ignore bad data */ }
+      } catch (e) {
+        setPrefillError(e instanceof Error ? e.message : 'Could not parse hire data from AI');
+      }
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -116,7 +121,13 @@ export default function OnboardingPage() {
     return (
       <main className="min-h-screen bg-base-200 flex items-center justify-center">
         <div className="text-center space-y-3">
-          <p className="text-base-content/60">No onboarding data — start from the Dashboard.</p>
+          {prefillError ? (
+            <div className="alert alert-error text-sm max-w-sm">
+              <span>AI returned data that could not be used: <strong>{prefillError}</strong>. Try again with more detail.</span>
+            </div>
+          ) : (
+            <p className="text-base-content/60">No onboarding data — start from the Dashboard.</p>
+          )}
           <button className="btn btn-primary btn-sm" onClick={() => router.push('/')}>
             Back to Dashboard
           </button>
