@@ -6,7 +6,8 @@ import Link from 'next/link';
 import { ExternalLink, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
-import { PROBLEM_TYPES } from '@/data/problemTypes';
+import { ROLES } from '@/data/roles';
+import { SITES } from '@/data/sites';
 
 const PRIORITY_BADGE: Record<string, string> = {
   high: 'badge-error',
@@ -17,12 +18,29 @@ const PRIORITY_LABEL: Record<string, string> = {
   high: 'H', low: 'L',
 };
 
-function normalizeScreenToTypeId(screen: string): string {
-  if (!screen) return '';
-  if (PROBLEM_TYPES[screen]) return screen;
-  const lower = screen.toLowerCase().replace(/[\s-]/g, '_');
-  if (PROBLEM_TYPES[lower]) return lower;
-  return '';
+const CHECKLIST_OPTIONS = [
+  { value: '',            label: 'No checklist' },
+  { value: 'Onboarding', label: 'Onboarding'   },
+  { value: 'Offboarding', label: 'Offboarding' },
+];
+
+const CHECKLIST_ROUTES: Record<string, string> = {
+  Onboarding:  '/onboarding',
+  Offboarding: '/offboarding',
+};
+
+// Onboarding fields are built dynamically (next asset # comes from the DB)
+const ONBOARDING_FIELDS_BASE = 'First name, Last name, Role, Site, Start date';
+
+function generateComputerName(
+  site: keyof typeof SITES,
+  role: keyof typeof ROLES,
+  firstName: string,
+  lastName: string
+): string {
+  const siteCode = SITES[site]?.code ?? '';
+  const initials = `${firstName[0] || ''}${lastName[0] || ''}`.toUpperCase();
+  return initials ? `${siteCode}-${initials}` : '';
 }
 
 function formatDate(dateStr: string | null | undefined): string {
@@ -159,6 +177,7 @@ export default function DashboardPage() {
   const [priority, setPriority]   = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]     = useState('');
   const [status, setStatus]       = useState<'pending' | 'in_progress' | 'resolved'>('pending');
+  const [checklist, setChecklist] = useState('');
 
   // Add task modal state
   const [showAddModal,   setShowAddModal]   = useState(false);
@@ -171,38 +190,38 @@ export default function DashboardPage() {
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // Problem type state
-  const [problemTypeInput, setProblemTypeInput] = useState('');
-  const [matchedTypes,     setMatchedTypes]     = useState<string[]>([]);
-  const [selectedType,     setSelectedType]     = useState<string | null>(null);
-  const [matching,         setMatching]         = useState(false);
-  const [diagnosing,       setDiagnosing]       = useState(false);
-  const [aiResponse,       setAiResponse]       = useState<string | null>(null);
-  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
-  const [followUpAnswer,   setFollowUpAnswer]   = useState('');
-  const [conversation,     setConversation]     = useState<{ role: 'ai' | 'user'; text: string }[]>([]);
-
   // Autosave bookkeeping
   const panelDirtyRef     = useRef(false);
   const saveTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const savedInfoReqRef   = useRef('');
+  const savedInfoReqRef   = useRef('');   // last-saved value for each update textarea
   const savedInfoDoneRef  = useRef('');
   const savedIssuesRef    = useRef('');
   const savedDetailsRef   = useRef('');
 
+  // Hire fields — populated by AI, used for localStorage navigation
+  const [hireFirstName,  setHireFirstName]  = useState('');
+  const [hireLastName,   setHireLastName]   = useState('');
+  const [hireRole,       setHireRole]       = useState<keyof typeof ROLES>('business_office');
+  const [hireSite,       setHireSite]       = useState<keyof typeof SITES>('holden');
+  const [hireStartDate,  setHireStartDate]  = useState('');
+  const [hireNextAsset,  setHireNextAsset]  = useState('');
+  const [hireComputer,   setHireComputer]   = useState('');
+  const [hireNotes,      setHireNotes]      = useState('');
+  const [structuredText, setStructuredText] = useState('');  // AI output textarea
+  const [pasted,         setPasted]         = useState(false);
+  const [structuring,    setStructuring]    = useState(false);
+
   // Voice state + refs
-  const [listeningNum,          setListeningNum]          = useState(false);
-  const [listeningName,         setListeningName]         = useState(false);
-  const [listeningDate,         setListeningDate]         = useState(false);
-  const [listeningProblemType,  setListeningProblemType]  = useState(false);
+  const [listeningNum,         setListeningNum]         = useState(false);
+  const [listeningName,        setListeningName]        = useState(false);
+  const [listeningDate,        setListeningDate]        = useState(false);
   const [listeningInfoRequired, setListeningInfoRequired] = useState(false);
-  const [listeningInfoDone,     setListeningInfoDone]     = useState(false);
-  const [listeningIssues,       setListeningIssues]       = useState(false);
+  const [listeningInfoDone,    setListeningInfoDone]    = useState(false);
+  const [listeningIssues,      setListeningIssues]      = useState(false);
 
   const numRecRef           = useRef<unknown>(null);
   const nameRecRef          = useRef<unknown>(null);
   const dateRecRef          = useRef<unknown>(null);
-  const problemTypeRecRef   = useRef<unknown>(null);
   const infoRequiredRecRef  = useRef<unknown>(null);
   const infoDoneRecRef      = useRef<unknown>(null);
   const issuesRecRef        = useRef<unknown>(null);
@@ -233,6 +252,26 @@ export default function DashboardPage() {
       .catch(() => {});
   }, [loadTasks]);
 
+  // Auto-populate the info-required textarea whenever checklist or selected task changes.
+  // (infoRequired is always a generated template — never saved to or loaded from the DB)
+  useEffect(() => {
+    if (checklist !== 'Onboarding') { setInfoRequired(''); return; }
+    setInfoRequired(`Information needed: ${ONBOARDING_FIELDS_BASE}, Next asset #, Computer name, Notes`);
+    fetch('/api/assets/download')
+      .then(r => r.json())
+      .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
+        const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
+        if (nums.length > 0) {
+          const next = String(Math.max(...nums) + 1).padStart(4, '0');
+          setInfoRequired(`Information needed: ${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Computer name, Notes`);
+        }
+      })
+      .catch(() => {});
+  // selectedTask in deps ensures this re-runs when a new task is loaded,
+  // even if the checklist value didn't change between tasks.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [checklist, selectedTask]);
+
   // ── Autosave main fields ──────────────────────────────────────────────────
   useEffect(() => {
     if (!panelDirtyRef.current) return;
@@ -244,7 +283,7 @@ export default function DashboardPage() {
           await fetch(`/api/issues/${selectedTask.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null }),
+            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: checklist || null, status, date_due: dateDue || null }),
           });
           loadTasks();
         }
@@ -254,12 +293,12 @@ export default function DashboardPage() {
     }, 1500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskName, priority, dateDue, status, selectedType]);
+  }, [taskName, priority, dateDue, status, checklist]);
 
   // Save a textarea as an incident_update on blur (only if changed since last save)
   async function saveUpdate(type: string, note: string, lastRef: React.MutableRefObject<string>) {
     const trimmed = note.trim();
-    if (trimmed === lastRef.current || !selectedTask) return;
+    if (trimmed === lastRef.current || !selectedTask) return; // allow empty to persist clears
     setSaveStatus('saving');
     try {
       await fetch(`/api/issues/${selectedTask.id}/updates`, {
@@ -273,18 +312,12 @@ export default function DashboardPage() {
     } catch { setSaveStatus('idle'); }
   }
 
-  async function saveAiUpdate(type: 'ai_response' | 'user_reply', note: string) {
-    if (!selectedTask || !note.trim()) return;
-    try {
-      await fetch(`/api/issues/${selectedTask.id}/updates`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, note: note.trim() }),
-      });
-    } catch { /* ignore */ }
-  }
-
   function markDirty() { panelDirtyRef.current = true; }
+
+  // Auto-generate computer name from hire fields
+  useEffect(() => {
+    setHireComputer(generateComputerName(hireSite, hireRole, hireFirstName, hireLastName));
+  }, [hireFirstName, hireLastName, hireSite, hireRole]);
 
   const inProgress = useMemo(() => {
     const priorityOrder = (t: Incident) => t.priority === 'high' ? 0 : t.priority === null ? 1 : 2;
@@ -306,17 +339,16 @@ export default function DashboardPage() {
     setPriority('');
     setDateDue('');
     setStatus('pending');
+    setChecklist('');
     setInfoRequired('');
     setInfoDone('');
     setIssues('');
     setSelectedTask(null);
-    setProblemTypeInput('');
-    setMatchedTypes([]);
-    setSelectedType(null);
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setFollowUpAnswer('');
-    setConversation([]);
+    setHireFirstName(''); setHireLastName('');
+    setHireRole('business_office'); setHireSite('holden');
+    setHireStartDate(''); setHireNextAsset('');
+    setHireComputer(''); setHireNotes('');
+    setStructuredText(''); setPasted(false);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
@@ -328,76 +360,46 @@ export default function DashboardPage() {
     setDateDue(task.date_due || '');
     const s = task.status === 'open' ? 'pending' : task.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
-
-    // Normalize screen → problem type ID
-    const rawScreen = task.screen || '';
-    const typeId = normalizeScreenToTypeId(rawScreen);
-    setSelectedType(typeId || null);
-    setProblemTypeInput(typeId ? (PROBLEM_TYPES[typeId]?.label ?? rawScreen) : rawScreen);
-    setMatchedTypes([]);
-
+    const newChecklist = task.screen || '';
+    setChecklist(newChecklist);
     setInfoDone('');
     setIssues('');
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setFollowUpAnswer('');
-    setConversation([]);
     setSelectedTask(task);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
 
-    // Set infoRequired from type questions immediately
-    if (typeId && PROBLEM_TYPES[typeId]) {
-      setInfoRequired(`Information needed: ${PROBLEM_TYPES[typeId].questions.join(', ')}`);
+    // Set the infoRequired template immediately (synchronous) so it always appears.
+    // Then refine with the actual next asset number once the fetch resolves.
+    if (newChecklist === 'Onboarding') {
+      setInfoRequired(`Information needed: ${ONBOARDING_FIELDS_BASE}, Next asset #, Computer name, Notes`);
+      fetch('/api/assets/download')
+        .then(r => r.json())
+        .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
+          const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
+          if (nums.length > 0) {
+            const next = String(Math.max(...nums) + 1).padStart(4, '0');
+            setInfoRequired(`Information needed: ${ONBOARDING_FIELDS_BASE}, Next asset #${next}?, Computer name, Notes`);
+          }
+        })
+        .catch(() => {});
     } else {
       setInfoRequired('');
     }
 
-    // Load updates
+    // Load the most recent progress update into infoDone
     fetch(`/api/issues/${task.id}/updates`)
       .then(r => r.json())
-      .then(({ updates }: { updates: { type: string; note: string; created_at?: string }[] }) => {
-        const latest = (t: string) => updates.find(u => u.type === t)?.note ?? '';
-
+      .then(({ updates }: { updates: { type: string; note: string }[] }) => {
+        const latest = (type: string) => updates.find(u => u.type === type)?.note ?? '';
         const progress = latest('progress');
         setInfoDone(progress);
         savedInfoDoneRef.current = progress;
-
+        // If results look like structured onboarding data, show "Go to Onboarding Checklist" not "Structure it"
+        setPasted(/^Computer name:/m.test(progress));
         const details = latest('details');
         if (details) {
           setInfoRequired(details);
           savedDetailsRef.current = details;
-        }
-
-        // Load conversation from ai_response / user_reply updates (in order)
-        const aiConv = updates
-          .filter(u => u.type === 'ai_response' || u.type === 'user_reply')
-          .map(u => ({
-            role: (u.type === 'ai_response' ? 'ai' : 'user') as 'ai' | 'user',
-            text: u.note,
-          }));
-        setConversation(aiConv);
-        if (aiConv.length > 0) {
-          const lastAi = [...aiConv].reverse().find(u => u.role === 'ai');
-          if (lastAi) setAiResponse(lastAi.text);
-        }
-
-        // For onboarding without saved details, refine with actual asset number
-        if (typeId === 'onboarding' && !details) {
-          fetch('/api/assets/download')
-            .then(r => r.json())
-            .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
-              const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
-              if (nums.length > 0) {
-                const next = String(Math.max(...nums) + 1).padStart(4, '0');
-                const pt = PROBLEM_TYPES['onboarding'];
-                if (pt) {
-                  const updatedQ = pt.questions.map(q => q === 'Next asset #?' ? `Next asset #${next}?` : q);
-                  setInfoRequired(`Information needed: ${updatedQ.join(', ')}`);
-                }
-              }
-            })
-            .catch(() => {});
         }
       })
       .catch(() => {});
@@ -497,140 +499,99 @@ export default function DashboardPage() {
     };
   }
 
-  function selectProblemType(id: string) {
-    setSelectedType(id);
-    const pt = PROBLEM_TYPES[id];
-    if (!pt) return;
-
-    setInfoRequired(`Information needed: ${pt.questions.join(', ')}`);
-
-    if (id === 'onboarding') {
-      fetch('/api/assets/download')
-        .then(r => r.json())
-        .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
-          const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
-          if (nums.length > 0) {
-            const next = String(Math.max(...nums) + 1).padStart(4, '0');
-            const updatedQ = pt.questions.map(q => q === 'Next asset #?' ? `Next asset #${next}?` : q);
-            setInfoRequired(`Information needed: ${updatedQ.join(', ')}`);
-          }
-        })
-        .catch(() => {});
-    }
-
-    markDirty();
-  }
-
-  async function handleMatchProblemType() {
-    if (!problemTypeInput.trim()) return;
-    setMatching(true);
-    setMatchedTypes([]);
-    setSelectedType(null);
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setConversation([]);
+  async function handleStructureIt() {
+    if (!infoDone.trim()) return;
+    setStructuring(true);
     try {
-      const res = await fetch('/api/ai/match-problem-type', {
+      const roles = Object.keys(ROLES).join(', ');
+      const sites = 'holden, oakdale, business';
+      const res = await fetch('/api/ai', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          description: problemTypeInput,
-          problem_types: Object.entries(PROBLEM_TYPES).map(([id, { label }]) => `${id}: ${label}`),
+          prompt: `${infoRequired.trim() ? `The user was collecting the following information: "${infoRequired.trim()}"\n\n` : ''}Extract new hire information from this text: "${infoDone.trim()}"`,
+          system: `You extract new hire information from free-form text. Return ONLY a valid JSON object with exactly these fields:
+- firstName: string
+- lastName: string
+- role: one of [${roles}]
+- site: one of [${sites}]
+- startDate: YYYY-MM-DD string (or empty string if not mentioned)
+- nextAssetNumber: string (or empty string if not mentioned)
+- computerName: string (or empty string if not mentioned)
+- notes: string (any other info not captured above, or empty string)
+Return only the JSON object, no explanation, no markdown fences.`,
         }),
       });
       const data = await res.json();
-      const matches: string[] = data.matches ?? [];
-      setMatchedTypes(matches);
-      if (matches.length === 0) {
-        toast.error("No matching problem type found. Try describing the problem differently.");
-      } else if (matches.length === 1) {
-        selectProblemType(matches[0]);
-      }
-      // If multiple matches: show button group, user picks one
+      const hire = JSON.parse(data.text);
+      const fn   = hire.firstName  || '';
+      const ln   = hire.lastName   || '';
+      const role = (hire.role && ROLES[hire.role as keyof typeof ROLES]) ? hire.role as keyof typeof ROLES : 'business_office';
+      const site = (hire.site && SITES[hire.site as keyof typeof SITES]) ? hire.site as keyof typeof SITES : 'holden';
+      // Use AI-extracted computer name if provided, otherwise auto-generate
+      const comp = hire.computerName || generateComputerName(site, role, fn, ln);
+      // If AI didn't find an asset number, fall back to the suggested one from the ? hint in infoRequired
+      const suggestedAsset = (() => { const m = infoRequired.match(/Next asset #(\d+)\?/); return m ? m[1] : ''; })();
+      const assetNum = hire.nextAssetNumber || suggestedAsset;
+
+      setHireFirstName(fn);
+      setHireLastName(ln);
+      setHireRole(role);
+      setHireSite(site);
+      setHireStartDate(hire.startDate || '');
+      setHireNextAsset(assetNum);
+      setHireComputer(comp);
+      setHireNotes(hire.notes || '');
+
+      // Put the structured summary into its own textarea (not the original)
+      const lines = [
+        fn             && `First name: ${fn}`,
+        ln             && `Last name: ${ln}`,
+        ROLES[role]    && `Role: ${ROLES[role].label}`,
+        SITES[site]    && `Site: ${SITES[site].label}`,
+        hire.startDate && `Start date: ${hire.startDate}`,
+        assetNum       && `Next asset #: ${assetNum}`,
+        comp           && `Computer name: ${comp}`,
+        hire.notes     && `Notes: ${hire.notes}`,
+      ].filter(Boolean);
+      setStructuredText(lines.join('\n'));
+      setPasted(false);
     } catch {
-      toast.error('Could not match problem type — try again.');
+      toast.error('Could not structure the text — try again.');
     }
-    setMatching(false);
+    setStructuring(false);
   }
 
-  async function handleDiagnose() {
-    if (!selectedType) return;
+  function goToOnboarding() {
+    // Hire fields are set by handleStructureIt in the current session.
+    // If loading an existing task (fields empty), parse them from the structured text in Results.
+    let fn = hireFirstName, ln = hireLastName;
+    let role = hireRole, site = hireSite;
+    let startDate = hireStartDate, assetNum = hireNextAsset;
+    let comp = hireComputer, notes = hireNotes;
 
-    // For onboarding with no info: navigate directly
-    if (selectedType === 'onboarding' && !infoDone.trim() && !infoRequired.trim()) {
-      router.push('/onboarding');
-      return;
+    if (!fn && infoDone) {
+      const get = (label: string) => {
+        const m = infoDone.match(new RegExp(`^${label}:\\s*(.+)$`, 'mi'));
+        return m ? m[1].trim() : '';
+      };
+      fn       = get('First name');
+      ln       = get('Last name');
+      startDate = get('Start date');
+      assetNum = get('Next asset #');
+      comp     = get('Computer name');
+      notes    = get('Notes');
+      const roleLabel = get('Role');
+      const siteLabel = get('Site');
+      role = (Object.entries(ROLES).find(([, v]) => v.label === roleLabel)?.[0] ?? 'business_office') as keyof typeof ROLES;
+      site = (Object.entries(SITES).find(([, v]) => v.label === siteLabel)?.[0] ?? 'holden') as keyof typeof SITES;
     }
 
-    setDiagnosing(true);
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setConversation([]);
-
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problem_type: selectedType,
-          task_details: infoRequired || null,
-          information: infoDone || null,
-          task_fields: { title: taskName, priority: priority || null, date_due: dateDue || null, status },
-          conversation: null,
-        }),
-      });
-      const data = await res.json();
-
-      if (selectedType === 'onboarding' && data.structured_data !== undefined) {
-        localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
-        router.push('/onboarding');
-        return;
-      }
-
-      const responseText: string = data.response ?? '';
-      const fups: string[] = data.follow_up_questions ?? [];
-      setAiResponse(responseText);
-      setFollowUpQuestions(fups);
-      setConversation([{ role: 'ai', text: responseText }]);
-      await saveAiUpdate('ai_response', responseText);
-    } catch {
-      toast.error('Could not get AI response — try again.');
-    }
-    setDiagnosing(false);
-  }
-
-  async function handleFollowUp() {
-    if (!followUpAnswer.trim() || !selectedType) return;
-    const answer = followUpAnswer.trim();
-    const updatedConv = [...conversation, { role: 'user' as const, text: answer }];
-    setConversation(updatedConv);
-    setFollowUpAnswer('');
-    await saveAiUpdate('user_reply', answer);
-
-    setDiagnosing(true);
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problem_type: selectedType,
-          task_details: infoRequired || null,
-          information: infoDone || null,
-          task_fields: { title: taskName, priority: priority || null, date_due: dateDue || null, status },
-          conversation: updatedConv.map(c => ({ role: c.role, content: c.text })),
-        }),
-      });
-      const data = await res.json();
-      const responseText: string = data.response ?? '';
-      const fups: string[] = data.follow_up_questions ?? [];
-      setAiResponse(responseText);
-      setFollowUpQuestions(fups);
-      setConversation(prev => [...prev, { role: 'ai', text: responseText }]);
-      await saveAiUpdate('ai_response', responseText);
-    } catch {
-      toast.error('Could not get AI response — try again.');
-    }
-    setDiagnosing(false);
+    localStorage.setItem('onboarding_prefill', JSON.stringify({
+      firstName: fn, lastName: ln, role, site,
+      startDate, nextAssetNumber: assetNum, computerName: comp, notes,
+    }));
+    router.push('/onboarding');
   }
 
   async function handleAddTask() {
@@ -687,9 +648,6 @@ export default function DashboardPage() {
     setSeeding(false);
   }
 
-  // Suppress unused variable warnings for voice refs not used in current render
-  void numRecRef; void parseSpokenNumber; void listeningNum; void setListeningNum;
-
   if (loading) {
     return (
       <div className="min-h-screen bg-base-200 flex items-center justify-center">
@@ -715,13 +673,15 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-lg font-bold mb-2">Tasks in the queue</h2>
             <TaskTable tasks={queue} onRowClick={loadTask} variant="queue" />
-            <button
-              className="btn btn-outline btn-sm w-full mt-2"
-              onClick={handleSeedData}
-              disabled={seeding}
-            >
-              {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
-            </button>
+            {tasks.length === 0 && (
+              <button
+                className="btn btn-outline btn-sm w-full mt-2"
+                onClick={handleSeedData}
+                disabled={seeding}
+              >
+                {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
+              </button>
+            )}
           </div>
 
         </div>
@@ -840,116 +800,51 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Status */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Status</span>
-                </label>
-                <div className="flex gap-1">
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'pending' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => { setStatus('pending'); markDirty(); }}
-                  >
-                    Queue
-                  </button>
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => { setStatus('in_progress'); markDirty(); }}
-                  >
-                    In&nbsp;Progress
-                  </button>
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
-                    onClick={() => { setStatus('resolved'); markDirty(); }}
-                  >
-                    Complete
-                  </button>
-                </div>
-              </div>
-
-              {/* Problem type */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Problem type</span>
-                </label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    value={problemTypeInput}
-                    onChange={e => {
-                      setProblemTypeInput(e.target.value);
-                      setSelectedType(null);
-                      setMatchedTypes([]);
-                    }}
-                    placeholder="Describe the problem to identify its type..."
-                  />
-                  <VoiceButton
-                    listening={listeningProblemType}
-                    onToggle={() => listeningProblemType
-                      ? stopVoice(problemTypeRecRef as React.MutableRefObject<unknown>, setListeningProblemType)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setProblemTypeInput(prev => prev ? `${prev} ${text}` : text),
-                            () => setProblemTypeInput('')
-                          ),
-                          setListeningProblemType,
-                          problemTypeRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
+              {/* Status + Checklist (two-column row) */}
+              <div className="grid grid-cols-2 gap-3">
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Status</span>
+                  </label>
+                  <div className="flex gap-1">
+                    <button
+                      className={`btn btn-xs flex-1 ${status === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => { setStatus('pending'); markDirty(); }}
+                    >
+                      Queue
+                    </button>
+                    <button
+                      className={`btn btn-xs flex-1 ${status === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
+                      onClick={() => { setStatus('in_progress'); markDirty(); }}
+                    >
+                      In&nbsp;Progress
+                    </button>
+                    <button
+                      className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
+                      onClick={() => { setStatus('resolved'); markDirty(); }}
+                    >
+                      Complete
+                    </button>
+                  </div>
                 </div>
 
-                <button
-                  className="btn btn-outline btn-sm mt-1 w-full"
-                  onClick={handleMatchProblemType}
-                  disabled={matching || !problemTypeInput.trim()}
-                >
-                  {matching && <span className="loading loading-spinner loading-xs" />}
-                  {matching ? 'Matching…' : 'Match'}
-                </button>
-
-                {/* Multiple matches — user picks one */}
-                {matchedTypes.length > 1 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {matchedTypes.map(id => (
-                      <button
-                        key={id}
-                        className={`btn btn-xs ${selectedType === id ? 'btn-primary' : 'btn-outline'}`}
-                        onClick={() => selectProblemType(id)}
-                      >
-                        {PROBLEM_TYPES[id]?.label ?? id}
-                      </button>
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Checklist</span>
+                  </label>
+                  <select
+                    className="select select-bordered select-sm w-full"
+                    value={checklist}
+                    onChange={e => { setChecklist(e.target.value); markDirty(); }}
+                  >
+                    {CHECKLIST_OPTIONS.map(opt => (
+                      <option key={opt.value} value={opt.value}>{opt.label}</option>
                     ))}
-                  </div>
-                )}
-
-                {/* Selected type badge */}
-                {selectedType && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-xs text-base-content/50">Type:</span>
-                    <span className="badge badge-sm badge-outline badge-primary">
-                      {PROBLEM_TYPES[selectedType]?.label ?? selectedType}
-                    </span>
-                  </div>
-                )}
-
-                {/* Ask the AI button */}
-                {selectedType && (
-                  <button
-                    className="btn btn-primary btn-sm mt-2 w-full"
-                    onClick={handleDiagnose}
-                    disabled={diagnosing}
-                  >
-                    {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                    {diagnosing
-                      ? 'Thinking…'
-                      : `Ask the AI to help with ${PROBLEM_TYPES[selectedType]?.label ?? selectedType}`}
-                  </button>
-                )}
+                  </select>
+                </div>
               </div>
 
-              {/* Task details */}
+              {/* Information needed */}
               <div className="form-control">
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Task details</span>
@@ -980,16 +875,16 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Information to send to the AI */}
+              {/* Results */}
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Information to send to the AI</span>
+                  <span className="label-text text-xs font-semibold">Results</span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
                     value={infoDone}
-                    onChange={e => setInfoDone(e.target.value)}
+                    onChange={e => { setInfoDone(e.target.value); setPasted(false); }}
                     onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
                     placeholder="What information was gathered or what actions were taken..."
                   />
@@ -1009,7 +904,47 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
+
+                {/* Structure it — hidden once text has been pasted (until user edits again) */}
+                {checklist === 'Onboarding' && infoDone.trim() && !pasted && (
+                  <button
+                    className="btn btn-outline btn-sm mt-2 w-full"
+                    onClick={handleStructureIt}
+                    disabled={structuring}
+                  >
+                    {structuring && <span className="loading loading-spinner loading-xs" />}
+                    {structuring ? 'Structuring…' : 'Structure it'}
+                  </button>
+                )}
+
+                {/* Go to Onboarding Checklist — appears after user pastes structured text */}
+                {checklist === 'Onboarding' && pasted && (
+                  <button className="btn btn-primary btn-sm mt-2 w-full gap-1" onClick={goToOnboarding}>
+                    Go to Onboarding Checklist <ExternalLink className="w-3 h-3" />
+                  </button>
+                )}
               </div>
+
+              {/* Structured text textarea — appears after AI runs, before paste */}
+              {checklist === 'Onboarding' && structuredText && !pasted && (
+                <div className="space-y-2">
+                  <AutoTextarea
+                    className="textarea textarea-bordered textarea-sm w-full text-sm font-mono"
+                    value={structuredText}
+                    onChange={e => setStructuredText(e.target.value)}
+                  />
+                  <button
+                    className="btn btn-outline btn-sm w-full"
+                    onClick={() => {
+                      setInfoDone(structuredText);
+                      setPasted(true);
+                      saveUpdate('progress', structuredText, savedInfoDoneRef);
+                    }}
+                  >
+                    Paste into Results
+                  </button>
+                </div>
+              )}
 
               {/* Issues / Comments */}
               <div className="form-control">
@@ -1042,54 +977,6 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* IT Buddy response panel */}
-              {conversation.length > 0 && (
-                <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">IT Buddy</span>
-                  </label>
-                  <div className="space-y-2">
-                    {conversation.map((turn, i) => (
-                      <div
-                        key={i}
-                        className={`rounded-box p-3 text-sm whitespace-pre-wrap ${
-                          turn.role === 'ai' ? 'bg-primary/10' : 'bg-base-200'
-                        }`}
-                      >
-                        <p className="text-xs font-semibold text-base-content/50 mb-1">
-                          {turn.role === 'ai' ? 'IT Buddy' : 'You'}
-                        </p>
-                        <p>{turn.text}</p>
-                      </div>
-                    ))}
-                  </div>
-
-                  {followUpQuestions.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs font-semibold text-base-content/60">Follow-up questions:</p>
-                      <ul className="list-disc list-inside text-sm text-base-content/70 space-y-0.5">
-                        {followUpQuestions.map((q, i) => <li key={i}>{q}</li>)}
-                      </ul>
-                      <AutoTextarea
-                        className="textarea textarea-bordered textarea-sm w-full text-sm mt-2"
-                        value={followUpAnswer}
-                        onChange={e => setFollowUpAnswer(e.target.value)}
-                        placeholder="Your answer..."
-                      />
-                      <button
-                        className="btn btn-outline btn-sm w-full mt-1"
-                        onClick={handleFollowUp}
-                        disabled={diagnosing || !followUpAnswer.trim()}
-                      >
-                        {diagnosing
-                          ? <span className="loading loading-spinner loading-xs" />
-                          : 'Send answer'}
-                      </button>
-                    </div>
-                  )}
-                </div>
-              )}
-
               {/* View details link + delete */}
               <div className="flex items-center gap-2">
                 <Link
@@ -1114,6 +1001,16 @@ export default function DashboardPage() {
                 {saveStatus === 'saved'  && <span className="text-xs text-success">Saved ✓</span>}
               </div>
 
+              {/* Load demo data (only when no tasks exist) */}
+              {tasks.length === 0 && (
+                <button
+                  className="btn btn-ghost btn-xs w-full"
+                  onClick={handleSeedData}
+                  disabled={seeding}
+                >
+                  {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
+                </button>
+              )}
 
             </div>
           </div>
