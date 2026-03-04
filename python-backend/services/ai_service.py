@@ -249,6 +249,7 @@ async def diagnose(
     information: str | None = None,
     task_fields: dict | None = None,
     conversation: list[dict] | None = None,
+    inventory_context: str | None = None,
     user_email: str = "",
 ) -> dict:
     """Diagnose an IT issue or extract onboarding structured data."""
@@ -305,10 +306,15 @@ Return only the JSON object, no explanation, no markdown fences.""",
         # Build message list: initial user request + conversation history
         is_first_pass = not conversation
         if is_first_pass:
+            inventory_block = (
+                f"\n\nInventory data from the asset database (use this to answer questions you would otherwise ask):\n{inventory_context}"
+                if inventory_context else ""
+            )
             user_msg = (
                 f"I have gathered some initial context about this IT issue. "
                 f"Use it to understand the situation and identify what key information is still missing. "
-                f"Do NOT attempt a diagnosis yet — your job on this first pass is to ask the specific, targeted follow-up questions that will give you what you need to diagnose it properly.\n\n{context_text}"
+                f"Do NOT attempt a diagnosis yet — your job on this first pass is to ask the specific, targeted follow-up questions that will give you what you need to diagnose it properly."
+                f"{inventory_block}\n\n{context_text}"
             )
         else:
             user_msg = f"Here is the full context for this IT issue:\n\n{context_text}"
@@ -322,9 +328,16 @@ Return only the JSON object, no explanation, no markdown fences.""",
                 messages.append({"role": api_role, "content": content})
             # Last turn is the user's latest answer — Claude will respond
 
+        inventory_instruction = (
+            "\n\nYou have been given inventory data from the asset database. "
+            "For any question whose answer is visible in that data, do NOT ask it — use the data directly. "
+            "Only ask follow-up questions for information that is NOT in the inventory."
+            if inventory_context else ""
+        )
+
         system = f"""You are IT Buddy, an expert IT advisor for Oriol Healthcare (nursing facility with three sites: Holden, Oakdale, Business Office).
 
-You are working a {label} issue.
+You are working a {label} issue.{inventory_instruction}
 
 On the FIRST pass (no prior conversation), your sole job is to ask the right follow-up questions — not to diagnose. Use the initial context to focus your questions. Set "response" to a brief acknowledgement of what you know so far (1–2 sentences), and put all your questions in "follow_up_questions".
 
