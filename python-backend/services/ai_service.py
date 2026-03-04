@@ -270,7 +270,21 @@ async def diagnose(
             system="""You extract new hire information from free-form text. Return ONLY a valid JSON object with exactly these fields:
 - firstName: string
 - lastName: string
-- role: one of [cna, lpn, rn, administrator, maintenance, housekeeping, dietary, laundry, social_worker, activity_director, business_office, it, medical_records, pt_ot]
+- role: one of the following keys (pick the closest match):
+    executive       = Executive / Administrator
+    business_office = Business Office staff
+    admissions      = Admissions
+    hr              = Human Resources
+    don_adon        = DON / ADON / Director of Nursing / RN supervisor
+    social_services = Social Services / Case Manager / Social Worker
+    activities      = Activities / Activity Director
+    sdc             = SDC (Staff Development Coordinator)
+    home_health     = Home Health staff
+    maintenance     = Maintenance / Facilities
+    kitchen         = Kitchen / Food Services / Dietary / Laundry / Housekeeping
+    concierge       = Concierge / Front Desk
+    it              = IT / Tech staff
+    clinical_floor  = CNA / LPN / RN / Floor Clinical / Med Aide
 - site: one of [holden, oakdale, business_office]
 - startDate: YYYY-MM-DD string (or empty string if not mentioned)
 - nextAssetNumber: string (or empty string if not mentioned)
