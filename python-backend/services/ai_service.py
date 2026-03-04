@@ -222,6 +222,10 @@ Return only the JSON object, no markdown fences.""",
     headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
 
     text = message.content[0].text.strip()
+    # Strip markdown fences if the model wrapped the JSON
+    if text.startswith("```"):
+        lines = text.splitlines()
+        text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
     try:
         result = _json.loads(text)
         return result.get("matches", [])

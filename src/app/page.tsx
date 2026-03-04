@@ -523,6 +523,18 @@ export default function DashboardPage() {
 
   async function handleMatchProblemType() {
     if (!problemTypeInput.trim()) return;
+
+    // Direct match: if input already equals a known ID or label, skip the API call
+    const inputLower = problemTypeInput.trim().toLowerCase();
+    const directMatch = Object.entries(PROBLEM_TYPES).find(
+      ([id, { label }]) => id === inputLower || label.toLowerCase() === inputLower
+    );
+    if (directMatch) {
+      setMatchedTypes([directMatch[0]]);
+      selectProblemType(directMatch[0]);
+      return;
+    }
+
     setMatching(true);
     setMatchedTypes([]);
     setSelectedType(null);
