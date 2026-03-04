@@ -946,19 +946,6 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-                {/* Ask the AI button */}
-                {selectedType && (
-                  <button
-                    className="btn btn-primary btn-sm mt-2 w-full"
-                    onClick={handleDiagnose}
-                    disabled={diagnosing}
-                  >
-                    {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                    {diagnosing
-                      ? 'Thinking…'
-                      : `Ask the AI to help with ${PROBLEM_TYPES[selectedType]?.label ?? selectedType}`}
-                  </button>
-                )}
               </div>
 
               {/* Task details */}
@@ -1021,6 +1008,19 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
+                {/* Ask the AI button */}
+                {selectedType && (
+                  <button
+                    className="btn btn-primary btn-sm mt-2 w-full"
+                    onClick={handleDiagnose}
+                    disabled={diagnosing}
+                  >
+                    {diagnosing && <span className="loading loading-spinner loading-xs" />}
+                    {diagnosing
+                      ? 'Thinking…'
+                      : `Ask the AI to help with ${PROBLEM_TYPES[selectedType]?.label ?? selectedType}`}
+                  </button>
+                )}
               </div>
 
               {/* Issues / Comments */}
