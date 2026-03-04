@@ -1058,7 +1058,7 @@ export default function DashboardPage() {
               {conversation.length > 0 && (
                 <div className="form-control">
                   <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">IT Buddy</span>
+                    <span className="label-text text-xs font-semibold">IT Buddy Interactions</span>
                   </label>
                   <div className="space-y-2">
                     {conversation.map((turn, i) => (
