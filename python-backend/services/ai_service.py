@@ -303,7 +303,17 @@ Return only the JSON object, no explanation, no markdown fences.""",
         context_text = "\n\n".join(context_parts)
 
         # Build message list: initial user request + conversation history
-        messages = [{"role": "user", "content": f"Please analyze this IT issue:\n\n{context_text}"}]
+        is_first_pass = not conversation
+        if is_first_pass:
+            user_msg = (
+                f"I have gathered some initial context about this IT issue. "
+                f"Use it to understand the situation and identify what key information is still missing. "
+                f"Do NOT attempt a diagnosis yet — your job on this first pass is to ask the specific, targeted follow-up questions that will give you what you need to diagnose it properly.\n\n{context_text}"
+            )
+        else:
+            user_msg = f"Here is the full context for this IT issue:\n\n{context_text}"
+
+        messages = [{"role": "user", "content": user_msg}]
         if conversation:
             for turn in conversation:
                 role = turn.get("role", "user")
@@ -314,11 +324,15 @@ Return only the JSON object, no explanation, no markdown fences.""",
 
         system = f"""You are IT Buddy, an expert IT advisor for Oriol Healthcare (nursing facility with three sites: Holden, Oakdale, Business Office).
 
-You are diagnosing an IT issue of type: {label}
+You are working a {label} issue.
+
+On the FIRST pass (no prior conversation), your sole job is to ask the right follow-up questions — not to diagnose. Use the initial context to focus your questions. Set "response" to a brief acknowledgement of what you know so far (1–2 sentences), and put all your questions in "follow_up_questions".
+
+On SUBSEQUENT passes (conversation history present), analyze the answers and either provide a diagnosis or ask any remaining critical questions. When you have enough information for a complete diagnosis, set "follow_up_questions" to [].
 
 Return a JSON object with exactly these fields:
-- "response": your analysis or next diagnostic step (plain text, no markdown symbols)
-- "follow_up_questions": a list of specific questions you need answered to complete the diagnosis; use an empty list [] if you have enough information for a complete diagnosis
+- "response": your brief acknowledgement (first pass) or full diagnosis/analysis (subsequent passes) — plain text, no markdown symbols
+- "follow_up_questions": list of specific questions still needed, or [] if you have enough for a full diagnosis
 
 Return only the JSON object, no markdown fences."""
 
