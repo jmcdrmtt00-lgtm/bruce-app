@@ -136,7 +136,6 @@ class DiagnoseRequest(BaseModel):
     information: str | None = None
     task_fields: dict | None = None
     conversation: list[dict] | None = None
-    inventory_context: str | None = None
     user_email: str | None = None
 
 
@@ -154,6 +153,5 @@ async def diagnose_ep(req: DiagnoseRequest):
         req.information,
         req.task_fields,
         req.conversation,
-        req.inventory_context,
         req.user_email or "",
     )

@@ -66,7 +66,7 @@ export interface IncidentUpdate {
   id: string;
   incident_id: string;
   user_id: string;
-  type: 'approach' | 'progress' | 'resolved';
+  type: 'approach' | 'progress' | 'resolved' | 'details' | 'ai_response' | 'user_reply';
   note: string;
   created_at: string;
 }

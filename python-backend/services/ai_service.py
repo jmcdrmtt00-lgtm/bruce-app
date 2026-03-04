@@ -249,7 +249,6 @@ async def diagnose(
     information: str | None = None,
     task_fields: dict | None = None,
     conversation: list[dict] | None = None,
-    inventory_context: str | None = None,
     user_email: str = "",
 ) -> dict:
     """Diagnose an IT issue or extract onboarding structured data."""
@@ -271,7 +270,7 @@ async def diagnose(
             system="""You extract new hire information from free-form text. Return ONLY a valid JSON object with exactly these fields:
 - firstName: string
 - lastName: string
-- role: one of [executive, business_office, admissions, hr, don_adon, social_services, activities, sdc, home_health, maintenance, kitchen, concierge, it, clinical_floor]
+- role: one of [cna, lpn, rn, administrator, maintenance, housekeeping, dietary, laundry, social_worker, activity_director, business_office, it, medical_records, pt_ot]
 - site: one of [holden, oakdale, business_office]
 - startDate: YYYY-MM-DD string (or empty string if not mentioned)
 - nextAssetNumber: string (or empty string if not mentioned)
@@ -304,22 +303,7 @@ Return only the JSON object, no explanation, no markdown fences.""",
         context_text = "\n\n".join(context_parts)
 
         # Build message list: initial user request + conversation history
-        is_first_pass = not conversation
-        if is_first_pass:
-            inventory_block = (
-                f"\n\nInventory data from the asset database (use this to answer questions you would otherwise ask):\n{inventory_context}"
-                if inventory_context else ""
-            )
-            user_msg = (
-                f"I have gathered some initial context about this IT issue. "
-                f"Use it to understand the situation and identify what key information is still missing. "
-                f"Do NOT attempt a diagnosis yet — your job on this first pass is to ask the specific, targeted follow-up questions that will give you what you need to diagnose it properly."
-                f"{inventory_block}\n\n{context_text}"
-            )
-        else:
-            user_msg = f"Here is the full context for this IT issue:\n\n{context_text}"
-
-        messages = [{"role": "user", "content": user_msg}]
+        messages = [{"role": "user", "content": f"Please analyze this IT issue:\n\n{context_text}"}]
         if conversation:
             for turn in conversation:
                 role = turn.get("role", "user")
@@ -328,28 +312,13 @@ Return only the JSON object, no explanation, no markdown fences.""",
                 messages.append({"role": api_role, "content": content})
             # Last turn is the user's latest answer — Claude will respond
 
-        inventory_instruction = (
-            "\n\nYou have been given inventory data from the asset database. "
-            "For any question whose answer is visible in that data, do NOT ask it — use the data directly. "
-            "Only ask follow-up questions for information that is NOT in the inventory.\n"
-            "IMPORTANT: On the first pass, begin your 'response' field by briefly summarising what relevant "
-            "devices or records you found in the inventory (e.g. 'I found 2 Network devices at Holden: ...'), "
-            "then ask the user to flag anything that looks wrong or out of date before you rely on it. "
-            "After that, list only the follow-up questions for information the inventory does NOT contain."
-            if inventory_context else ""
-        )
-
         system = f"""You are IT Buddy, an expert IT advisor for Oriol Healthcare (nursing facility with three sites: Holden, Oakdale, Business Office).
 
-You are working a {label} issue.{inventory_instruction}
-
-On the FIRST pass (no prior conversation), your sole job is to ask the right follow-up questions — not to diagnose. Use the initial context to focus your questions. Set "response" to a brief acknowledgement of what you know so far (1–2 sentences), and put all your questions in "follow_up_questions".
-
-On SUBSEQUENT passes (conversation history present), analyze the answers and either provide a diagnosis or ask any remaining critical questions. When you have enough information for a complete diagnosis, set "follow_up_questions" to [].
+You are diagnosing an IT issue of type: {label}
 
 Return a JSON object with exactly these fields:
-- "response": your brief acknowledgement (first pass) or full diagnosis/analysis (subsequent passes) — plain text, no markdown symbols
-- "follow_up_questions": list of specific questions still needed, or [] if you have enough for a full diagnosis
+- "response": your analysis or next diagnostic step (plain text, no markdown symbols)
+- "follow_up_questions": a list of specific questions you need answered to complete the diagnosis; use an empty list [] if you have enough information for a complete diagnosis
 
 Return only the JSON object, no markdown fences."""
 
