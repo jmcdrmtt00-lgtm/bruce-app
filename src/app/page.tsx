@@ -715,15 +715,13 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-lg font-bold mb-2">Tasks in the queue</h2>
             <TaskTable tasks={queue} onRowClick={loadTask} variant="queue" />
-            {tasks.length === 0 && (
-              <button
-                className="btn btn-outline btn-sm w-full mt-2"
-                onClick={handleSeedData}
-                disabled={seeding}
-              >
-                {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
-              </button>
-            )}
+            <button
+              className="btn btn-outline btn-sm w-full mt-2"
+              onClick={handleSeedData}
+              disabled={seeding}
+            >
+              {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
+            </button>
           </div>
 
         </div>
@@ -1116,16 +1114,6 @@ export default function DashboardPage() {
                 {saveStatus === 'saved'  && <span className="text-xs text-success">Saved ✓</span>}
               </div>
 
-              {/* Load demo data (only when no tasks exist) */}
-              {tasks.length === 0 && (
-                <button
-                  className="btn btn-ghost btn-xs w-full"
-                  onClick={handleSeedData}
-                  disabled={seeding}
-                >
-                  {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
-                </button>
-              )}
 
             </div>
           </div>
