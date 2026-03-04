@@ -331,7 +331,11 @@ Return only the JSON object, no explanation, no markdown fences.""",
         inventory_instruction = (
             "\n\nYou have been given inventory data from the asset database. "
             "For any question whose answer is visible in that data, do NOT ask it — use the data directly. "
-            "Only ask follow-up questions for information that is NOT in the inventory."
+            "Only ask follow-up questions for information that is NOT in the inventory.\n"
+            "IMPORTANT: On the first pass, begin your 'response' field by briefly summarising what relevant "
+            "devices or records you found in the inventory (e.g. 'I found 2 Network devices at Holden: ...'), "
+            "then ask the user to flag anything that looks wrong or out of date before you rely on it. "
+            "After that, list only the follow-up questions for information the inventory does NOT contain."
             if inventory_context else ""
         )
 
