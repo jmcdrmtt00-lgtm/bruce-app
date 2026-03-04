@@ -201,6 +201,143 @@ Plain text only, no markdown symbols."""
     return message.content[0].text.strip()
 
 
+async def match_problem_type(description: str, problem_types: list[str], user_email: str = "") -> list[str]:
+    """Classify a freeform description against a list of known problem types."""
+    import json as _json
+
+    types_text = "\n".join(f"- {pt}" for pt in problem_types)
+
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=256,
+        system=f"""You are an IT problem classifier. Match the user's description to one or more of these problem types:
+
+{types_text}
+
+Each entry is formatted as "id: Label". Return a JSON object with key "matches" containing a list of matching type IDs (the part before the colon).
+Return one ID if confident; up to 3 if genuinely ambiguous. Return an empty list if nothing matches.
+Return only the JSON object, no markdown fences.""",
+        messages=[{"role": "user", "content": description}],
+    )
+    headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+
+    text = message.content[0].text.strip()
+    try:
+        result = _json.loads(text)
+        return result.get("matches", [])
+    except Exception:
+        return []
+
+
+_PROBLEM_TYPE_LABELS = {
+    "onboarding": "Onboarding",
+    "intermittent_network_slowness": "Intermittent Network Slowness",
+    "application_performance_degradation": "Application Performance Degradation",
+    "access_drift_permission_sprawl": "Access Drift / Permission Sprawl",
+    "recurring_endpoint_instability": "Recurring Endpoint Instability",
+    "backup_reliability": "Backup Reliability / Restore Confidence Issues",
+}
+
+
+async def diagnose(
+    problem_type: str,
+    task_details: str | None = None,
+    information: str | None = None,
+    task_fields: dict | None = None,
+    conversation: list[dict] | None = None,
+    user_email: str = "",
+) -> dict:
+    """Diagnose an IT issue or extract onboarding structured data."""
+    import json as _json
+
+    label = _PROBLEM_TYPE_LABELS.get(problem_type, problem_type)
+
+    if problem_type == "onboarding":
+        context_parts = []
+        if task_details:
+            context_parts.append(f"Task details: {task_details}")
+        if information:
+            context_parts.append(f"Information gathered:\n{information}")
+        context = "\n\n".join(context_parts) if context_parts else "No information provided."
+
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=512,
+            system="""You extract new hire information from free-form text. Return ONLY a valid JSON object with exactly these fields:
+- firstName: string
+- lastName: string
+- role: one of [cna, lpn, rn, administrator, maintenance, housekeeping, dietary, laundry, social_worker, activity_director, business_office, it, medical_records, pt_ot]
+- site: one of [holden, oakdale, business_office]
+- startDate: YYYY-MM-DD string (or empty string if not mentioned)
+- nextAssetNumber: string (or empty string if not mentioned)
+- computerName: string (or empty string if not mentioned)
+- notes: string (any other info not captured above, or empty string)
+Return only the JSON object, no explanation, no markdown fences.""",
+            messages=[{"role": "user", "content": context}],
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text = message.content[0].text.strip()
+        try:
+            structured_data = _json.loads(text)
+            return {"structured_data": structured_data}
+        except Exception:
+            return {"structured_data": {}}
+
+    else:
+        # Build context string
+        context_parts = [f"Problem type: {label}"]
+        if task_fields:
+            tf_parts = [f"{k}: {v}" for k, v in task_fields.items() if v]
+            if tf_parts:
+                context_parts.append("Task: " + ", ".join(tf_parts))
+        if task_details:
+            context_parts.append(f"Questions/Details:\n{task_details}")
+        if information:
+            context_parts.append(f"Information gathered:\n{information}")
+        context_text = "\n\n".join(context_parts)
+
+        # Build message list: initial user request + conversation history
+        messages = [{"role": "user", "content": f"Please analyze this IT issue:\n\n{context_text}"}]
+        if conversation:
+            for turn in conversation:
+                role = turn.get("role", "user")
+                content = turn.get("content", turn.get("text", ""))
+                api_role = "assistant" if role == "ai" else "user"
+                messages.append({"role": api_role, "content": content})
+            # Last turn is the user's latest answer — Claude will respond
+
+        system = f"""You are IT Buddy, an expert IT advisor for Oriol Healthcare (nursing facility with three sites: Holden, Oakdale, Business Office).
+
+You are diagnosing an IT issue of type: {label}
+
+Return a JSON object with exactly these fields:
+- "response": your analysis or next diagnostic step (plain text, no markdown symbols)
+- "follow_up_questions": a list of specific questions you need answered to complete the diagnosis; use an empty list [] if you have enough information for a complete diagnosis
+
+Return only the JSON object, no markdown fences."""
+
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=2048,
+            system=system,
+            messages=messages,
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text = message.content[0].text.strip()
+        try:
+            result = _json.loads(text)
+            return {
+                "response": result.get("response", ""),
+                "follow_up_questions": result.get("follow_up_questions", []),
+            }
+        except Exception:
+            return {"response": text, "follow_up_questions": []}
+
+
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:
     """Scan completed task notes for time-based suggestions and return new tasks to propose."""
     if not completed_tasks:

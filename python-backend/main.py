@@ -122,3 +122,36 @@ async def advise_answer(request: AdviseAnswerRequest):
 async def check_suggestions(request: CheckSuggestionsRequest):
     suggestions = await ai_service.check_suggestions(request.completed_tasks, request.user_email)
     return {"suggestions": suggestions}
+
+
+class MatchProblemTypeRequest(BaseModel):
+    description: str
+    problem_types: list[str]
+    user_email: str | None = None
+
+
+class DiagnoseRequest(BaseModel):
+    problem_type: str
+    task_details: str | None = None
+    information: str | None = None
+    task_fields: dict | None = None
+    conversation: list[dict] | None = None
+    user_email: str | None = None
+
+
+@app.post("/api/match-problem-type")
+async def match_problem_type_ep(req: MatchProblemTypeRequest):
+    matches = await ai_service.match_problem_type(req.description, req.problem_types, req.user_email or "")
+    return {"matches": matches}
+
+
+@app.post("/api/diagnose")
+async def diagnose_ep(req: DiagnoseRequest):
+    return await ai_service.diagnose(
+        req.problem_type,
+        req.task_details,
+        req.information,
+        req.task_fields,
+        req.conversation,
+        req.user_email or "",
+    )
