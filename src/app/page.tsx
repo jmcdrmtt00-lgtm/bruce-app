@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ExternalLink, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
-import { PROBLEM_TYPES } from '@/data/problemTypes';
+import { PROBLEM_TYPES, QUICK_TASK_TYPES } from '@/data/problemTypes';
 
 const PRIORITY_BADGE: Record<string, string> = {
   high: 'badge-error',
@@ -879,12 +879,22 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Problem type */}
+              {/* Task type */}
               <div className="form-control">
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Task type</span>
                 </label>
                 <div className="flex gap-1 items-start">
+                  <select
+                    className="select select-bordered select-sm text-sm"
+                    value={QUICK_TASK_TYPES.some(t => t.id === selectedType) ? selectedType ?? '' : ''}
+                    onChange={e => { if (e.target.value) selectProblemType(e.target.value); else { setSelectedType(null); setMatchedTypes([]); } }}
+                  >
+                    <option value="">Type…</option>
+                    {QUICK_TASK_TYPES.map(t => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                  </select>
                   <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
                     value={problemTypeInput}
@@ -933,16 +943,6 @@ export default function DashboardPage() {
                         {PROBLEM_TYPES[id]?.label ?? id}
                       </button>
                     ))}
-                  </div>
-                )}
-
-                {/* Selected type badge */}
-                {selectedType && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-xs text-base-content/50">Type:</span>
-                    <span className="badge badge-sm badge-outline badge-primary">
-                      {PROBLEM_TYPES[selectedType]?.label ?? selectedType}
-                    </span>
                   </div>
                 )}
 

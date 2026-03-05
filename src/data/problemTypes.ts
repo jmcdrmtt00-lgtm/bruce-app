@@ -3,10 +3,24 @@ export interface ProblemType {
   questions: string[];
 }
 
+export const QUICK_TASK_TYPES = [
+  { id: 'onboarding',      label: 'Onboarding' },
+  { id: 'diagnose',        label: 'Diagnose & test' },
+  { id: 'update_database', label: 'Update database' },
+] as const;
+
 export const PROBLEM_TYPES: Record<string, ProblemType> = {
   onboarding: {
     label: 'Onboarding',
     questions: ['First name', 'Last name', 'Role', 'Site', 'Start date', 'Next asset #?', 'Computer name', 'Notes'],
+  },
+  diagnose: {
+    label: 'Diagnose & test',
+    questions: [],
+  },
+  update_database: {
+    label: 'Update database',
+    questions: [],
   },
   intermittent_network_slowness: {
     label: 'Intermittent Network Slowness',
