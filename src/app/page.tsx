@@ -1163,19 +1163,17 @@ export default function DashboardPage() {
                   {diagStage === 'cause' && diagCause && (
                     <div className="rounded-box p-3 bg-primary/10 space-y-2">
                       <p className="text-sm font-medium">{diagCause}</p>
-                      {diagDetail && (
-                        <div>
-                          <button
-                            className="text-xs text-primary underline"
-                            onClick={() => setDiagDetailOpen(o => !o)}
-                          >
-                            {diagDetailOpen ? 'Hide detail' : 'More detail →'}
-                          </button>
-                          {diagDetailOpen && (
-                            <p className="text-xs text-base-content/70 mt-1">{diagDetail}</p>
-                          )}
-                        </div>
-                      )}
+                      <div>
+                        <button
+                          className="text-xs text-primary underline"
+                          onClick={() => setDiagDetailOpen(o => !o)}
+                        >
+                          {diagDetailOpen ? 'Hide detail' : 'More detail →'}
+                        </button>
+                        {diagDetailOpen && (
+                          <p className="text-xs text-base-content/70 mt-1">{diagDetail ?? 'No additional detail available.'}</p>
+                        )}
+                      </div>
                       <div className="flex gap-2 pt-1">
                         <button
                           className="btn btn-primary btn-sm flex-1"
