@@ -3,6 +3,7 @@
 import { GeneratedOutput } from '@/types';
 import { ROLES, SYSTEM_LABELS } from '@/data/roles';
 import { SITES } from '@/data/sites';
+import { COMPANY_NAME, EMAIL_DOMAIN, TEMP_PASSWORD } from '@/data/customerConfig';
 
 interface Props {
   output: GeneratedOutput;
@@ -29,7 +30,7 @@ function FieldRow({ label, value, blank, mono }: FieldRowProps) {
 export default function LoginInfoSheet({ output }: Props) {
   const { hire, loginId, systems } = output;
   const fullName = `${hire.firstName} ${hire.lastName}`;
-  const email = `${loginId}@oriolhealthcare.com`;
+  const email = `${loginId}@${EMAIL_DOMAIN}`;
   const site = SITES[hire.site];
   const role = ROLES[hire.role];
 
@@ -54,7 +55,7 @@ export default function LoginInfoSheet({ output }: Props) {
         {/* Print header — hidden on screen */}
         <div className="hidden print:block mb-4">
           <h1 className="text-xl font-bold">New Employee Login Information</h1>
-          <p className="text-sm text-gray-600">Oriol Healthcare</p>
+          <p className="text-sm text-gray-600">{COMPANY_NAME}</p>
         </div>
 
         <div className="mb-4">
@@ -85,7 +86,7 @@ export default function LoginInfoSheet({ output }: Props) {
           <table className="w-full">
             <tbody>
               <FieldRow label="Domain Login" value={loginId} mono />
-              <FieldRow label="Temp Password" value="Password1" mono />
+              <FieldRow label="Temp Password" value={TEMP_PASSWORD} mono />
             </tbody>
           </table>
         </section>
@@ -110,7 +111,7 @@ export default function LoginInfoSheet({ output }: Props) {
             <table className="w-full">
               <tbody>
                 <FieldRow label="Username" value={loginId} mono />
-                <FieldRow label="Temp Password" value="Password1" mono />
+                <FieldRow label="Temp Password" value={TEMP_PASSWORD} mono />
               </tbody>
             </table>
           </section>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react';
 import { GeneratedOutput } from '@/types';
 import { ROLES, SYSTEM_LABELS } from '@/data/roles';
 import { SITES } from '@/data/sites';
+import { AD_DOMAIN } from '@/data/customerConfig';
 
 interface Props {
   output: GeneratedOutput;
@@ -26,7 +27,7 @@ export default function OnboardingChecklist({ output, sessionId, onStartOver }: 
   const computerItems: CheckItem[] = needsComputer ? [
     { id: 'asset', label: `Tag computer — Asset #${hire.nextAssetNumber}` },
     { id: 'rename', label: `Rename computer to ${hire.computerName}` },
-    { id: 'domain', label: 'Join to domain (oriolhealthcare.local)' },
+    { id: 'domain', label: `Join to domain (${AD_DOMAIN})` },
     { id: 'updates', label: 'Run Windows Updates' },
     { id: 'software', label: 'Install standard software (Office, AV, etc.)' },
     ...(computerType === 'desktop+laptop' ? [{ id: 'laptop', label: 'Set up laptop as well (desktop+laptop role)' }] : []),
