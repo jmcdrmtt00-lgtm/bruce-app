@@ -630,6 +630,7 @@ export default function DashboardPage() {
         setDiagConversation([userTurn, aiTurn]);
         setDiagQuestions(data.questions);
         setDiagStage('questions');
+        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
         await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
       }
     } catch {
@@ -672,6 +673,7 @@ export default function DashboardPage() {
         setDiagConversation(prev => [...prev, aiTurn]);
         setDiagQuestions(data.questions);
         setDiagStage('questions');
+        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
         await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
       }
     } catch {
@@ -1124,14 +1126,14 @@ export default function DashboardPage() {
                   {diagStage === 'questions' && diagQuestions && (
                     <div className="rounded-box p-3 bg-primary/10 space-y-2">
                       <p className="text-xs font-semibold text-base-content/50">To narrow down the cause, please answer:</p>
-                      <ul className="list-disc list-inside text-sm space-y-0.5">
+                      <ol className="list-decimal list-inside text-sm space-y-1">
                         {diagQuestions.map((q, i) => <li key={i}>{q}</li>)}
-                      </ul>
+                      </ol>
                       <AutoTextarea
-                        className="textarea textarea-bordered textarea-sm w-full text-sm"
+                        className="textarea textarea-bordered textarea-sm w-full text-sm font-mono"
                         value={diagAnswer}
                         onChange={e => setDiagAnswer(e.target.value)}
-                        placeholder="Your answers..."
+                        placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
                       />
                       <button
                         className="btn btn-outline btn-sm w-full"
@@ -1161,6 +1163,7 @@ export default function DashboardPage() {
                           onClick={() => {
                             setDiagStage('questions');
                             setDiagQuestions(["What else can you tell me about the problem?"]);
+                            setDiagAnswer('1. ');
                             setDiagCause(null);
                           }}
                           disabled={diagnosing}
