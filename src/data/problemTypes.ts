@@ -5,7 +5,7 @@ export interface ProblemType {
 
 export const QUICK_TASK_TYPES = [
   { id: 'onboarding',      label: 'Onboarding' },
-  { id: 'diagnose',        label: 'Diagnose & test' },
+  { id: 'diagnose',        label: 'Diagnose and fix' },
   { id: 'update_database', label: 'Update database' },
 ] as const;
 
@@ -15,8 +15,8 @@ export const PROBLEM_TYPES: Record<string, ProblemType> = {
     questions: ['First name', 'Last name', 'Role', 'Site', 'Start date', 'Next asset #?', 'Computer name', 'Notes'],
   },
   diagnose: {
-    label: 'Diagnose & test',
-    questions: [],
+    label: 'Diagnose and fix',
+    questions: ['Symptoms - what, when, where'],
   },
   update_database: {
     label: 'Update database',
