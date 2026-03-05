@@ -123,7 +123,7 @@ export default function OnboardingPage() {
         <div className="text-center space-y-3">
           {prefillError ? (
             <div className="alert alert-error text-sm max-w-sm">
-              <span>The AI couldn&apos;t parse the hire details. Go back to the Dashboard, fill in the onboarding task with the employee&apos;s name, role, site, and start date, then click Ask the AI again.</span>
+              <span>The AI couldn&apos;t parse the hire details ({prefillError}). Go back to the Dashboard, fill in the onboarding task with the employee&apos;s name, role, site, and start date, then click Ask the AI again.</span>
             </div>
           ) : (
             <p className="text-base-content/60">No onboarding data — start from the Dashboard.</p>
