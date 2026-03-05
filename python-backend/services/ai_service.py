@@ -26,7 +26,7 @@ async def summarize_incident(description: str, user_email: str = "") -> str:
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=30,
-        system="Generate a very short title (5-8 words) for this IT problem. Return only the title, nothing else.",
+        system=prompt_loader.get_summarize_prompt(),
         messages=[{"role": "user", "content": description}],
     )
     headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
@@ -120,27 +120,11 @@ async def advise_plan(question: str, in_progress_tasks: list[dict], user_email: 
     """Pass 1 — decide what data to look up, return rephrasing + optional SQL."""
     import json as _json
 
-    system = f"""You are IT Buddy, an IT advisor for an IT professional at Oriol Healthcare — \
-a nursing facility operator with three sites: Holden, Oakdale, and Business Office.
-
-Current in-progress tasks:
-{_tasks_text(in_progress_tasks)}
-
-Review the user's question. Return a JSON object with exactly these fields:
-- "rephrasing": one sentence starting with "You're asking..." confirming what you understood
-- "sql": a single SELECT query if database data would help you give a better answer, \
-otherwise null. Use {{user_id}} as a placeholder.
-- "lookup_description": a short phrase describing what you are looking up (e.g. \
-"warranty expiration dates for your computers"), or null if sql is null.
-
-Only generate SQL if it would let you give a meaningfully better answer. \
-For questions answerable from the in-progress tasks alone, set sql to null.
-
-You may query:
-{INCIDENTS_SCHEMA}
-{ASSETS_SCHEMA}
-
-Return only the JSON object with no markdown fences."""
+    system = (
+        prompt_loader.get_advise_plan_prompt()
+        .replace("{{in_progress_tasks}}", _tasks_text(in_progress_tasks))
+        .replace("{{schemas}}", f"{INCIDENTS_SCHEMA}\n{ASSETS_SCHEMA}")
+    )
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
@@ -179,15 +163,11 @@ async def advise_answer(
     elif lookup_description:
         data_section = f"\nYou tried to look up {lookup_description} but the query returned no results.\n"
 
-    system = f"""You are IT Buddy, an IT advisor for an IT professional at Oriol Healthcare — \
-a nursing facility operator with three sites: Holden, Oakdale, and Business Office.
-
-Current in-progress tasks:
-{_tasks_text(in_progress_tasks)}
-{data_section}
-Answer the user's question directly and helpfully. Be specific — reference task names, \
-equipment names, or data points from the lookup where relevant. \
-Plain text only, no markdown symbols."""
+    system = (
+        prompt_loader.get_advise_answer_prompt()
+        .replace("{{in_progress_tasks}}", _tasks_text(in_progress_tasks))
+        .replace("{{data_section}}", data_section)
+    )
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
@@ -207,16 +187,11 @@ async def match_problem_type(description: str, problem_types: list[str], user_em
 
     types_text = "\n".join(f"- {pt}" for pt in problem_types)
 
+    system = prompt_loader.get_match_type_prompt().replace("{{problem_types}}", types_text)
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=256,
-        system=f"""You are an IT problem classifier. Match the user's description to one or more of these problem types:
-
-{types_text}
-
-Each entry is formatted as "id: Label". Return a JSON object with key "matches" containing a list of matching type IDs (the part before the colon).
-Return one ID if confident; up to 3 if genuinely ambiguous. Return an empty list if nothing matches.
-Return only the JSON object, no markdown fences.""",
+        system=system,
         messages=[{"role": "user", "content": description}],
     )
     headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
@@ -267,30 +242,7 @@ async def diagnose(
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=512,
-            system="""You extract new hire information from free-form text. Return ONLY a valid JSON object with exactly these fields:
-- firstName: string
-- lastName: string
-- role: one of the following keys (pick the closest match):
-    executive       = Executive / Administrator
-    business_office = Business Office staff
-    admissions      = Admissions
-    hr              = Human Resources
-    don_adon        = DON / ADON / Director of Nursing / RN supervisor
-    social_services = Social Services / Case Manager / Social Worker
-    activities      = Activities / Activity Director
-    sdc             = SDC (Staff Development Coordinator)
-    home_health     = Home Health staff
-    maintenance     = Maintenance / Facilities
-    kitchen         = Kitchen / Food Services / Dietary / Laundry / Housekeeping
-    concierge       = Concierge / Front Desk
-    it              = IT / Tech staff
-    clinical_floor  = CNA / LPN / RN / Floor Clinical / Med Aide
-- site: one of [holden, oakdale, business_office]
-- startDate: YYYY-MM-DD string (or empty string if not mentioned)
-- nextAssetNumber: string (or empty string if not mentioned)
-- computerName: string (or empty string if not mentioned)
-- notes: string (any other info not captured above, or empty string)
-Return only the JSON object, no explanation, no markdown fences.""",
+            system=prompt_loader.get_onboarding_prompt(),
             messages=[{"role": "user", "content": context}],
         )
         headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
@@ -326,15 +278,7 @@ Return only the JSON object, no explanation, no markdown fences.""",
                 messages.append({"role": api_role, "content": content})
             # Last turn is the user's latest answer — Claude will respond
 
-        system = f"""You are IT Buddy, an expert IT advisor for Oriol Healthcare (nursing facility with three sites: Holden, Oakdale, Business Office).
-
-You are diagnosing an IT issue of type: {label}
-
-Return a JSON object with exactly these fields:
-- "response": your analysis or next diagnostic step (plain text, no markdown symbols)
-- "follow_up_questions": a list of specific questions you need answered to complete the diagnosis; use an empty list [] if you have enough information for a complete diagnosis
-
-Return only the JSON object, no markdown fences."""
+        system = prompt_loader.get_diagnose_prompt().replace("{{label}}", label)
 
         message = client.messages.create(
             model="claude-sonnet-4-6",
