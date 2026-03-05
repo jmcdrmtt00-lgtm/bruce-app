@@ -179,6 +179,8 @@ export default function DashboardPage() {
   const [diagnosing,       setDiagnosing]       = useState(false);
   const [diagStage,        setDiagStage]        = useState<'idle' | 'questions' | 'cause' | 'fix'>('idle');
   const [diagCause,        setDiagCause]        = useState<string | null>(null);
+  const [diagDetail,       setDiagDetail]       = useState<string | null>(null);
+  const [diagDetailOpen,   setDiagDetailOpen]   = useState(false);
   const [diagQuestions,    setDiagQuestions]    = useState<string[] | null>(null);
   const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
   const [diagConversation, setDiagConversation] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
@@ -317,6 +319,8 @@ export default function DashboardPage() {
     setSelectedType(null);
     setDiagStage('idle');
     setDiagCause(null);
+    setDiagDetail(null);
+    setDiagDetailOpen(false);
     setDiagQuestions(null);
     setDiagSteps(null);
     setDiagConversation([]);
@@ -344,6 +348,8 @@ export default function DashboardPage() {
     setIssues('');
     setDiagStage('idle');
     setDiagCause(null);
+    setDiagDetail(null);
+    setDiagDetailOpen(false);
     setDiagQuestions(null);
     setDiagSteps(null);
     setDiagConversation([]);
@@ -533,6 +539,8 @@ export default function DashboardPage() {
     setSelectedType(null);
     setDiagStage('idle');
     setDiagCause(null);
+    setDiagDetail(null);
+    setDiagDetailOpen(false);
     setDiagQuestions(null);
     setDiagSteps(null);
     setDiagConversation([]);
@@ -599,6 +607,8 @@ export default function DashboardPage() {
     setDiagnosing(true);
     setDiagStage('idle');
     setDiagCause(null);
+    setDiagDetail(null);
+    setDiagDetailOpen(false);
     setDiagQuestions(null);
     setDiagSteps(null);
     setDiagConversation([]);
@@ -623,6 +633,8 @@ export default function DashboardPage() {
         const aiTurn = { role: 'ai' as const, content: data.cause };
         setDiagConversation([userTurn, aiTurn]);
         setDiagCause(data.cause);
+        setDiagDetail(data.detail ?? null);
+        setDiagDetailOpen(false);
         setDiagStage('cause');
         await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
       } else if (data.questions?.length) {
@@ -666,6 +678,8 @@ export default function DashboardPage() {
         const aiTurn = { role: 'ai' as const, content: data.cause };
         setDiagConversation(prev => [...prev, aiTurn]);
         setDiagCause(data.cause);
+        setDiagDetail(data.detail ?? null);
+        setDiagDetailOpen(false);
         setDiagStage('cause');
         await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
       } else if (data.questions?.length) {
@@ -1148,8 +1162,20 @@ export default function DashboardPage() {
                   {/* Cause stage */}
                   {diagStage === 'cause' && diagCause && (
                     <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-xs font-semibold text-base-content/50">Likely cause:</p>
-                      <p className="text-sm">{diagCause}</p>
+                      <p className="text-sm font-medium">{diagCause}</p>
+                      {diagDetail && (
+                        <div>
+                          <button
+                            className="text-xs text-primary underline"
+                            onClick={() => setDiagDetailOpen(o => !o)}
+                          >
+                            {diagDetailOpen ? 'Hide detail' : 'More detail →'}
+                          </button>
+                          {diagDetailOpen && (
+                            <p className="text-xs text-base-content/70 mt-1">{diagDetail}</p>
+                          )}
+                        </div>
+                      )}
                       <div className="flex gap-2 pt-1">
                         <button
                           className="btn btn-primary btn-sm flex-1"
@@ -1165,6 +1191,7 @@ export default function DashboardPage() {
                             setDiagQuestions(["What else can you tell me about the problem?"]);
                             setDiagAnswer('1. ');
                             setDiagCause(null);
+                            setDiagDetail(null);
                           }}
                           disabled={diagnosing}
                         >

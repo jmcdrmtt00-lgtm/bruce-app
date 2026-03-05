@@ -302,10 +302,11 @@ async def diagnose(
             result = _json.loads(text)
             return {
                 "cause":     result.get("cause") or None,
+                "detail":    result.get("detail") or None,
                 "questions": result.get("questions") or None,
             }
         except Exception:
-            return {"cause": None, "questions": [text]}
+            return {"cause": None, "detail": None, "questions": [text]}
 
 
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:
