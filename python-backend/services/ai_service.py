@@ -220,6 +220,7 @@ _PROBLEM_TYPE_LABELS = {
 
 async def diagnose(
     problem_type: str,
+    stage: str = "symptoms",
     task_details: str | None = None,
     information: str | None = None,
     task_fields: dict | None = None,
@@ -255,35 +256,42 @@ async def diagnose(
         except Exception:
             return {"structured_data": {}}
 
-    else:
-        # Build context string
-        context_parts = [f"Problem type: {label}"]
-        if task_fields:
-            tf_parts = [f"{k}: {v}" for k, v in task_fields.items() if v]
-            if tf_parts:
-                context_parts.append("Task: " + ", ".join(tf_parts))
-        if task_details:
-            context_parts.append(f"Questions/Details:\n{task_details}")
-        if information:
-            context_parts.append(f"Information gathered:\n{information}")
-        context_text = "\n\n".join(context_parts)
+    elif stage == "fix":
+        # Call 3: given agreed cause, return fix steps
+        cause_text = information or task_details or "Unknown cause"
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            system=prompt_loader.get_diagnose_fix_prompt(),
+            messages=[{"role": "user", "content": f"Cause: {cause_text}"}],
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
 
-        # Build message list: initial user request + conversation history
-        messages = [{"role": "user", "content": f"Please analyze this IT issue:\n\n{context_text}"}]
+        text = message.content[0].text.strip()
+        try:
+            result = _json.loads(text)
+            return {"steps": result.get("steps", [])}
+        except Exception:
+            return {"steps": [text]}
+
+    else:
+        # Calls 1 & 2: symptoms or follow-up loop — return {cause} or {questions}
+        # Build multi-turn message history
         if conversation:
+            messages = []
             for turn in conversation:
                 role = turn.get("role", "user")
                 content = turn.get("content", turn.get("text", ""))
-                api_role = "assistant" if role == "ai" else "user"
-                messages.append({"role": api_role, "content": content})
-            # Last turn is the user's latest answer — Claude will respond
-
-        system = prompt_loader.get_diagnose_prompt().replace("{{label}}", label)
+                messages.append({"role": "assistant" if role == "ai" else "user", "content": content})
+        else:
+            symptoms = task_details or information or "No symptoms provided."
+            messages = [{"role": "user", "content": f"Symptoms: {symptoms}"}]
 
         message = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=2048,
-            system=system,
+            max_tokens=512,
+            system=prompt_loader.get_diagnose_prompt(),
             messages=messages,
         )
         headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
@@ -293,11 +301,11 @@ async def diagnose(
         try:
             result = _json.loads(text)
             return {
-                "response": result.get("response", ""),
-                "follow_up_questions": result.get("follow_up_questions", []),
+                "cause":     result.get("cause") or None,
+                "questions": result.get("questions") or None,
             }
         except Exception:
-            return {"response": text, "follow_up_questions": []}
+            return {"cause": None, "questions": [text]}
 
 
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:

@@ -58,15 +58,27 @@ _DEFAULT_ONBOARDING = """You extract new hire information from free-form text. R
 - notes: string (any other info not captured above, or empty string)
 Return only the JSON object, no explanation, no markdown fences."""
 
-_DEFAULT_DIAGNOSE = """You are IT Buddy, an expert IT advisor for Oriol Healthcare (nursing facility with three sites: Holden, Oakdale, Business Office).
+_DEFAULT_DIAGNOSE = """You are IT Buddy, a concise IT diagnostic assistant for a one-person IT shop.
 
-You are diagnosing an IT issue of type: {{label}}
+Analyze the IT problem described and determine if you can confidently identify the likely cause.
 
-Return a JSON object with exactly these fields:
-- "response": your analysis or next diagnostic step (plain text, no markdown symbols)
-- "follow_up_questions": a list of specific questions you need answered to complete the diagnosis; use an empty list [] if you have enough information for a complete diagnosis
+If you are confident in the cause: return a brief description (2 sentences max).
+If you are not confident: return up to 3 specific questions that would help identify the cause. Do not ask more than 3.
 
-Return only the JSON object, no markdown fences."""
+Return ONLY a valid JSON object with exactly these fields:
+- "cause": a brief description of the likely cause (string), or null if not yet confident
+- "questions": an array of up to 3 specific follow-up questions, or null if confident
+
+Exactly one of "cause" or "questions" must be non-null. Plain text only, no markdown."""
+
+_DEFAULT_DIAGNOSE_FIX = """You are IT Buddy, a concise IT diagnostic assistant for a one-person IT shop.
+
+The cause of an IT problem has been identified. Provide a numbered list of specific, actionable steps to fix it. Maximum 7 steps. Be specific — name actual settings, commands, or tools where relevant.
+
+Return ONLY a valid JSON object with exactly these fields:
+- "steps": an array of step strings (do not include step numbers in the strings)
+
+Plain text only, no markdown symbols."""
 
 _DEFAULT_ADVISE_PLAN = """You are IT Buddy, an IT advisor for an IT professional at Oriol Healthcare — \
 a nursing facility operator with three sites: Holden, Oakdale, and Business Office.
@@ -178,6 +190,11 @@ def get_onboarding_prompt() -> str:
 def get_diagnose_prompt() -> str:
     _ensure_loaded()
     return _prompts.get("p-bruce-diagnose") or _DEFAULT_DIAGNOSE
+
+
+def get_diagnose_fix_prompt() -> str:
+    _ensure_loaded()
+    return _prompts.get("p-bruce-diagnose-fix") or _DEFAULT_DIAGNOSE_FIX
 
 
 def get_advise_plan_prompt() -> str:

@@ -177,10 +177,12 @@ export default function DashboardPage() {
   const [selectedType,     setSelectedType]     = useState<string | null>(null);
   const [matching,         setMatching]         = useState(false);
   const [diagnosing,       setDiagnosing]       = useState(false);
-  const [aiResponse,       setAiResponse]       = useState<string | null>(null);
-  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
-  const [followUpAnswer,   setFollowUpAnswer]   = useState('');
-  const [conversation,     setConversation]     = useState<{ role: 'ai' | 'user'; text: string }[]>([]);
+  const [diagStage,        setDiagStage]        = useState<'idle' | 'questions' | 'cause' | 'fix'>('idle');
+  const [diagCause,        setDiagCause]        = useState<string | null>(null);
+  const [diagQuestions,    setDiagQuestions]    = useState<string[] | null>(null);
+  const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
+  const [diagConversation, setDiagConversation] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
+  const [diagAnswer,       setDiagAnswer]       = useState('');
 
   // Autosave bookkeeping
   const panelDirtyRef     = useRef(false);
@@ -313,10 +315,12 @@ export default function DashboardPage() {
     setProblemTypeInput('');
     setMatchedTypes([]);
     setSelectedType(null);
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setFollowUpAnswer('');
-    setConversation([]);
+    setDiagStage('idle');
+    setDiagCause(null);
+    setDiagQuestions(null);
+    setDiagSteps(null);
+    setDiagConversation([]);
+    setDiagAnswer('');
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
@@ -338,10 +342,12 @@ export default function DashboardPage() {
 
     setInfoDone('');
     setIssues('');
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setFollowUpAnswer('');
-    setConversation([]);
+    setDiagStage('idle');
+    setDiagCause(null);
+    setDiagQuestions(null);
+    setDiagSteps(null);
+    setDiagConversation([]);
+    setDiagAnswer('');
     setSelectedTask(task);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
@@ -367,19 +373,6 @@ export default function DashboardPage() {
         if (details) {
           setInfoRequired(details);
           savedDetailsRef.current = details;
-        }
-
-        // Load conversation from ai_response / user_reply updates (in order)
-        const aiConv = updates
-          .filter(u => u.type === 'ai_response' || u.type === 'user_reply')
-          .map(u => ({
-            role: (u.type === 'ai_response' ? 'ai' : 'user') as 'ai' | 'user',
-            text: u.note,
-          }));
-        setConversation(aiConv);
-        if (aiConv.length > 0) {
-          const lastAi = [...aiConv].reverse().find(u => u.role === 'ai');
-          if (lastAi) setAiResponse(lastAi.text);
         }
 
         // For onboarding without saved details, refine with actual asset number
@@ -538,9 +531,12 @@ export default function DashboardPage() {
     setMatching(true);
     setMatchedTypes([]);
     setSelectedType(null);
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setConversation([]);
+    setDiagStage('idle');
+    setDiagCause(null);
+    setDiagQuestions(null);
+    setDiagSteps(null);
+    setDiagConversation([]);
+    setDiagAnswer('');
     try {
       const res = await fetch('/api/ai/match-problem-type', {
         method: 'POST',
@@ -568,16 +564,45 @@ export default function DashboardPage() {
   async function handleDiagnose() {
     if (!selectedType) return;
 
-    // For onboarding with no info: navigate directly
-    if (selectedType === 'onboarding' && !infoDone.trim() && !infoRequired.trim()) {
-      router.push('/onboarding');
+    // Onboarding: use AI to extract structured data, then navigate to form
+    if (selectedType === 'onboarding') {
+      if (!infoDone.trim() && !infoRequired.trim()) {
+        router.push('/onboarding');
+        return;
+      }
+      setDiagnosing(true);
+      try {
+        const res = await fetch('/api/ai/diagnose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            problem_type: 'onboarding',
+            stage: 'symptoms',
+            task_details: infoRequired || null,
+            information: infoDone || null,
+          }),
+        });
+        const data = await res.json();
+        if (data.structured_data !== undefined) {
+          localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
+          router.push('/onboarding');
+          return;
+        }
+      } catch {
+        toast.error('Could not get AI response — try again.');
+      }
+      setDiagnosing(false);
       return;
     }
 
+    // Stage 1: symptoms → cause or questions
     setDiagnosing(true);
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setConversation([]);
+    setDiagStage('idle');
+    setDiagCause(null);
+    setDiagQuestions(null);
+    setDiagSteps(null);
+    setDiagConversation([]);
+    setDiagAnswer('');
 
     try {
       const res = await fetch('/api/ai/diagnose', {
@@ -585,26 +610,28 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           problem_type: selectedType,
+          stage: 'symptoms',
           task_details: infoRequired || null,
           information: infoDone || null,
-          task_fields: { title: taskName, priority: priority || null, date_due: dateDue || null, status },
-          conversation: null,
         }),
       });
       const data = await res.json();
+      const symptoms = [infoRequired, infoDone].filter(Boolean).join('\n') || 'No symptoms provided.';
+      const userTurn = { role: 'user' as const, content: `Symptoms: ${symptoms}` };
 
-      if (selectedType === 'onboarding' && data.structured_data !== undefined) {
-        localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
-        router.push('/onboarding');
-        return;
+      if (data.cause) {
+        const aiTurn = { role: 'ai' as const, content: data.cause };
+        setDiagConversation([userTurn, aiTurn]);
+        setDiagCause(data.cause);
+        setDiagStage('cause');
+        await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
+      } else if (data.questions?.length) {
+        const aiTurn = { role: 'ai' as const, content: data.questions.join('\n') };
+        setDiagConversation([userTurn, aiTurn]);
+        setDiagQuestions(data.questions);
+        setDiagStage('questions');
+        await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
       }
-
-      const responseText: string = data.response ?? '';
-      const fups: string[] = data.follow_up_questions ?? [];
-      setAiResponse(responseText);
-      setFollowUpQuestions(fups);
-      setConversation([{ role: 'ai', text: responseText }]);
-      await saveAiUpdate('ai_response', responseText);
     } catch {
       toast.error('Could not get AI response — try again.');
     }
@@ -612,12 +639,14 @@ export default function DashboardPage() {
   }
 
   async function handleFollowUp() {
-    if (!followUpAnswer.trim() || !selectedType) return;
-    const answer = followUpAnswer.trim();
-    const updatedConv = [...conversation, { role: 'user' as const, text: answer }];
-    setConversation(updatedConv);
-    setFollowUpAnswer('');
+    if (!diagAnswer.trim() || !selectedType) return;
+    const answer = diagAnswer.trim();
+    setDiagAnswer('');
     await saveAiUpdate('user_reply', answer);
+
+    const userTurn = { role: 'user' as const, content: answer };
+    const updatedConv = [...diagConversation, userTurn];
+    setDiagConversation(updatedConv);
 
     setDiagnosing(true);
     try {
@@ -626,21 +655,51 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           problem_type: selectedType,
-          task_details: infoRequired || null,
-          information: infoDone || null,
-          task_fields: { title: taskName, priority: priority || null, date_due: dateDue || null, status },
-          conversation: updatedConv.map(c => ({ role: c.role, content: c.text })),
+          stage: 'followup',
+          conversation: updatedConv,
         }),
       });
       const data = await res.json();
-      const responseText: string = data.response ?? '';
-      const fups: string[] = data.follow_up_questions ?? [];
-      setAiResponse(responseText);
-      setFollowUpQuestions(fups);
-      setConversation(prev => [...prev, { role: 'ai', text: responseText }]);
-      await saveAiUpdate('ai_response', responseText);
+
+      if (data.cause) {
+        const aiTurn = { role: 'ai' as const, content: data.cause };
+        setDiagConversation(prev => [...prev, aiTurn]);
+        setDiagCause(data.cause);
+        setDiagStage('cause');
+        await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
+      } else if (data.questions?.length) {
+        const aiTurn = { role: 'ai' as const, content: (data.questions as string[]).join('\n') };
+        setDiagConversation(prev => [...prev, aiTurn]);
+        setDiagQuestions(data.questions);
+        setDiagStage('questions');
+        await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
+      }
     } catch {
       toast.error('Could not get AI response — try again.');
+    }
+    setDiagnosing(false);
+  }
+
+  async function handleConfirmCause() {
+    if (!diagCause || !selectedType) return;
+    setDiagnosing(true);
+    try {
+      const res = await fetch('/api/ai/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problem_type: selectedType,
+          stage: 'fix',
+          information: diagCause,
+        }),
+      });
+      const data = await res.json();
+      const steps: string[] = data.steps ?? [];
+      setDiagSteps(steps);
+      setDiagStage('fix');
+      await saveAiUpdate('ai_response', `Fix steps: ${steps.join(' | ')}`);
+    } catch {
+      toast.error('Could not get fix steps — try again.');
     }
     setDiagnosing(false);
   }
@@ -1055,48 +1114,70 @@ export default function DashboardPage() {
               </div>
 
               {/* IT Buddy response panel */}
-              {conversation.length > 0 && (
+              {diagStage !== 'idle' && (
                 <div className="form-control">
                   <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">IT Buddy Interactions</span>
+                    <span className="label-text text-xs font-semibold">IT Buddy</span>
                   </label>
-                  <div className="space-y-2">
-                    {conversation.map((turn, i) => (
-                      <div
-                        key={i}
-                        className={`rounded-box p-3 text-sm whitespace-pre-wrap ${
-                          turn.role === 'ai' ? 'bg-primary/10' : 'bg-base-200'
-                        }`}
-                      >
-                        <p className="text-xs font-semibold text-base-content/50 mb-1">
-                          {turn.role === 'ai' ? 'IT Buddy' : 'You'}
-                        </p>
-                        <p>{turn.text}</p>
-                      </div>
-                    ))}
-                  </div>
 
-                  {followUpQuestions.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs font-semibold text-base-content/60">Follow-up questions:</p>
-                      <ul className="list-disc list-inside text-sm text-base-content/70 space-y-0.5">
-                        {followUpQuestions.map((q, i) => <li key={i}>{q}</li>)}
+                  {/* Questions stage */}
+                  {diagStage === 'questions' && diagQuestions && (
+                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
+                      <p className="text-xs font-semibold text-base-content/50">To narrow down the cause, please answer:</p>
+                      <ul className="list-disc list-inside text-sm space-y-0.5">
+                        {diagQuestions.map((q, i) => <li key={i}>{q}</li>)}
                       </ul>
                       <AutoTextarea
-                        className="textarea textarea-bordered textarea-sm w-full text-sm mt-2"
-                        value={followUpAnswer}
-                        onChange={e => setFollowUpAnswer(e.target.value)}
-                        placeholder="Your answer..."
+                        className="textarea textarea-bordered textarea-sm w-full text-sm"
+                        value={diagAnswer}
+                        onChange={e => setDiagAnswer(e.target.value)}
+                        placeholder="Your answers..."
                       />
                       <button
-                        className="btn btn-outline btn-sm w-full mt-1"
+                        className="btn btn-outline btn-sm w-full"
                         onClick={handleFollowUp}
-                        disabled={diagnosing || !followUpAnswer.trim()}
+                        disabled={diagnosing || !diagAnswer.trim()}
                       >
-                        {diagnosing
-                          ? <span className="loading loading-spinner loading-xs" />
-                          : 'Send answer'}
+                        {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
                       </button>
+                    </div>
+                  )}
+
+                  {/* Cause stage */}
+                  {diagStage === 'cause' && diagCause && (
+                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
+                      <p className="text-xs font-semibold text-base-content/50">Likely cause:</p>
+                      <p className="text-sm">{diagCause}</p>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          className="btn btn-primary btn-sm flex-1"
+                          onClick={handleConfirmCause}
+                          disabled={diagnosing}
+                        >
+                          {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Get fix steps'}
+                        </button>
+                        <button
+                          className="btn btn-outline btn-sm flex-1"
+                          onClick={() => {
+                            setDiagStage('questions');
+                            setDiagQuestions(["What else can you tell me about the problem?"]);
+                            setDiagCause(null);
+                          }}
+                          disabled={diagnosing}
+                        >
+                          Not quite right
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fix stage */}
+                  {diagStage === 'fix' && diagSteps && (
+                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
+                      <p className="text-xs font-semibold text-base-content/50">Fix steps:</p>
+                      <ol className="list-decimal list-inside text-sm space-y-1">
+                        {diagSteps.map((s, i) => <li key={i}>{s}</li>)}
+                      </ol>
                     </div>
                   )}
                 </div>
