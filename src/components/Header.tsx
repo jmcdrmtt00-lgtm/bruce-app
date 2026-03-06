@@ -13,6 +13,7 @@ import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 const NAV = [
   { href: '/',                     label: 'Dashboard'             },
   { href: '/ask-ai',               label: 'Ask the AI'            },
+  { href: '/task-management',      label: 'Task List'             },
   { href: '/query-tasks',          label: 'Query Completed Tasks' },
   { href: '/query-inventory',      label: 'Query Inventory'       },
   { href: '/inventory-management', label: 'Inventory Mgmt'        },
@@ -25,8 +26,7 @@ const DEMO_NAV = [
 
 // jmcdrmtt00 only
 const ADMIN_NAV = [
-  { href: '/task-management',  label: 'Demo Tasks'      },
-  { href: '/demo-scenarios',   label: 'Demo Scenarios'  },
+  { href: '/demo-scenarios', label: 'Demo Scenarios' },
 ];
 
 // Auth pages are public — hide the nav on these routes
