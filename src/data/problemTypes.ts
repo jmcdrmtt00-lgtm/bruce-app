@@ -16,7 +16,7 @@ export const PROBLEM_TYPES: Record<string, ProblemType> = {
   },
   diagnose: {
     label: 'Diagnose and fix',
-    questions: ['Symptoms - what, when, where'],
+    questions: ['Describe the problem'],
   },
   update_database: {
     label: 'Update database',
