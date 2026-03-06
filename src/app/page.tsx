@@ -27,7 +27,10 @@ function normalizeScreenToTypeId(screen: string): string {
 
 function formatDate(dateStr: string | null | undefined): string {
   if (!dateStr) return '';
-  const d = new Date(dateStr);
+  // Parse YYYY-MM-DD parts directly to avoid UTC-to-local timezone shift
+  const [year, month, day] = dateStr.split('-').map(Number);
+  if (!year || !month || !day) return '';
+  const d = new Date(year, month - 1, day);
   if (isNaN(d.getTime())) return '';
   return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
