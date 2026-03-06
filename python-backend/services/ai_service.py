@@ -285,7 +285,10 @@ async def diagnose(
                 content = turn.get("content", turn.get("text", ""))
                 messages.append({"role": "assistant" if role == "ai" else "user", "content": content})
         else:
-            symptoms = task_details or information or "No symptoms provided."
+            # information = what the user actually typed; task_details = field label template
+            # Send information first; append task_details only if it adds context
+            parts = [p for p in [information, task_details] if p and p.strip()]
+            symptoms = "\n".join(parts) if parts else "No symptoms provided."
             messages = [{"role": "user", "content": f"Symptoms: {symptoms}"}]
 
         message = client.messages.create(
