@@ -4,6 +4,7 @@ import { useRef, useState, useEffect } from 'react';
 import Link from 'next/link';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/lib/formatDate';
 
 interface TaskResult {
   id?: string;
@@ -21,11 +22,6 @@ interface SimResult {
   task_number: number;
   title: string;
   similarity: string;
-}
-
-function formatDate(d?: string) {
-  if (!d) return '';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function QueryTasksPage() {

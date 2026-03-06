@@ -7,6 +7,7 @@ import { ExternalLink, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
 import { PROBLEM_TYPES, QUICK_TASK_TYPES } from '@/data/problemTypes';
+import { formatDate } from '@/lib/formatDate';
 
 const PRIORITY_BADGE: Record<string, string> = {
   high: 'badge-error',
@@ -23,16 +24,6 @@ function normalizeScreenToTypeId(screen: string): string {
   const lower = screen.toLowerCase().replace(/[\s-]/g, '_');
   if (PROBLEM_TYPES[lower]) return lower;
   return '';
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '';
-  // Parse YYYY-MM-DD parts directly to avoid UTC-to-local timezone shift
-  const [year, month, day] = dateStr.split('-').map(Number);
-  if (!year || !month || !day) return '';
-  const d = new Date(year, month - 1, day);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
 
 function TaskTable({
