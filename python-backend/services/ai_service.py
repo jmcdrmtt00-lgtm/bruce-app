@@ -269,6 +269,9 @@ async def diagnose(
         headlights_tracker.track_activity(user_email, sessions=1)
 
         text = message.content[0].text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
         try:
             result = _json.loads(text)
             return {"steps": result.get("steps", [])}
@@ -299,6 +302,9 @@ async def diagnose(
         headlights_tracker.track_activity(user_email, sessions=1)
 
         text = message.content[0].text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
         try:
             result = _json.loads(text)
             return {
