@@ -509,10 +509,16 @@ export default function DashboardPage() {
       return t !== 0 ? t : Math.random() - 0.5; // random within same tier
     });
     const result: UnassignedAsset[] = [sorted[0]];
-    const seen = new Set([`${sorted[0].make ?? ''}|${sorted[0].model ?? ''}`]);
+    const seenKeys    = new Set([`${sorted[0].make ?? ''}|${sorted[0].model ?? ''}`]);
+    const makesWithModel = new Set(sorted[0].make && sorted[0].model ? [sorted[0].make] : []);
     for (const asset of sorted.slice(1)) {
       const key = `${asset.make ?? ''}|${asset.model ?? ''}`;
-      if (!seen.has(key)) { seen.add(key); result.push(asset); }
+      if (seenKeys.has(key)) continue;
+      // Skip make-only assets when that make already appears with a model
+      if (asset.make && !asset.model && makesWithModel.has(asset.make)) continue;
+      seenKeys.add(key);
+      if (asset.make && asset.model) makesWithModel.add(asset.make);
+      result.push(asset);
     }
     return result;
   }
