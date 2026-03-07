@@ -500,6 +500,14 @@ export default function DashboardPage() {
     return desc || (asset.asset_number ? `Asset #${asset.asset_number}` : fallback);
   }
 
+  function assetSummary(asset: UnassignedAsset, fallback: string): string {
+    const parts = [assetLabel(asset, fallback)];
+    if (asset.os)           parts.push(`OS: ${asset.os}`);
+    if (asset.ram)          parts.push(`Memory: ${asset.ram}`);
+    if (asset.asset_number) parts.push(`Asset# ${asset.asset_number}`);
+    return parts.join(', ');
+  }
+
   function groupByMakeModel(assets: UnassignedAsset[]): UnassignedAsset[] {
     if (assets.length === 0) return [];
     // Prefer assets with both make+model, then make-only, then neither
@@ -1120,18 +1128,10 @@ export default function DashboardPage() {
                             ) : (
                               <>
                                 {/* Primary */}
-                                <div className="bg-base-100 rounded p-2 space-y-1">
-                                  <p className="text-sm font-medium">{assetLabel(proposals[0], label)}</p>
-                                  {proposals[0].asset_number && (
-                                    <p className="text-xs text-base-content/50">Asset #{proposals[0].asset_number}</p>
-                                  )}
-                                  {(proposals[0].os || proposals[0].ram) && (
-                                    <p className="text-xs text-base-content/60">
-                                      {[proposals[0].os, proposals[0].ram].filter(Boolean).join(' · ')}
-                                    </p>
-                                  )}
+                                <div className="bg-base-100 rounded p-2 flex items-center justify-between gap-2">
+                                  <p className="text-sm">{assetSummary(proposals[0], label)}</p>
                                   <button
-                                    className="btn btn-primary btn-xs mt-1"
+                                    className="btn btn-primary btn-xs shrink-0"
                                     onClick={() => handleApproveAsset(proposals[0], cat)}
                                   >
                                     Approve
@@ -1142,14 +1142,10 @@ export default function DashboardPage() {
                                   <div className="space-y-1 pt-1">
                                     <p className="text-xs text-base-content/40">Alternatives:</p>
                                     {proposals.slice(1).map(asset => (
-                                      <div key={asset.id} className="flex items-center justify-between bg-base-100 rounded px-2 py-1">
-                                        <span className="text-xs">
-                                          {assetLabel(asset, label)}
-                                          {asset.asset_number ? ` · #${asset.asset_number}` : ''}
-                                          {asset.ram && [asset.make, asset.model].filter(Boolean).length > 0 ? ` · ${asset.ram}` : ''}
-                                        </span>
+                                      <div key={asset.id} className="flex items-center justify-between bg-base-100 rounded px-2 py-1 gap-2">
+                                        <span className="text-xs">{assetSummary(asset, label)}</span>
                                         <button
-                                          className="btn btn-outline btn-xs"
+                                          className="btn btn-outline btn-xs shrink-0"
                                           onClick={() => handleApproveAsset(asset, cat)}
                                         >
                                           Use this
