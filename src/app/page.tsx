@@ -213,17 +213,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadTasks();
-    fetch('/api/suggest', { method: 'POST' })
-      .then(r => r.json())
-      .then(data => {
-        if (data.created > 0) {
-          toast.success(
-            `IT Buddy suggested ${data.created} new task${data.created > 1 ? 's' : ''} — check the queue.`
-          );
-          loadTasks();
-        }
-      })
-      .catch(() => {});
   }, [loadTasks]);
 
   // ── Autosave main fields ──────────────────────────────────────────────────
