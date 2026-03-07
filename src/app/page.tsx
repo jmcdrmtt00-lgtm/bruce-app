@@ -193,6 +193,8 @@ export default function DashboardPage() {
   const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
   const [diagConversation, setDiagConversation] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
   const [diagAnswer,       setDiagAnswer]       = useState('');
+  const [attachOpen,        setAttachOpen]        = useState(false);
+  const [attachedFile,      setAttachedFile]      = useState<File | null>(null);
   const [onboardingData,    setOnboardingData]    = useState<Record<string, string> | null>(null);
   const [computerProposals, setComputerProposals] = useState<UnassignedAsset[]>([]);
   const [computerApproved,  setComputerApproved]  = useState<UnassignedAsset | null>(null);
@@ -325,6 +327,8 @@ export default function DashboardPage() {
     setDiagSteps(null);
     setDiagConversation([]);
     setDiagAnswer('');
+    setAttachOpen(false);
+    setAttachedFile(null);
     setOnboardingData(null);
     setComputerProposals([]); setComputerApproved(null);
     setPhoneProposals([]);    setPhoneApproved(null);
@@ -1034,15 +1038,48 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
-                {/* Ask the AI button */}
-                <button
-                  className="btn btn-primary btn-sm mt-2 w-full"
-                  onClick={handleDiagnose}
-                  disabled={diagnosing}
-                >
-                  {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                  {diagnosing ? 'Thinking…' : 'Ask the AI'}
-                </button>
+                {/* Ask the AI + attach file */}
+                <div className="mt-2 space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <button
+                      className="btn btn-primary btn-sm flex-1"
+                      onClick={handleDiagnose}
+                      disabled={diagnosing}
+                    >
+                      {diagnosing && <span className="loading loading-spinner loading-xs" />}
+                      {diagnosing ? 'Thinking…' : 'Ask the AI'}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm text-base-content/40 hover:text-base-content"
+                      title="Attach a file"
+                      onClick={() => setAttachOpen(o => !o)}
+                      type="button"
+                    >
+                      📎
+                    </button>
+                  </div>
+                  {attachOpen && (
+                    <div className="rounded-box border border-base-300 p-2 space-y-1">
+                      <p className="text-xs text-base-content/50">Attach a file (image, text, PDF)</p>
+                      <input
+                        type="file"
+                        accept="image/*,.txt,.pdf,.csv,.log"
+                        className="file-input file-input-bordered file-input-xs w-full"
+                        onChange={e => setAttachedFile(e.target.files?.[0] ?? null)}
+                      />
+                      {attachedFile && (
+                        <p className="text-xs text-base-content/60">
+                          {attachedFile.name}
+                          <button
+                            className="ml-2 text-error"
+                            onClick={() => { setAttachedFile(null); }}
+                            type="button"
+                          >✕</button>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Issues / Comments */}
