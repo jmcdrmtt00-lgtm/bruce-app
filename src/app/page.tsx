@@ -1082,7 +1082,7 @@ export default function DashboardPage() {
                   {/* Fix stage */}
                   {diagStage === 'fix' && diagSteps && (
                     <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-xs font-semibold text-base-content/50">Fix steps:</p>
+                      <p className="text-xs font-semibold text-base-content/50">Try these steps in order:</p>
                       <ol className="list-decimal list-inside text-sm space-y-1">
                         {diagSteps.map((s, i) => <li key={i}>{s}</li>)}
                       </ol>
