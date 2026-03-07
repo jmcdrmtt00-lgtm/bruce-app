@@ -166,10 +166,7 @@ export default function DashboardPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   // Problem type state
-  const [problemTypeInput, setProblemTypeInput] = useState('');
-  const [matchedTypes,     setMatchedTypes]     = useState<string[]>([]);
-  const [selectedType,     setSelectedType]     = useState<string | null>(null);
-  const [matching,         setMatching]         = useState(false);
+  const [selectedType,     setSelectedType]     = useState<string>('general');
   const [diagnosing,       setDiagnosing]       = useState(false);
   const [diagStage,        setDiagStage]        = useState<'idle' | 'questions' | 'cause' | 'fix'>('idle');
   const [diagCause,        setDiagCause]        = useState<string | null>(null);
@@ -192,7 +189,6 @@ export default function DashboardPage() {
   const [listeningNum,          setListeningNum]          = useState(false);
   const [listeningName,         setListeningName]         = useState(false);
   const [listeningDate,         setListeningDate]         = useState(false);
-  const [listeningProblemType,  setListeningProblemType]  = useState(false);
   const [listeningInfoRequired, setListeningInfoRequired] = useState(false);
   const [listeningInfoDone,     setListeningInfoDone]     = useState(false);
   const [listeningIssues,       setListeningIssues]       = useState(false);
@@ -200,7 +196,6 @@ export default function DashboardPage() {
   const numRecRef           = useRef<unknown>(null);
   const nameRecRef          = useRef<unknown>(null);
   const dateRecRef          = useRef<unknown>(null);
-  const problemTypeRecRef   = useRef<unknown>(null);
   const infoRequiredRecRef  = useRef<unknown>(null);
   const infoDoneRecRef      = useRef<unknown>(null);
   const issuesRecRef        = useRef<unknown>(null);
@@ -308,9 +303,7 @@ export default function DashboardPage() {
     setInfoDone('');
     setIssues('');
     setSelectedTask(null);
-    setProblemTypeInput('');
-    setMatchedTypes([]);
-    setSelectedType(null);
+    setSelectedType('general');
     setDiagStage('idle');
     setDiagCause(null);
     setDiagDetail(null);
@@ -331,12 +324,10 @@ export default function DashboardPage() {
     const s = task.status === 'open' ? 'pending' : task.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
 
-    // Normalize screen → problem type ID
+    // Normalize screen → problem type ID, default to 'general'
     const rawScreen = task.screen || '';
     const typeId = normalizeScreenToTypeId(rawScreen);
-    setSelectedType(typeId || null);
-    setProblemTypeInput(typeId ? (PROBLEM_TYPES[typeId]?.label ?? rawScreen) : rawScreen);
-    setMatchedTypes([]);
+    setSelectedType(typeId || 'general');
 
     setInfoDone('');
     setIssues('');
@@ -512,55 +503,6 @@ export default function DashboardPage() {
     }
 
     markDirty();
-  }
-
-  async function handleMatchProblemType() {
-    if (!problemTypeInput.trim()) return;
-
-    // Direct match: if input already equals a known ID or label, skip the API call
-    const inputLower = problemTypeInput.trim().toLowerCase();
-    const directMatch = Object.entries(PROBLEM_TYPES).find(
-      ([id, { label }]) => id === inputLower || label.toLowerCase() === inputLower
-    );
-    if (directMatch) {
-      setMatchedTypes([directMatch[0]]);
-      selectProblemType(directMatch[0]);
-      return;
-    }
-
-    setMatching(true);
-    setMatchedTypes([]);
-    setSelectedType(null);
-    setDiagStage('idle');
-    setDiagCause(null);
-    setDiagDetail(null);
-    setDiagDetailOpen(false);
-    setDiagQuestions(null);
-    setDiagSteps(null);
-    setDiagConversation([]);
-    setDiagAnswer('');
-    try {
-      const res = await fetch('/api/ai/match-problem-type', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: problemTypeInput,
-          problem_types: Object.entries(PROBLEM_TYPES).map(([id, { label }]) => `${id}: ${label}`),
-        }),
-      });
-      const data = await res.json();
-      const matches: string[] = data.matches ?? [];
-      setMatchedTypes(matches);
-      if (matches.length === 0) {
-        toast.error("No matching problem type found. Try describing the problem differently.");
-      } else if (matches.length === 1) {
-        selectProblemType(matches[0]);
-      }
-      // If multiple matches: show button group, user picks one
-    } catch {
-      toast.error('Could not match problem type — try again.');
-    }
-    setMatching(false);
   }
 
   async function handleDiagnose() {
@@ -953,67 +895,15 @@ export default function DashboardPage() {
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Task type</span>
                 </label>
-                <div className="flex gap-1 items-start">
-                  <select
-                    className="select select-bordered select-sm text-sm"
-                    value={QUICK_TASK_TYPES.some(t => t.id === selectedType) ? selectedType ?? '' : ''}
-                    onChange={e => { if (e.target.value) selectProblemType(e.target.value); else { setSelectedType(null); setMatchedTypes([]); } }}
-                  >
-                    <option value="">Type…</option>
-                    {QUICK_TASK_TYPES.map(t => (
-                      <option key={t.id} value={t.id}>{t.label}</option>
-                    ))}
-                  </select>
-                  <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    value={problemTypeInput}
-                    onChange={e => {
-                      setProblemTypeInput(e.target.value);
-                      setSelectedType(null);
-                      setMatchedTypes([]);
-                    }}
-                    placeholder="Describe the problem to identify its type..."
-                  />
-                  <VoiceButton
-                    listening={listeningProblemType}
-                    onToggle={() => listeningProblemType
-                      ? stopVoice(problemTypeRecRef as React.MutableRefObject<unknown>, setListeningProblemType)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setProblemTypeInput(prev => prev ? `${prev} ${text}` : text),
-                            () => setProblemTypeInput('')
-                          ),
-                          setListeningProblemType,
-                          problemTypeRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
-                </div>
-
-                <button
-                  className="btn btn-outline btn-sm mt-1 w-full"
-                  onClick={handleMatchProblemType}
-                  disabled={matching || !problemTypeInput.trim()}
+                <select
+                  className="select select-bordered select-sm text-sm w-full"
+                  value={selectedType}
+                  onChange={e => selectProblemType(e.target.value)}
                 >
-                  {matching && <span className="loading loading-spinner loading-xs" />}
-                  {matching ? 'Matching…' : 'Match'}
-                </button>
-
-                {/* Multiple matches — user picks one */}
-                {matchedTypes.length > 1 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {matchedTypes.map(id => (
-                      <button
-                        key={id}
-                        className={`btn btn-xs ${selectedType === id ? 'btn-primary' : 'btn-outline'}`}
-                        onClick={() => selectProblemType(id)}
-                      >
-                        {PROBLEM_TYPES[id]?.label ?? id}
-                      </button>
-                    ))}
-                  </div>
-                )}
+                  {QUICK_TASK_TYPES.map(t => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
 
               </div>
 
@@ -1078,18 +968,14 @@ export default function DashboardPage() {
                   />
                 </div>
                 {/* Ask the AI button */}
-                {selectedType && (
-                  <button
-                    className="btn btn-primary btn-sm mt-2 w-full"
-                    onClick={handleDiagnose}
-                    disabled={diagnosing}
-                  >
-                    {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                    {diagnosing
-                      ? 'Thinking…'
-                      : `Ask the AI to help with ${PROBLEM_TYPES[selectedType]?.label ?? selectedType}`}
-                  </button>
-                )}
+                <button
+                  className="btn btn-primary btn-sm mt-2 w-full"
+                  onClick={handleDiagnose}
+                  disabled={diagnosing}
+                >
+                  {diagnosing && <span className="loading loading-spinner loading-xs" />}
+                  {diagnosing ? 'Thinking…' : 'Ask the AI'}
+                </button>
               </div>
 
               {/* Issues / Comments */}
