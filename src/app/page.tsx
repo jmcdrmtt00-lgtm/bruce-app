@@ -6,7 +6,25 @@ import Link from 'next/link';
 import { ExternalLink, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
-import { PROBLEM_TYPES } from '@/data/problemTypes';
+import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
+import { formatDate } from '@/lib/formatDate';
+
+interface UnassignedAsset {
+  id: string;
+  asset_number: string | null;
+  name: string | null;
+  make: string | null;
+  model: string | null;
+  os: string | null;
+  ram: string | null;
+  site: string;
+}
+
+const SITE_LABELS: Record<string, string> = {
+  holden:          'Holden',
+  oakdale:         'Oakdale',
+  business_office: 'Business Office',
+};
 
 const PRIORITY_BADGE: Record<string, string> = {
   high: 'badge-error',
@@ -19,17 +37,10 @@ const PRIORITY_LABEL: Record<string, string> = {
 
 function normalizeScreenToTypeId(screen: string): string {
   if (!screen) return '';
-  if (PROBLEM_TYPES[screen]) return screen;
+  if (TASK_TYPES[screen]) return screen;
   const lower = screen.toLowerCase().replace(/[\s-]/g, '_');
-  if (PROBLEM_TYPES[lower]) return lower;
+  if (TASK_TYPES[lower]) return lower;
   return '';
-}
-
-function formatDate(dateStr: string | null | undefined): string {
-  if (!dateStr) return '';
-  const d = new Date(dateStr);
-  if (isNaN(d.getTime())) return '';
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
 }
 
 function TaskTable({
@@ -172,15 +183,25 @@ export default function DashboardPage() {
   const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
 
   // Problem type state
-  const [problemTypeInput, setProblemTypeInput] = useState('');
-  const [matchedTypes,     setMatchedTypes]     = useState<string[]>([]);
-  const [selectedType,     setSelectedType]     = useState<string | null>(null);
-  const [matching,         setMatching]         = useState(false);
+  const [selectedType,     setSelectedType]     = useState<string>('general');
   const [diagnosing,       setDiagnosing]       = useState(false);
-  const [aiResponse,       setAiResponse]       = useState<string | null>(null);
-  const [followUpQuestions, setFollowUpQuestions] = useState<string[]>([]);
-  const [followUpAnswer,   setFollowUpAnswer]   = useState('');
-  const [conversation,     setConversation]     = useState<{ role: 'ai' | 'user'; text: string }[]>([]);
+  const [diagStage,        setDiagStage]        = useState<'idle' | 'questions' | 'cause' | 'fix'>('idle');
+  const [diagCause,        setDiagCause]        = useState<string | null>(null);
+  const [diagDetail,       setDiagDetail]       = useState<string | null>(null);
+  const [diagDetailOpen,   setDiagDetailOpen]   = useState(false);
+  const [diagQuestions,    setDiagQuestions]    = useState<string[] | null>(null);
+  const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
+  const [diagConversation, setDiagConversation] = useState<Record<string, unknown>[]>([]);
+  const [diagAnswer,       setDiagAnswer]       = useState('');
+  const [attachOpen,        setAttachOpen]        = useState(false);
+  const [attachedFile,      setAttachedFile]      = useState<File | null>(null);
+  const [onboardingData,    setOnboardingData]    = useState<Record<string, string> | null>(null);
+  const [computerProposals, setComputerProposals] = useState<UnassignedAsset[]>([]);
+  const [computerApproved,  setComputerApproved]  = useState<UnassignedAsset | null>(null);
+  const [phoneProposals,    setPhoneProposals]    = useState<UnassignedAsset[]>([]);
+  const [phoneApproved,     setPhoneApproved]     = useState<UnassignedAsset | null>(null);
+  const [ipadProposals,     setIpadProposals]     = useState<UnassignedAsset[]>([]);
+  const [ipadApproved,      setIpadApproved]      = useState<UnassignedAsset | null>(null);
 
   // Autosave bookkeeping
   const panelDirtyRef     = useRef(false);
@@ -194,7 +215,6 @@ export default function DashboardPage() {
   const [listeningNum,          setListeningNum]          = useState(false);
   const [listeningName,         setListeningName]         = useState(false);
   const [listeningDate,         setListeningDate]         = useState(false);
-  const [listeningProblemType,  setListeningProblemType]  = useState(false);
   const [listeningInfoRequired, setListeningInfoRequired] = useState(false);
   const [listeningInfoDone,     setListeningInfoDone]     = useState(false);
   const [listeningIssues,       setListeningIssues]       = useState(false);
@@ -202,7 +222,6 @@ export default function DashboardPage() {
   const numRecRef           = useRef<unknown>(null);
   const nameRecRef          = useRef<unknown>(null);
   const dateRecRef          = useRef<unknown>(null);
-  const problemTypeRecRef   = useRef<unknown>(null);
   const infoRequiredRecRef  = useRef<unknown>(null);
   const infoDoneRecRef      = useRef<unknown>(null);
   const issuesRecRef        = useRef<unknown>(null);
@@ -220,17 +239,6 @@ export default function DashboardPage() {
 
   useEffect(() => {
     loadTasks();
-    fetch('/api/suggest', { method: 'POST' })
-      .then(r => r.json())
-      .then(data => {
-        if (data.created > 0) {
-          toast.success(
-            `IT Buddy suggested ${data.created} new task${data.created > 1 ? 's' : ''} — check the queue.`
-          );
-          loadTasks();
-        }
-      })
-      .catch(() => {});
   }, [loadTasks]);
 
   // ── Autosave main fields ──────────────────────────────────────────────────
@@ -310,13 +318,21 @@ export default function DashboardPage() {
     setInfoDone('');
     setIssues('');
     setSelectedTask(null);
-    setProblemTypeInput('');
-    setMatchedTypes([]);
-    setSelectedType(null);
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setFollowUpAnswer('');
-    setConversation([]);
+    setSelectedType('general');
+    setDiagStage('idle');
+    setDiagCause(null);
+    setDiagDetail(null);
+    setDiagDetailOpen(false);
+    setDiagQuestions(null);
+    setDiagSteps(null);
+    setDiagConversation([]);
+    setDiagAnswer('');
+    setAttachOpen(false);
+    setAttachedFile(null);
+    setOnboardingData(null);
+    setComputerProposals([]); setComputerApproved(null);
+    setPhoneProposals([]);    setPhoneApproved(null);
+    setIpadProposals([]);     setIpadApproved(null);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
@@ -329,26 +345,32 @@ export default function DashboardPage() {
     const s = task.status === 'open' ? 'pending' : task.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
 
-    // Normalize screen → problem type ID
+    // Normalize screen → problem type ID, default to 'general'
     const rawScreen = task.screen || '';
     const typeId = normalizeScreenToTypeId(rawScreen);
-    setSelectedType(typeId || null);
-    setProblemTypeInput(typeId ? (PROBLEM_TYPES[typeId]?.label ?? rawScreen) : rawScreen);
-    setMatchedTypes([]);
+    setSelectedType(typeId || 'general');
 
     setInfoDone('');
     setIssues('');
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setFollowUpAnswer('');
-    setConversation([]);
+    setDiagStage('idle');
+    setDiagCause(null);
+    setDiagDetail(null);
+    setDiagDetailOpen(false);
+    setDiagQuestions(null);
+    setDiagSteps(null);
+    setDiagConversation([]);
+    setDiagAnswer('');
+    setOnboardingData(null);
+    setComputerProposals([]); setComputerApproved(null);
+    setPhoneProposals([]);    setPhoneApproved(null);
+    setIpadProposals([]);     setIpadApproved(null);
     setSelectedTask(task);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
 
-    // Set infoRequired from type questions immediately
-    if (typeId && PROBLEM_TYPES[typeId]) {
-      setInfoRequired(`Information needed: ${PROBLEM_TYPES[typeId].questions.join(', ')}`);
+    // Set infoRequired from type fields immediately
+    if (typeId && TASK_TYPES[typeId]) {
+      setInfoRequired(`Information needed: ${TASK_TYPES[typeId].fields.join(', ')}`);
     } else {
       setInfoRequired('');
     }
@@ -369,36 +391,6 @@ export default function DashboardPage() {
           savedDetailsRef.current = details;
         }
 
-        // Load conversation from ai_response / user_reply updates (in order)
-        const aiConv = updates
-          .filter(u => u.type === 'ai_response' || u.type === 'user_reply')
-          .map(u => ({
-            role: (u.type === 'ai_response' ? 'ai' : 'user') as 'ai' | 'user',
-            text: u.note,
-          }));
-        setConversation(aiConv);
-        if (aiConv.length > 0) {
-          const lastAi = [...aiConv].reverse().find(u => u.role === 'ai');
-          if (lastAi) setAiResponse(lastAi.text);
-        }
-
-        // For onboarding without saved details, refine with actual asset number
-        if (typeId === 'onboarding' && !details) {
-          fetch('/api/assets/download')
-            .then(r => r.json())
-            .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
-              const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
-              if (nums.length > 0) {
-                const next = String(Math.max(...nums) + 1).padStart(4, '0');
-                const pt = PROBLEM_TYPES['onboarding'];
-                if (pt) {
-                  const updatedQ = pt.questions.map(q => q === 'Next asset #?' ? `Next asset #${next}?` : q);
-                  setInfoRequired(`Information needed: ${updatedQ.join(', ')}`);
-                }
-              }
-            })
-            .catch(() => {});
-        }
       })
       .catch(() => {});
   }
@@ -499,85 +491,135 @@ export default function DashboardPage() {
 
   function selectProblemType(id: string) {
     setSelectedType(id);
-    const pt = PROBLEM_TYPES[id];
+    const pt = TASK_TYPES[id];
     if (!pt) return;
 
-    setInfoRequired(`Information needed: ${pt.questions.join(', ')}`);
-
-    if (id === 'onboarding') {
-      fetch('/api/assets/download')
-        .then(r => r.json())
-        .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
-          const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
-          if (nums.length > 0) {
-            const next = String(Math.max(...nums) + 1).padStart(4, '0');
-            const updatedQ = pt.questions.map(q => q === 'Next asset #?' ? `Next asset #${next}?` : q);
-            setInfoRequired(`Information needed: ${updatedQ.join(', ')}`);
-          }
-        })
-        .catch(() => {});
-    }
+    setInfoRequired(`Information needed: ${pt.fields.join(', ')}`);
 
     markDirty();
   }
 
-  async function handleMatchProblemType() {
-    if (!problemTypeInput.trim()) return;
+  function assetLabel(asset: UnassignedAsset, fallback: string): string {
+    const desc = [asset.make, asset.model].filter(Boolean).join(' ');
+    return desc || (asset.asset_number ? `Asset #${asset.asset_number}` : fallback);
+  }
 
-    // Direct match: if input already equals a known ID or label, skip the API call
-    const inputLower = problemTypeInput.trim().toLowerCase();
-    const directMatch = Object.entries(PROBLEM_TYPES).find(
-      ([id, { label }]) => id === inputLower || label.toLowerCase() === inputLower
-    );
-    if (directMatch) {
-      setMatchedTypes([directMatch[0]]);
-      selectProblemType(directMatch[0]);
-      return;
+  function assetSummary(asset: UnassignedAsset, fallback: string): string {
+    const parts = [assetLabel(asset, fallback)];
+    if (asset.os)           parts.push(`OS: ${asset.os}`);
+    if (asset.ram)          parts.push(`Memory: ${asset.ram}`);
+    if (asset.asset_number) parts.push(`Asset# ${asset.asset_number}`);
+    return parts.join(', ');
+  }
+
+  function groupByMakeModel(assets: UnassignedAsset[]): UnassignedAsset[] {
+    if (assets.length === 0) return [];
+    // Prefer assets with both make+model, then make-only, then neither
+    const tier = (a: UnassignedAsset) => (a.make && a.model ? 0 : a.make ? 1 : 2);
+    const sorted = [...assets].sort((a, b) => {
+      const t = tier(a) - tier(b);
+      return t !== 0 ? t : Math.random() - 0.5; // random within same tier
+    });
+    const result: UnassignedAsset[] = [sorted[0]];
+    const seenKeys    = new Set([`${sorted[0].make ?? ''}|${sorted[0].model ?? ''}`]);
+    const makesWithModel = new Set(sorted[0].make && sorted[0].model ? [sorted[0].make] : []);
+    for (const asset of sorted.slice(1)) {
+      const key = `${asset.make ?? ''}|${asset.model ?? ''}`;
+      if (seenKeys.has(key)) continue;
+      // Skip make-only assets when that make already appears with a model
+      if (asset.make && !asset.model && makesWithModel.has(asset.make)) continue;
+      seenKeys.add(key);
+      if (asset.make && asset.model) makesWithModel.add(asset.make);
+      result.push(asset);
     }
+    return result;
+  }
 
-    setMatching(true);
-    setMatchedTypes([]);
-    setSelectedType(null);
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setConversation([]);
+  async function handleApproveAsset(
+    asset: UnassignedAsset,
+    category: 'Computer' | 'Phone' | 'iPad',
+  ) {
+    if (!onboardingData) return;
+    const fullName = `${onboardingData.firstName ?? ''} ${onboardingData.lastName ?? ''}`.trim();
     try {
-      const res = await fetch('/api/ai/match-problem-type', {
-        method: 'POST',
+      const res = await fetch(`/api/assets/${asset.id}/assign`, {
+        method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          description: problemTypeInput,
-          problem_types: Object.entries(PROBLEM_TYPES).map(([id, { label }]) => `${id}: ${label}`),
-        }),
+        body: JSON.stringify({ assigned_to: fullName }),
       });
-      const data = await res.json();
-      const matches: string[] = data.matches ?? [];
-      setMatchedTypes(matches);
-      if (matches.length === 0) {
-        toast.error("No matching problem type found. Try describing the problem differently.");
-      } else if (matches.length === 1) {
-        selectProblemType(matches[0]);
-      }
-      // If multiple matches: show button group, user picks one
+      if (!res.ok) throw new Error();
+      if (category === 'Computer') setComputerApproved(asset);
+      else if (category === 'Phone') setPhoneApproved(asset);
+      else if (category === 'iPad')  setIpadApproved(asset);
+      toast.success(`${category} assigned to ${fullName}!`);
     } catch {
-      toast.error('Could not match problem type — try again.');
+      toast.error('Could not assign asset — try again.');
     }
-    setMatching(false);
   }
 
   async function handleDiagnose() {
     if (!selectedType) return;
 
-    // For onboarding with no info: navigate directly
-    if (selectedType === 'onboarding' && !infoDone.trim() && !infoRequired.trim()) {
-      router.push('/onboarding');
+    // Onboarding: use AI to extract structured data, then show asset proposal
+    if (selectedType === 'onboarding') {
+      if (!infoDone.trim() && !infoRequired.trim()) {
+        router.push('/onboarding');
+        return;
+      }
+      setDiagnosing(true);
+      try {
+        const res = await fetch('/api/ai/diagnose', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            problem_type: 'onboarding',
+            stage: 'symptoms',
+            task_details: infoRequired || null,
+            information: infoDone || null,
+          }),
+        });
+        const data = await res.json();
+        if (data.structured_data !== undefined) {
+          localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
+          setOnboardingData(data.structured_data);
+          setComputerApproved(null); setPhoneApproved(null); setIpadApproved(null);
+
+          // Fetch unassigned Computer, Phone, iPad at the new hire's site in parallel
+          const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
+          if (siteLabel) {
+            const [compRes, phoneRes, ipadRes] = await Promise.all([
+              fetch(`/api/assets/unassigned?site=${encodeURIComponent(siteLabel)}&category=Computer`),
+              fetch(`/api/assets/unassigned?site=${encodeURIComponent(siteLabel)}&category=Phone`),
+              fetch(`/api/assets/unassigned?site=${encodeURIComponent(siteLabel)}&category=iPad`),
+            ]);
+            const [compData, phoneData, ipadData] = await Promise.all([
+              compRes.json(), phoneRes.json(), ipadRes.json(),
+            ]);
+            setComputerProposals(groupByMakeModel(compData.assets ?? []));
+            setPhoneProposals(groupByMakeModel(phoneData.assets ?? []));
+            setIpadProposals(groupByMakeModel(ipadData.assets ?? []));
+          } else {
+            setComputerProposals([]); setPhoneProposals([]); setIpadProposals([]);
+          }
+          setDiagStage('cause');
+        }
+      } catch {
+        toast.error('Could not get AI response — try again.');
+      }
+      setDiagnosing(false);
       return;
     }
 
+    // Stage 1: symptoms → cause or questions
     setDiagnosing(true);
-    setAiResponse(null);
-    setFollowUpQuestions([]);
-    setConversation([]);
+    setDiagStage('idle');
+    setDiagCause(null);
+    setDiagDetail(null);
+    setDiagDetailOpen(false);
+    setDiagQuestions(null);
+    setDiagSteps(null);
+    setDiagConversation([]);
+    setDiagAnswer('');
 
     try {
       const res = await fetch('/api/ai/diagnose', {
@@ -585,26 +627,37 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           problem_type: selectedType,
+          stage: 'symptoms',
           task_details: infoRequired || null,
           information: infoDone || null,
-          task_fields: { title: taskName, priority: priority || null, date_due: dateDue || null, status },
-          conversation: null,
         }),
       });
       const data = await res.json();
+      const symptoms = [infoRequired, infoDone].filter(Boolean).join('\n') || 'No symptoms provided.';
+      const userTurn = { role: 'user' as const, content: `Symptoms: ${symptoms}` };
 
-      if (selectedType === 'onboarding' && data.structured_data !== undefined) {
-        localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
-        router.push('/onboarding');
-        return;
+      // If tool use happened, prepend those turns so follow-up passes have full context
+      const toolTurns = data._tool_context ? [
+        { role: 'tool_use'    as const, tool_use_id: data._tool_context.tool_call.tool_use_id, name: data._tool_context.tool_call.name, input: data._tool_context.tool_call.input },
+        { role: 'tool_result' as const, tool_use_id: data._tool_context.tool_call.tool_use_id, content: data._tool_context.tool_result },
+      ] : [];
+
+      if (data.cause) {
+        const aiTurn = { role: 'ai' as const, content: data.cause };
+        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
+        setDiagCause(data.cause);
+        setDiagDetail(data.detail ?? null);
+        setDiagDetailOpen(false);
+        setDiagStage('cause');
+        await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
+      } else if (data.questions?.length) {
+        const aiTurn = { role: 'ai' as const, content: data.questions.join('\n') };
+        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
+        setDiagQuestions(data.questions);
+        setDiagStage('questions');
+        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
+        await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
       }
-
-      const responseText: string = data.response ?? '';
-      const fups: string[] = data.follow_up_questions ?? [];
-      setAiResponse(responseText);
-      setFollowUpQuestions(fups);
-      setConversation([{ role: 'ai', text: responseText }]);
-      await saveAiUpdate('ai_response', responseText);
     } catch {
       toast.error('Could not get AI response — try again.');
     }
@@ -612,12 +665,14 @@ export default function DashboardPage() {
   }
 
   async function handleFollowUp() {
-    if (!followUpAnswer.trim() || !selectedType) return;
-    const answer = followUpAnswer.trim();
-    const updatedConv = [...conversation, { role: 'user' as const, text: answer }];
-    setConversation(updatedConv);
-    setFollowUpAnswer('');
+    if (!diagAnswer.trim() || !selectedType) return;
+    const answer = diagAnswer.trim();
+    setDiagAnswer('');
     await saveAiUpdate('user_reply', answer);
+
+    const userTurn = { role: 'user' as const, content: answer };
+    const updatedConv = [...diagConversation, userTurn];
+    setDiagConversation(updatedConv);
 
     setDiagnosing(true);
     try {
@@ -626,21 +681,54 @@ export default function DashboardPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           problem_type: selectedType,
-          task_details: infoRequired || null,
-          information: infoDone || null,
-          task_fields: { title: taskName, priority: priority || null, date_due: dateDue || null, status },
-          conversation: updatedConv.map(c => ({ role: c.role, content: c.text })),
+          stage: 'followup',
+          conversation: updatedConv,
         }),
       });
       const data = await res.json();
-      const responseText: string = data.response ?? '';
-      const fups: string[] = data.follow_up_questions ?? [];
-      setAiResponse(responseText);
-      setFollowUpQuestions(fups);
-      setConversation(prev => [...prev, { role: 'ai', text: responseText }]);
-      await saveAiUpdate('ai_response', responseText);
+
+      if (data.cause) {
+        const aiTurn = { role: 'ai' as const, content: data.cause };
+        setDiagConversation(prev => [...prev, aiTurn]);
+        setDiagCause(data.cause);
+        setDiagDetail(data.detail ?? null);
+        setDiagDetailOpen(false);
+        setDiagStage('cause');
+        await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
+      } else if (data.questions?.length) {
+        const aiTurn = { role: 'ai' as const, content: (data.questions as string[]).join('\n') };
+        setDiagConversation(prev => [...prev, aiTurn]);
+        setDiagQuestions(data.questions);
+        setDiagStage('questions');
+        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
+        await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
+      }
     } catch {
       toast.error('Could not get AI response — try again.');
+    }
+    setDiagnosing(false);
+  }
+
+  async function handleConfirmCause() {
+    if (!diagCause || !selectedType) return;
+    setDiagnosing(true);
+    try {
+      const res = await fetch('/api/ai/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problem_type: selectedType,
+          stage: 'fix',
+          information: diagCause,
+        }),
+      });
+      const data = await res.json();
+      const steps: string[] = data.steps ?? [];
+      setDiagSteps(steps);
+      setDiagStage('fix');
+      await saveAiUpdate('ai_response', `Fix steps: ${steps.join(' | ')}`);
+    } catch {
+      toast.error('Could not get fix steps — try again.');
     }
     setDiagnosing(false);
   }
@@ -801,25 +889,36 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Priority + Date Due (two-column row) */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Priority + Status + Date Due (three-column row) */}
+              <div className="grid grid-cols-3 gap-3">
                 <div className="form-control">
                   <label className="label py-0">
                     <span className="label-text text-xs font-semibold">Priority</span>
                   </label>
-                  <div className="flex gap-1">
-                    {(['high', 'low'] as const).map(p => (
-                      <button
-                        key={p}
-                        className={`btn btn-xs flex-1 capitalize ${priority === p
-                          ? p === 'high' ? 'btn-error' : 'btn-success'
-                          : 'btn-outline'}`}
-                        onClick={() => { setPriority(prev => prev === p ? '' : p); markDirty(); }}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
+                  <select
+                    className="select select-bordered select-sm text-sm w-full"
+                    value={priority}
+                    onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }}
+                  >
+                    <option value="">—</option>
+                    <option value="high">High</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Status</span>
+                  </label>
+                  <select
+                    className="select select-bordered select-sm text-sm w-full"
+                    value={status}
+                    onChange={e => { setStatus(e.target.value as 'pending' | 'in_progress' | 'resolved'); markDirty(); }}
+                  >
+                    <option value="pending">Queue</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="resolved">Complete</option>
+                  </select>
                 </div>
 
                 <div className="form-control">
@@ -852,99 +951,20 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Status */}
+              {/* Task type */}
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Status</span>
+                  <span className="label-text text-xs font-semibold">Task type</span>
                 </label>
-                <div className="flex gap-1">
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'pending' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => { setStatus('pending'); markDirty(); }}
-                  >
-                    Queue
-                  </button>
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => { setStatus('in_progress'); markDirty(); }}
-                  >
-                    In&nbsp;Progress
-                  </button>
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
-                    onClick={() => { setStatus('resolved'); markDirty(); }}
-                  >
-                    Complete
-                  </button>
-                </div>
-              </div>
-
-              {/* Problem type */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Problem type</span>
-                </label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    value={problemTypeInput}
-                    onChange={e => {
-                      setProblemTypeInput(e.target.value);
-                      setSelectedType(null);
-                      setMatchedTypes([]);
-                    }}
-                    placeholder="Describe the problem to identify its type..."
-                  />
-                  <VoiceButton
-                    listening={listeningProblemType}
-                    onToggle={() => listeningProblemType
-                      ? stopVoice(problemTypeRecRef as React.MutableRefObject<unknown>, setListeningProblemType)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setProblemTypeInput(prev => prev ? `${prev} ${text}` : text),
-                            () => setProblemTypeInput('')
-                          ),
-                          setListeningProblemType,
-                          problemTypeRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
-                </div>
-
-                <button
-                  className="btn btn-outline btn-sm mt-1 w-full"
-                  onClick={handleMatchProblemType}
-                  disabled={matching || !problemTypeInput.trim()}
+                <select
+                  className="select select-bordered select-sm text-sm w-full"
+                  value={selectedType}
+                  onChange={e => selectProblemType(e.target.value)}
                 >
-                  {matching && <span className="loading loading-spinner loading-xs" />}
-                  {matching ? 'Matching…' : 'Match'}
-                </button>
-
-                {/* Multiple matches — user picks one */}
-                {matchedTypes.length > 1 && (
-                  <div className="flex flex-wrap gap-1 mt-2">
-                    {matchedTypes.map(id => (
-                      <button
-                        key={id}
-                        className={`btn btn-xs ${selectedType === id ? 'btn-primary' : 'btn-outline'}`}
-                        onClick={() => selectProblemType(id)}
-                      >
-                        {PROBLEM_TYPES[id]?.label ?? id}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* Selected type badge */}
-                {selectedType && (
-                  <div className="mt-2 flex items-center gap-2">
-                    <span className="text-xs text-base-content/50">Type:</span>
-                    <span className="badge badge-sm badge-outline badge-primary">
-                      {PROBLEM_TYPES[selectedType]?.label ?? selectedType}
-                    </span>
-                  </div>
-                )}
+                  {QUICK_TASK_TYPES.map(t => (
+                    <option key={t.id} value={t.id}>{t.label}</option>
+                  ))}
+                </select>
 
               </div>
 
@@ -1008,19 +1028,48 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
-                {/* Ask the AI button */}
-                {selectedType && (
-                  <button
-                    className="btn btn-primary btn-sm mt-2 w-full"
-                    onClick={handleDiagnose}
-                    disabled={diagnosing}
-                  >
-                    {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                    {diagnosing
-                      ? 'Thinking…'
-                      : `Ask the AI to help with ${PROBLEM_TYPES[selectedType]?.label ?? selectedType}`}
-                  </button>
-                )}
+                {/* Ask the AI + attach file */}
+                <div className="mt-2 space-y-2">
+                  <div className="flex gap-2 items-center">
+                    <button
+                      className="btn btn-primary btn-sm flex-1"
+                      onClick={handleDiagnose}
+                      disabled={diagnosing}
+                    >
+                      {diagnosing && <span className="loading loading-spinner loading-xs" />}
+                      {diagnosing ? 'Thinking…' : 'Ask the AI'}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm text-base-content/40 hover:text-base-content"
+                      title="Attach a file"
+                      onClick={() => setAttachOpen(o => !o)}
+                      type="button"
+                    >
+                      📎
+                    </button>
+                  </div>
+                  {attachOpen && (
+                    <div className="rounded-box border border-base-300 p-2 space-y-1">
+                      <p className="text-xs text-base-content/50">Attach a file (image, text, PDF)</p>
+                      <input
+                        type="file"
+                        accept="image/*,.txt,.pdf,.csv,.log"
+                        className="file-input file-input-bordered file-input-xs w-full"
+                        onChange={e => setAttachedFile(e.target.files?.[0] ?? null)}
+                      />
+                      {attachedFile && (
+                        <p className="text-xs text-base-content/60">
+                          {attachedFile.name}
+                          <button
+                            className="ml-2 text-error"
+                            onClick={() => { setAttachedFile(null); }}
+                            type="button"
+                          >✕</button>
+                        </p>
+                      )}
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* Issues / Comments */}
@@ -1055,48 +1104,145 @@ export default function DashboardPage() {
               </div>
 
               {/* IT Buddy response panel */}
-              {conversation.length > 0 && (
+              {diagStage !== 'idle' && (
                 <div className="form-control">
                   <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">IT Buddy Interactions</span>
+                    <span className="label-text text-xs font-semibold">IT Buddy</span>
                   </label>
-                  <div className="space-y-2">
-                    {conversation.map((turn, i) => (
-                      <div
-                        key={i}
-                        className={`rounded-box p-3 text-sm whitespace-pre-wrap ${
-                          turn.role === 'ai' ? 'bg-primary/10' : 'bg-base-200'
-                        }`}
-                      >
-                        <p className="text-xs font-semibold text-base-content/50 mb-1">
-                          {turn.role === 'ai' ? 'IT Buddy' : 'You'}
-                        </p>
-                        <p>{turn.text}</p>
-                      </div>
-                    ))}
-                  </div>
 
-                  {followUpQuestions.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      <p className="text-xs font-semibold text-base-content/60">Follow-up questions:</p>
-                      <ul className="list-disc list-inside text-sm text-base-content/70 space-y-0.5">
-                        {followUpQuestions.map((q, i) => <li key={i}>{q}</li>)}
-                      </ul>
+                  {/* Questions stage */}
+                  {diagStage === 'questions' && diagQuestions && (
+                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
+                      <p className="text-xs font-semibold text-base-content/50">To narrow down the cause, please answer:</p>
+                      <ol className="list-decimal list-inside text-sm space-y-1">
+                        {diagQuestions.map((q, i) => <li key={i}>{q}</li>)}
+                      </ol>
                       <AutoTextarea
-                        className="textarea textarea-bordered textarea-sm w-full text-sm mt-2"
-                        value={followUpAnswer}
-                        onChange={e => setFollowUpAnswer(e.target.value)}
-                        placeholder="Your answer..."
+                        className="textarea textarea-bordered textarea-sm w-full text-sm font-mono"
+                        value={diagAnswer}
+                        onChange={e => setDiagAnswer(e.target.value)}
+                        placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
                       />
                       <button
-                        className="btn btn-outline btn-sm w-full mt-1"
+                        className="btn btn-outline btn-sm w-full"
                         onClick={handleFollowUp}
-                        disabled={diagnosing || !followUpAnswer.trim()}
+                        disabled={diagnosing || !diagAnswer.trim()}
                       >
-                        {diagnosing
-                          ? <span className="loading loading-spinner loading-xs" />
-                          : 'Send answer'}
+                        {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
                       </button>
+                    </div>
+                  )}
+
+                  {/* Cause stage — onboarding: asset proposals */}
+                  {diagStage === 'cause' && selectedType === 'onboarding' && onboardingData && (
+                    <div className="rounded-box p-3 bg-primary/10 space-y-4">
+
+                      {/* Helper: render one asset category section */}
+                      {(['Computer', 'Phone', 'iPad'] as const).map(cat => {
+                        const proposals = cat === 'Computer' ? computerProposals : cat === 'Phone' ? phoneProposals : ipadProposals;
+                        const approved  = cat === 'Computer' ? computerApproved  : cat === 'Phone' ? phoneApproved  : ipadApproved;
+                        const label     = cat === 'iPad' ? 'iPad' : cat === 'Computer' ? 'Computer' : 'Phone';
+                        return (
+                          <div key={cat} className="space-y-1">
+                            <p className="text-xs font-semibold text-base-content/50">Proposed {label.toLowerCase()}:</p>
+                            {approved ? (
+                              <p className="text-sm text-success">
+                                ✓ {[approved.make, approved.model].filter(Boolean).join(' ') || label}
+                                {approved.asset_number ? ` — Asset #${approved.asset_number}` : ''} assigned
+                              </p>
+                            ) : proposals.length === 0 ? (
+                              <p className="text-xs text-base-content/40">None available at this site</p>
+                            ) : (
+                              <>
+                                {/* Primary */}
+                                <div className="bg-base-100 rounded p-2 flex items-center justify-between gap-2">
+                                  <p className="text-sm">{assetSummary(proposals[0], label)}</p>
+                                  <button
+                                    className="btn btn-primary btn-xs shrink-0"
+                                    onClick={() => handleApproveAsset(proposals[0], cat)}
+                                  >
+                                    Approve
+                                  </button>
+                                </div>
+                                {/* Alternatives — one per distinct make/model */}
+                                {proposals.slice(1).length > 0 && (
+                                  <div className="space-y-1 pt-1">
+                                    <p className="text-xs text-base-content/40">Alternatives:</p>
+                                    {proposals.slice(1).map(asset => (
+                                      <div key={asset.id} className="flex items-center justify-between bg-base-100 rounded px-2 py-1 gap-2">
+                                        <span className="text-xs">{assetSummary(asset, label)}</span>
+                                        <button
+                                          className="btn btn-outline btn-xs shrink-0"
+                                          onClick={() => handleApproveAsset(asset, cat)}
+                                        >
+                                          Use this
+                                        </button>
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </>
+                            )}
+                          </div>
+                        );
+                      })}
+
+                      <button
+                        className="btn btn-primary btn-sm w-full"
+                        onClick={() => router.push('/onboarding')}
+                      >
+                        Open checklist →
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Cause stage — general: diagnosis result */}
+                  {diagStage === 'cause' && selectedType !== 'onboarding' && diagCause && (
+                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
+                      <p className="text-sm font-medium">{diagCause}</p>
+                      <div>
+                        <button
+                          className="text-xs text-primary underline"
+                          onClick={() => setDiagDetailOpen(o => !o)}
+                        >
+                          {diagDetailOpen ? 'Hide detail' : 'More detail →'}
+                        </button>
+                        {diagDetailOpen && (
+                          <p className="text-xs text-base-content/70 mt-1">{diagDetail ?? 'No additional detail available.'}</p>
+                        )}
+                      </div>
+                      <div className="flex gap-2 pt-1">
+                        <button
+                          className="btn btn-primary btn-sm flex-1"
+                          onClick={handleConfirmCause}
+                          disabled={diagnosing}
+                        >
+                          {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Steps to fix'}
+                        </button>
+                        <button
+                          className="btn btn-outline btn-sm flex-1"
+                          onClick={() => {
+                            setDiagStage('questions');
+                            setDiagQuestions(["What else can you tell me about the problem?"]);
+                            setDiagAnswer('1. ');
+                            setDiagCause(null);
+                            setDiagDetail(null);
+                          }}
+                          disabled={diagnosing}
+                        >
+                          Not quite right
+                        </button>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Fix stage */}
+                  {diagStage === 'fix' && diagSteps && (
+                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
+                      <p className="text-xs font-semibold text-base-content/50">Try these steps in order:</p>
+                      <ol className="list-decimal list-inside text-sm space-y-1">
+                        {diagSteps.map((s, i) => <li key={i}>{s}</li>)}
+                      </ol>
                     </div>
                   )}
                 </div>

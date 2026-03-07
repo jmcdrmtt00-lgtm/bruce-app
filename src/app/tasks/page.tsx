@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { AlertCircle, Clock } from 'lucide-react';
+import { formatDate } from '@/lib/formatDate';
 
 interface IssuesComment {
   timestamp: string;
@@ -25,11 +26,6 @@ const PRIORITY_CLASS: Record<string, string> = {
   Medium: 'badge-warning',
   Low:    'badge-info',
 };
-
-function formatDate(iso: string | null) {
-  if (!iso) return '';
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 function TaskCard({ task }: { task: DemoTask }) {
   const latestComment = task.issues_comments?.at(-1);

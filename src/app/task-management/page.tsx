@@ -4,7 +4,6 @@ import { useRef, useState } from 'react';
 import * as XLSX from 'xlsx';
 import { Upload, Download, FileSpreadsheet, CheckCircle } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { useAdminUser } from '@/libs/useAdminUser';
 
 // ── Column mapping ────────────────────────────────────────────────────────────
 
@@ -137,7 +136,6 @@ async function buildAndDownload() {
 // ── Component ─────────────────────────────────────────────────────────────────
 
 export default function TaskManagementPage() {
-  const isDemoUser = useAdminUser();
   const [downloading, setDownloading] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const [fileName, setFileName] = useState('');
@@ -145,14 +143,6 @@ export default function TaskManagementPage() {
   const [uploading, setUploading] = useState(false);
   const [uploadResult, setUploadResult] = useState<{ inserted: number } | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
-
-  if (!isDemoUser) {
-    return (
-      <main className="min-h-screen bg-base-200 flex items-center justify-center">
-        <p className="text-base-content/40">Not available for this account.</p>
-      </main>
-    );
-  }
 
   async function handleDownload() {
     setDownloading(true);
@@ -212,7 +202,7 @@ export default function TaskManagementPage() {
           <div className="card-body p-5 space-y-3">
             <h1 className="text-2xl font-bold">Download Tasks</h1>
             <p className="text-base-content/60 text-sm">
-              Export the current demo task database to Excel.
+              Export your current task list to Excel.
             </p>
             <button
               className="btn btn-success btn-sm w-fit"
@@ -233,7 +223,7 @@ export default function TaskManagementPage() {
           <div className="card-body p-5 space-y-4">
             <h2 className="text-xl font-bold">Upload Tasks</h2>
             <p className="text-base-content/60 text-sm">
-              Select an Excel (.xlsx) or CSV file. Replaces all existing demo tasks for this account.
+              Select an Excel (.xlsx) or CSV file. Replaces all existing tasks for your account.
             </p>
 
             <div

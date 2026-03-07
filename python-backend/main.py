@@ -132,11 +132,14 @@ class MatchProblemTypeRequest(BaseModel):
 
 class DiagnoseRequest(BaseModel):
     problem_type: str
+    stage: str = "symptoms"
     task_details: str | None = None
     information: str | None = None
     task_fields: dict | None = None
     conversation: list[dict] | None = None
     user_email: str | None = None
+    tool_call: dict | None = None
+    tool_result: str | None = None
 
 
 @app.post("/api/match-problem-type")
@@ -149,9 +152,12 @@ async def match_problem_type_ep(req: MatchProblemTypeRequest):
 async def diagnose_ep(req: DiagnoseRequest):
     return await ai_service.diagnose(
         req.problem_type,
+        req.stage,
         req.task_details,
         req.information,
         req.task_fields,
         req.conversation,
         req.user_email or "",
+        req.tool_call,
+        req.tool_result,
     )

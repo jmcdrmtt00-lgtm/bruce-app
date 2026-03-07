@@ -3,6 +3,7 @@
 import { useRef, useState, useEffect } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
 import toast from 'react-hot-toast';
+import { formatDate } from '@/lib/formatDate';
 
 interface AssetResult {
   id?: string;
@@ -21,11 +22,6 @@ interface AssetResult {
   site?: string;
   status?: string;
   [key: string]: unknown;
-}
-
-function formatDate(d?: string) {
-  if (!d) return '';
-  return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
 }
 
 export default function QueryInventoryPage() {

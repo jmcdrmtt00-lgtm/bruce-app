@@ -64,11 +64,6 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  // Only admin users can upload
-  if (user.user_metadata?.is_admin !== true) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-  }
-
   const { tasks } = await request.json() as { tasks: TaskRow[] };
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return NextResponse.json({ error: 'No tasks provided' }, { status: 400 });

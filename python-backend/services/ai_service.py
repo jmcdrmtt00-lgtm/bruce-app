@@ -26,7 +26,7 @@ async def summarize_incident(description: str, user_email: str = "") -> str:
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=30,
-        system="Generate a very short title (5-8 words) for this IT problem. Return only the title, nothing else.",
+        system=prompt_loader.get_summarize_prompt(),
         messages=[{"role": "user", "content": description}],
     )
     headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
@@ -120,27 +120,11 @@ async def advise_plan(question: str, in_progress_tasks: list[dict], user_email: 
     """Pass 1 — decide what data to look up, return rephrasing + optional SQL."""
     import json as _json
 
-    system = f"""You are IT Buddy, an IT advisor for an IT professional at Oriol Healthcare — \
-a nursing facility operator with three sites: Holden, Oakdale, and Business Office.
-
-Current in-progress tasks:
-{_tasks_text(in_progress_tasks)}
-
-Review the user's question. Return a JSON object with exactly these fields:
-- "rephrasing": one sentence starting with "You're asking..." confirming what you understood
-- "sql": a single SELECT query if database data would help you give a better answer, \
-otherwise null. Use {{user_id}} as a placeholder.
-- "lookup_description": a short phrase describing what you are looking up (e.g. \
-"warranty expiration dates for your computers"), or null if sql is null.
-
-Only generate SQL if it would let you give a meaningfully better answer. \
-For questions answerable from the in-progress tasks alone, set sql to null.
-
-You may query:
-{INCIDENTS_SCHEMA}
-{ASSETS_SCHEMA}
-
-Return only the JSON object with no markdown fences."""
+    system = (
+        prompt_loader.get_advise_plan_prompt()
+        .replace("{{in_progress_tasks}}", _tasks_text(in_progress_tasks))
+        .replace("{{schemas}}", f"{INCIDENTS_SCHEMA}\n{ASSETS_SCHEMA}")
+    )
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
@@ -179,15 +163,11 @@ async def advise_answer(
     elif lookup_description:
         data_section = f"\nYou tried to look up {lookup_description} but the query returned no results.\n"
 
-    system = f"""You are IT Buddy, an IT advisor for an IT professional at Oriol Healthcare — \
-a nursing facility operator with three sites: Holden, Oakdale, and Business Office.
-
-Current in-progress tasks:
-{_tasks_text(in_progress_tasks)}
-{data_section}
-Answer the user's question directly and helpfully. Be specific — reference task names, \
-equipment names, or data points from the lookup where relevant. \
-Plain text only, no markdown symbols."""
+    system = (
+        prompt_loader.get_advise_answer_prompt()
+        .replace("{{in_progress_tasks}}", _tasks_text(in_progress_tasks))
+        .replace("{{data_section}}", data_section)
+    )
 
     message = client.messages.create(
         model="claude-sonnet-4-6",
@@ -207,16 +187,11 @@ async def match_problem_type(description: str, problem_types: list[str], user_em
 
     types_text = "\n".join(f"- {pt}" for pt in problem_types)
 
+    system = prompt_loader.get_match_type_prompt().replace("{{problem_types}}", types_text)
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=256,
-        system=f"""You are an IT problem classifier. Match the user's description to one or more of these problem types:
-
-{types_text}
-
-Each entry is formatted as "id: Label". Return a JSON object with key "matches" containing a list of matching type IDs (the part before the colon).
-Return one ID if confident; up to 3 if genuinely ambiguous. Return an empty list if nothing matches.
-Return only the JSON object, no markdown fences.""",
+        system=system,
         messages=[{"role": "user", "content": description}],
     )
     headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
@@ -243,13 +218,36 @@ _PROBLEM_TYPE_LABELS = {
 }
 
 
+LOOKUP_ASSET_TOOL = {
+    "name": "lookup_asset",
+    "description": (
+        "Look up a device or asset in the IT inventory database by name or assigned user. "
+        "Returns purchase date, age, specs, and warranty info. Use this when knowing a device's "
+        "age or specs would meaningfully change your diagnosis."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "search_term": {
+                "type": "string",
+                "description": "Device name, assigned user, or location label (e.g. 'Activities PC', 'Activities', 'Dining Room printer')",
+            }
+        },
+        "required": ["search_term"],
+    },
+}
+
+
 async def diagnose(
     problem_type: str,
+    stage: str = "symptoms",
     task_details: str | None = None,
     information: str | None = None,
     task_fields: dict | None = None,
     conversation: list[dict] | None = None,
     user_email: str = "",
+    tool_call: dict | None = None,
+    tool_result: str | None = None,
 ) -> dict:
     """Diagnose an IT issue or extract onboarding structured data."""
     import json as _json
@@ -267,16 +265,7 @@ async def diagnose(
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=512,
-            system="""You extract new hire information from free-form text. Return ONLY a valid JSON object with exactly these fields:
-- firstName: string
-- lastName: string
-- role: one of [cna, lpn, rn, administrator, maintenance, housekeeping, dietary, laundry, social_worker, activity_director, business_office, it, medical_records, pt_ot]
-- site: one of [holden, oakdale, business_office]
-- startDate: YYYY-MM-DD string (or empty string if not mentioned)
-- nextAssetNumber: string (or empty string if not mentioned)
-- computerName: string (or empty string if not mentioned)
-- notes: string (any other info not captured above, or empty string)
-Return only the JSON object, no explanation, no markdown fences.""",
+            system=prompt_loader.get_onboarding_prompt(),
             messages=[{"role": "user", "content": context}],
         )
         headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
@@ -289,57 +278,129 @@ Return only the JSON object, no explanation, no markdown fences.""",
         except Exception:
             return {"structured_data": {}}
 
-    else:
-        # Build context string
-        context_parts = [f"Problem type: {label}"]
-        if task_fields:
-            tf_parts = [f"{k}: {v}" for k, v in task_fields.items() if v]
-            if tf_parts:
-                context_parts.append("Task: " + ", ".join(tf_parts))
-        if task_details:
-            context_parts.append(f"Questions/Details:\n{task_details}")
-        if information:
-            context_parts.append(f"Information gathered:\n{information}")
-        context_text = "\n\n".join(context_parts)
-
-        # Build message list: initial user request + conversation history
-        messages = [{"role": "user", "content": f"Please analyze this IT issue:\n\n{context_text}"}]
-        if conversation:
-            for turn in conversation:
-                role = turn.get("role", "user")
-                content = turn.get("content", turn.get("text", ""))
-                api_role = "assistant" if role == "ai" else "user"
-                messages.append({"role": api_role, "content": content})
-            # Last turn is the user's latest answer — Claude will respond
-
-        system = f"""You are IT Buddy, an expert IT advisor for Oriol Healthcare (nursing facility with three sites: Holden, Oakdale, Business Office).
-
-You are diagnosing an IT issue of type: {label}
-
-Return a JSON object with exactly these fields:
-- "response": your analysis or next diagnostic step (plain text, no markdown symbols)
-- "follow_up_questions": a list of specific questions you need answered to complete the diagnosis; use an empty list [] if you have enough information for a complete diagnosis
-
-Return only the JSON object, no markdown fences."""
-
+    elif stage == "fix":
+        # Call 3: given agreed cause, return fix steps
+        cause_text = information or task_details or "Unknown cause"
         message = client.messages.create(
             model="claude-sonnet-4-6",
-            max_tokens=2048,
-            system=system,
-            messages=messages,
+            max_tokens=1024,
+            system=prompt_loader.get_diagnose_fix_prompt(),
+            messages=[{"role": "user", "content": f"Cause: {cause_text}"}],
         )
         headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
         headlights_tracker.track_activity(user_email, sessions=1)
 
         text = message.content[0].text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
         try:
             result = _json.loads(text)
-            return {
-                "response": result.get("response", ""),
-                "follow_up_questions": result.get("follow_up_questions", []),
-            }
+            return {"steps": result.get("steps", [])}
         except Exception:
-            return {"response": text, "follow_up_questions": []}
+            return {"steps": [text]}
+
+    else:
+        # Calls 1 & 2: symptoms or follow-up loop — return {cause} or {questions}
+        # Build multi-turn message history
+        if conversation:
+            messages = []
+            for turn in conversation:
+                role = turn.get("role", "user")
+                if role == "tool_use":
+                    messages.append({"role": "assistant", "content": [
+                        {"type": "tool_use", "id": turn["tool_use_id"],
+                         "name": turn["name"], "input": turn["input"]}
+                    ]})
+                elif role == "tool_result":
+                    messages.append({"role": "user", "content": [
+                        {"type": "tool_result", "tool_use_id": turn["tool_use_id"],
+                         "content": turn["content"]}
+                    ]})
+                else:
+                    content = turn.get("content", turn.get("text", ""))
+                    messages.append({"role": "assistant" if role == "ai" else "user", "content": content})
+        else:
+            # information = what the user typed; task_details = UI label template (not useful to AI)
+            symptoms = (information or "").strip() or "No symptoms provided."
+            messages = [{"role": "user", "content": f"Symptoms: {symptoms}"}]
+
+        # Tool use: general tasks (all passes, so Claude retains access across follow-ups)
+        use_tools = (problem_type == "general" and tool_result is None)
+
+        if tool_call and tool_result is not None:
+            # Second pass: append tool use + result to message history, then get final diagnosis
+            messages = messages + [
+                {
+                    "role": "assistant",
+                    "content": [{"type": "tool_use", "id": tool_call["tool_use_id"],
+                                 "name": tool_call["name"], "input": tool_call["input"]}],
+                },
+                {
+                    "role": "user",
+                    "content": [{"type": "tool_result", "tool_use_id": tool_call["tool_use_id"],
+                                 "content": tool_result}],
+                },
+            ]
+            message = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=512,
+                system=prompt_loader.get_diagnose_prompt(),
+                messages=messages,
+            )
+        elif use_tools:
+            message = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=512,
+                system=prompt_loader.get_diagnose_prompt(),
+                messages=messages,
+                tools=[LOOKUP_ASSET_TOOL],
+            )
+            headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+            # If Claude wants to call a tool, return the tool call for Next.js to execute
+            if message.stop_reason == "tool_use":
+                tool_use_block = next(b for b in message.content if b.type == "tool_use")
+                return {
+                    "tool_call": {
+                        "name": tool_use_block.name,
+                        "input": tool_use_block.input,
+                        "tool_use_id": tool_use_block.id,
+                    }
+                }
+        else:
+            message = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=512,
+                system=prompt_loader.get_diagnose_prompt(),
+                messages=messages,
+            )
+
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text = message.content[0].text.strip()
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+        # Try parsing directly, then try extracting JSON from mixed text
+        parsed = None
+        try:
+            parsed = _json.loads(text)
+        except Exception:
+            import re as _re
+            m = _re.search(r'\{.*\}', text, _re.DOTALL)
+            if m:
+                try:
+                    parsed = _json.loads(m.group())
+                except Exception:
+                    pass
+        if parsed:
+            return {
+                "cause":     parsed.get("cause") or None,
+                "detail":    parsed.get("detail") or None,
+                "questions": parsed.get("questions") or None,
+            }
+        return {"cause": None, "detail": None, "questions": [text]}
 
 
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:
