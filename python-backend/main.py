@@ -138,6 +138,8 @@ class DiagnoseRequest(BaseModel):
     task_fields: dict | None = None
     conversation: list[dict] | None = None
     user_email: str | None = None
+    tool_call: dict | None = None
+    tool_result: str | None = None
 
 
 @app.post("/api/match-problem-type")
@@ -156,4 +158,6 @@ async def diagnose_ep(req: DiagnoseRequest):
         req.task_fields,
         req.conversation,
         req.user_email or "",
+        req.tool_call,
+        req.tool_result,
     )

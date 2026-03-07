@@ -218,6 +218,26 @@ _PROBLEM_TYPE_LABELS = {
 }
 
 
+LOOKUP_ASSET_TOOL = {
+    "name": "lookup_asset",
+    "description": (
+        "Look up a device or asset in the IT inventory database by name or assigned user. "
+        "Returns purchase date, age, specs, and warranty info. Use this when knowing a device's "
+        "age or specs would meaningfully change your diagnosis."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "search_term": {
+                "type": "string",
+                "description": "Device name, assigned user, or location label (e.g. 'Activities PC', 'Activities', 'Dining Room printer')",
+            }
+        },
+        "required": ["search_term"],
+    },
+}
+
+
 async def diagnose(
     problem_type: str,
     stage: str = "symptoms",
@@ -226,6 +246,8 @@ async def diagnose(
     task_fields: dict | None = None,
     conversation: list[dict] | None = None,
     user_email: str = "",
+    tool_call: dict | None = None,
+    tool_result: str | None = None,
 ) -> dict:
     """Diagnose an IT issue or extract onboarding structured data."""
     import json as _json
@@ -292,12 +314,56 @@ async def diagnose(
             symptoms = (information or "").strip() or "No symptoms provided."
             messages = [{"role": "user", "content": f"Symptoms: {symptoms}"}]
 
-        message = client.messages.create(
-            model="claude-sonnet-4-6",
-            max_tokens=512,
-            system=prompt_loader.get_diagnose_prompt(),
-            messages=messages,
-        )
+        # Tool use: general tasks on first pass only
+        use_tools = (problem_type == "general" and not conversation and tool_result is None)
+
+        if tool_call and tool_result is not None:
+            # Second pass: append tool use + result to message history, then get final diagnosis
+            messages = messages + [
+                {
+                    "role": "assistant",
+                    "content": [{"type": "tool_use", "id": tool_call["tool_use_id"],
+                                 "name": tool_call["name"], "input": tool_call["input"]}],
+                },
+                {
+                    "role": "user",
+                    "content": [{"type": "tool_result", "tool_use_id": tool_call["tool_use_id"],
+                                 "content": tool_result}],
+                },
+            ]
+            message = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=512,
+                system=prompt_loader.get_diagnose_prompt(),
+                messages=messages,
+            )
+        elif use_tools:
+            message = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=512,
+                system=prompt_loader.get_diagnose_prompt(),
+                messages=messages,
+                tools=[LOOKUP_ASSET_TOOL],
+            )
+            headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+            # If Claude wants to call a tool, return the tool call for Next.js to execute
+            if message.stop_reason == "tool_use":
+                tool_use_block = next(b for b in message.content if b.type == "tool_use")
+                return {
+                    "tool_call": {
+                        "name": tool_use_block.name,
+                        "input": tool_use_block.input,
+                        "tool_use_id": tool_use_block.id,
+                    }
+                }
+        else:
+            message = client.messages.create(
+                model="claude-sonnet-4-6",
+                max_tokens=512,
+                system=prompt_loader.get_diagnose_prompt(),
+                messages=messages,
+            )
+
         headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
         headlights_tracker.track_activity(user_email, sessions=1)
 
