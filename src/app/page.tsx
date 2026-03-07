@@ -1060,7 +1060,7 @@ export default function DashboardPage() {
                           onClick={handleConfirmCause}
                           disabled={diagnosing}
                         >
-                          {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Get steps to fix'}
+                          {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Steps to fix'}
                         </button>
                         <button
                           className="btn btn-outline btn-sm flex-1"
