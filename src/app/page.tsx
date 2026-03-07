@@ -495,12 +495,22 @@ export default function DashboardPage() {
     markDirty();
   }
 
+  function assetLabel(asset: UnassignedAsset, fallback: string): string {
+    const desc = [asset.make, asset.model].filter(Boolean).join(' ');
+    return desc || (asset.asset_number ? `Asset #${asset.asset_number}` : fallback);
+  }
+
   function groupByMakeModel(assets: UnassignedAsset[]): UnassignedAsset[] {
     if (assets.length === 0) return [];
-    const shuffled = [...assets].sort(() => Math.random() - 0.5);
-    const result: UnassignedAsset[] = [shuffled[0]];
-    const seen = new Set([`${shuffled[0].make ?? ''}|${shuffled[0].model ?? ''}`]);
-    for (const asset of shuffled.slice(1)) {
+    // Prefer assets with both make+model, then make-only, then neither
+    const tier = (a: UnassignedAsset) => (a.make && a.model ? 0 : a.make ? 1 : 2);
+    const sorted = [...assets].sort((a, b) => {
+      const t = tier(a) - tier(b);
+      return t !== 0 ? t : Math.random() - 0.5; // random within same tier
+    });
+    const result: UnassignedAsset[] = [sorted[0]];
+    const seen = new Set([`${sorted[0].make ?? ''}|${sorted[0].model ?? ''}`]);
+    for (const asset of sorted.slice(1)) {
       const key = `${asset.make ?? ''}|${asset.model ?? ''}`;
       if (!seen.has(key)) { seen.add(key); result.push(asset); }
     }
@@ -1105,10 +1115,10 @@ export default function DashboardPage() {
                               <>
                                 {/* Primary */}
                                 <div className="bg-base-100 rounded p-2 space-y-1">
-                                  <p className="text-sm font-medium">
-                                    {[proposals[0].make, proposals[0].model].filter(Boolean).join(' ') || label}
-                                    {proposals[0].asset_number ? ` — Asset #${proposals[0].asset_number}` : ''}
-                                  </p>
+                                  <p className="text-sm font-medium">{assetLabel(proposals[0], label)}</p>
+                                  {proposals[0].asset_number && (
+                                    <p className="text-xs text-base-content/50">Asset #{proposals[0].asset_number}</p>
+                                  )}
                                   {(proposals[0].os || proposals[0].ram) && (
                                     <p className="text-xs text-base-content/60">
                                       {[proposals[0].os, proposals[0].ram].filter(Boolean).join(' · ')}
@@ -1128,9 +1138,9 @@ export default function DashboardPage() {
                                     {proposals.slice(1).map(asset => (
                                       <div key={asset.id} className="flex items-center justify-between bg-base-100 rounded px-2 py-1">
                                         <span className="text-xs">
-                                          {[asset.make, asset.model].filter(Boolean).join(' ') || label}
-                                          {asset.asset_number ? ` #${asset.asset_number}` : ''}
-                                          {asset.ram ? ` · ${asset.ram}` : ''}
+                                          {assetLabel(asset, label)}
+                                          {asset.asset_number ? ` · #${asset.asset_number}` : ''}
+                                          {asset.ram && [asset.make, asset.model].filter(Boolean).length > 0 ? ` · ${asset.ram}` : ''}
                                         </span>
                                         <button
                                           className="btn btn-outline btn-xs"
