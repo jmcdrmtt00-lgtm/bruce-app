@@ -9,6 +9,23 @@ import { Incident } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
 
+interface UnassignedAsset {
+  id: string;
+  asset_number: string | null;
+  name: string | null;
+  make: string | null;
+  model: string | null;
+  os: string | null;
+  ram: string | null;
+  site: string;
+}
+
+const SITE_LABELS: Record<string, string> = {
+  holden:          'Holden',
+  oakdale:         'Oakdale',
+  business_office: 'Business Office',
+};
+
 const PRIORITY_BADGE: Record<string, string> = {
   high: 'badge-error',
   low:  'badge-success',
@@ -176,6 +193,9 @@ export default function DashboardPage() {
   const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
   const [diagConversation, setDiagConversation] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
   const [diagAnswer,       setDiagAnswer]       = useState('');
+  const [onboardingData,   setOnboardingData]   = useState<Record<string, string> | null>(null);
+  const [assetProposals,   setAssetProposals]   = useState<UnassignedAsset[]>([]);
+  const [assetApproved,    setAssetApproved]    = useState(false);
 
   // Autosave bookkeeping
   const panelDirtyRef     = useRef(false);
@@ -301,6 +321,9 @@ export default function DashboardPage() {
     setDiagSteps(null);
     setDiagConversation([]);
     setDiagAnswer('');
+    setOnboardingData(null);
+    setAssetProposals([]);
+    setAssetApproved(false);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
@@ -328,6 +351,9 @@ export default function DashboardPage() {
     setDiagSteps(null);
     setDiagConversation([]);
     setDiagAnswer('');
+    setOnboardingData(null);
+    setAssetProposals([]);
+    setAssetApproved(false);
     setSelectedTask(task);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
@@ -460,27 +486,31 @@ export default function DashboardPage() {
 
     setInfoRequired(`Information needed: ${pt.fields.join(', ')}`);
 
-    if (id === 'onboarding') {
-      fetch('/api/assets/download')
-        .then(r => r.json())
-        .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
-          const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
-          if (nums.length > 0) {
-            const next = String(Math.max(...nums) + 1).padStart(4, '0');
-            const updatedQ = pt.questions.map(q => q === 'Next asset #?' ? `Next asset #${next}?` : q);
-            setInfoRequired(`Information needed: ${updatedQ.join(', ')}`);
-          }
-        })
-        .catch(() => {});
-    }
-
     markDirty();
+  }
+
+  async function handleApproveAsset(asset: UnassignedAsset) {
+    if (!onboardingData) return;
+    const fullName = `${onboardingData.firstName ?? ''} ${onboardingData.lastName ?? ''}`.trim();
+    try {
+      const res = await fetch(`/api/assets/${asset.id}/assign`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assigned_to: fullName }),
+      });
+      if (!res.ok) throw new Error();
+      setAssetApproved(true);
+      setAssetProposals(prev => [asset, ...prev.filter(a => a.id !== asset.id)]);
+      toast.success('Computer assigned!');
+    } catch {
+      toast.error('Could not assign asset — try again.');
+    }
   }
 
   async function handleDiagnose() {
     if (!selectedType) return;
 
-    // Onboarding: use AI to extract structured data, then navigate to form
+    // Onboarding: use AI to extract structured data, then show asset proposal
     if (selectedType === 'onboarding') {
       if (!infoDone.trim() && !infoRequired.trim()) {
         router.push('/onboarding');
@@ -501,8 +531,22 @@ export default function DashboardPage() {
         const data = await res.json();
         if (data.structured_data !== undefined) {
           localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
-          router.push('/onboarding');
-          return;
+          setOnboardingData(data.structured_data);
+          setAssetApproved(false);
+
+          // Fetch unassigned computers at the new hire's site
+          const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
+          if (siteLabel) {
+            const assetsRes = await fetch(
+              `/api/assets/unassigned?site=${encodeURIComponent(siteLabel)}&category=Computer`
+            );
+            const assetsData = await assetsRes.json();
+            const shuffled = [...(assetsData.assets ?? [])].sort(() => Math.random() - 0.5);
+            setAssetProposals(shuffled);
+          } else {
+            setAssetProposals([]);
+          }
+          setDiagStage('cause');
         }
       } catch {
         toast.error('Could not get AI response — try again.');
@@ -1011,8 +1055,77 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Cause stage */}
-                  {diagStage === 'cause' && diagCause && (
+                  {/* Cause stage — onboarding: asset proposal */}
+                  {diagStage === 'cause' && selectedType === 'onboarding' && onboardingData && (
+                    <div className="rounded-box p-3 bg-primary/10 space-y-3">
+                      {assetProposals.length > 0 ? (
+                        <>
+                          <p className="text-xs font-semibold text-base-content/50">
+                            Proposed computer for {onboardingData.firstName}:
+                          </p>
+                          {assetApproved ? (
+                            <p className="text-sm text-success font-medium">
+                              ✓ Assigned to {onboardingData.firstName} {onboardingData.lastName}
+                              {assetProposals[0]?.asset_number ? ` — Asset #${assetProposals[0].asset_number}` : ''}
+                            </p>
+                          ) : (
+                            <>
+                              {/* Primary proposal */}
+                              <div className="bg-base-100 rounded p-2 space-y-1">
+                                <p className="text-sm font-medium">
+                                  {[assetProposals[0].make, assetProposals[0].model].filter(Boolean).join(' ') || 'Computer'}
+                                  {assetProposals[0].asset_number ? ` — Asset #${assetProposals[0].asset_number}` : ''}
+                                </p>
+                                <p className="text-xs text-base-content/60">
+                                  {[assetProposals[0].os, assetProposals[0].ram].filter(Boolean).join(' · ')}
+                                </p>
+                                <button
+                                  className="btn btn-primary btn-xs mt-1"
+                                  onClick={() => handleApproveAsset(assetProposals[0])}
+                                >
+                                  Approve
+                                </button>
+                              </div>
+                              {/* Alternatives */}
+                              {assetProposals.slice(1, 3).length > 0 && (
+                                <div className="space-y-1">
+                                  <p className="text-xs text-base-content/50">Alternatives:</p>
+                                  {assetProposals.slice(1, 3).map(asset => (
+                                    <div key={asset.id} className="flex items-center justify-between bg-base-100 rounded px-2 py-1">
+                                      <span className="text-xs">
+                                        {[asset.make, asset.model].filter(Boolean).join(' ') || 'Computer'}
+                                        {asset.asset_number ? ` #${asset.asset_number}` : ''}
+                                        {asset.ram ? ` · ${asset.ram}` : ''}
+                                      </span>
+                                      <button
+                                        className="btn btn-outline btn-xs"
+                                        onClick={() => handleApproveAsset(asset)}
+                                      >
+                                        Use this
+                                      </button>
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-base-content/60">
+                          No unassigned computers found at {SITE_LABELS[onboardingData.site ?? ''] ?? onboardingData.site}.
+                        </p>
+                      )}
+                      <button
+                        className="btn btn-primary btn-sm w-full"
+                        onClick={() => router.push('/onboarding')}
+                      >
+                        Open checklist →
+                      </button>
+                    </div>
+                  )}
+
+                  {/* Cause stage — general: diagnosis result */}
+                  {diagStage === 'cause' && selectedType !== 'onboarding' && diagCause && (
                     <div className="rounded-box p-3 bg-primary/10 space-y-2">
                       <p className="text-sm font-medium">{diagCause}</p>
                       <div>
