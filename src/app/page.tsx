@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ExternalLink, Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
-import { PROBLEM_TYPES, QUICK_TASK_TYPES } from '@/data/problemTypes';
+import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -20,9 +20,9 @@ const PRIORITY_LABEL: Record<string, string> = {
 
 function normalizeScreenToTypeId(screen: string): string {
   if (!screen) return '';
-  if (PROBLEM_TYPES[screen]) return screen;
+  if (TASK_TYPES[screen]) return screen;
   const lower = screen.toLowerCase().replace(/[\s-]/g, '_');
-  if (PROBLEM_TYPES[lower]) return lower;
+  if (TASK_TYPES[lower]) return lower;
   return '';
 }
 
@@ -332,9 +332,9 @@ export default function DashboardPage() {
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
 
-    // Set infoRequired from type questions immediately
-    if (typeId && PROBLEM_TYPES[typeId]) {
-      setInfoRequired(`Information needed: ${PROBLEM_TYPES[typeId].questions.join(', ')}`);
+    // Set infoRequired from type fields immediately
+    if (typeId && TASK_TYPES[typeId]) {
+      setInfoRequired(`Information needed: ${TASK_TYPES[typeId].fields.join(', ')}`);
     } else {
       setInfoRequired('');
     }
@@ -355,23 +355,6 @@ export default function DashboardPage() {
           savedDetailsRef.current = details;
         }
 
-        // For onboarding without saved details, refine with actual asset number
-        if (typeId === 'onboarding' && !details) {
-          fetch('/api/assets/download')
-            .then(r => r.json())
-            .then(({ assets }: { assets: { asset_number: string | null }[] }) => {
-              const nums = (assets ?? []).map(a => parseInt(a.asset_number ?? '')).filter(n => !isNaN(n));
-              if (nums.length > 0) {
-                const next = String(Math.max(...nums) + 1).padStart(4, '0');
-                const pt = PROBLEM_TYPES['onboarding'];
-                if (pt) {
-                  const updatedQ = pt.questions.map(q => q === 'Next asset #?' ? `Next asset #${next}?` : q);
-                  setInfoRequired(`Information needed: ${updatedQ.join(', ')}`);
-                }
-              }
-            })
-            .catch(() => {});
-        }
       })
       .catch(() => {});
   }
@@ -472,10 +455,10 @@ export default function DashboardPage() {
 
   function selectProblemType(id: string) {
     setSelectedType(id);
-    const pt = PROBLEM_TYPES[id];
+    const pt = TASK_TYPES[id];
     if (!pt) return;
 
-    setInfoRequired(`Information needed: ${pt.questions.join(', ')}`);
+    setInfoRequired(`Information needed: ${pt.fields.join(', ')}`);
 
     if (id === 'onboarding') {
       fetch('/api/assets/download')
