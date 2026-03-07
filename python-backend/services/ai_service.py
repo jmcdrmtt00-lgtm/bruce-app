@@ -307,8 +307,19 @@ async def diagnose(
             messages = []
             for turn in conversation:
                 role = turn.get("role", "user")
-                content = turn.get("content", turn.get("text", ""))
-                messages.append({"role": "assistant" if role == "ai" else "user", "content": content})
+                if role == "tool_use":
+                    messages.append({"role": "assistant", "content": [
+                        {"type": "tool_use", "id": turn["tool_use_id"],
+                         "name": turn["name"], "input": turn["input"]}
+                    ]})
+                elif role == "tool_result":
+                    messages.append({"role": "user", "content": [
+                        {"type": "tool_result", "tool_use_id": turn["tool_use_id"],
+                         "content": turn["content"]}
+                    ]})
+                else:
+                    content = turn.get("content", turn.get("text", ""))
+                    messages.append({"role": "assistant" if role == "ai" else "user", "content": content})
         else:
             # information = what the user typed; task_details = UI label template (not useful to AI)
             symptoms = (information or "").strip() or "No symptoms provided."
@@ -371,15 +382,25 @@ async def diagnose(
         if text.startswith("```"):
             lines = text.splitlines()
             text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+        # Try parsing directly, then try extracting JSON from mixed text
+        parsed = None
         try:
-            result = _json.loads(text)
-            return {
-                "cause":     result.get("cause") or None,
-                "detail":    result.get("detail") or None,
-                "questions": result.get("questions") or None,
-            }
+            parsed = _json.loads(text)
         except Exception:
-            return {"cause": None, "detail": None, "questions": [text]}
+            import re as _re
+            m = _re.search(r'\{.*\}', text, _re.DOTALL)
+            if m:
+                try:
+                    parsed = _json.loads(m.group())
+                except Exception:
+                    pass
+        if parsed:
+            return {
+                "cause":     parsed.get("cause") or None,
+                "detail":    parsed.get("detail") or None,
+                "questions": parsed.get("questions") or None,
+            }
+        return {"cause": None, "detail": None, "questions": [text]}
 
 
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:

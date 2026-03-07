@@ -191,7 +191,7 @@ export default function DashboardPage() {
   const [diagDetailOpen,   setDiagDetailOpen]   = useState(false);
   const [diagQuestions,    setDiagQuestions]    = useState<string[] | null>(null);
   const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
-  const [diagConversation, setDiagConversation] = useState<{ role: 'user' | 'ai'; content: string }[]>([]);
+  const [diagConversation, setDiagConversation] = useState<Record<string, unknown>[]>([]);
   const [diagAnswer,       setDiagAnswer]       = useState('');
   const [attachOpen,        setAttachOpen]        = useState(false);
   const [attachedFile,      setAttachedFile]      = useState<File | null>(null);
@@ -636,9 +636,15 @@ export default function DashboardPage() {
       const symptoms = [infoRequired, infoDone].filter(Boolean).join('\n') || 'No symptoms provided.';
       const userTurn = { role: 'user' as const, content: `Symptoms: ${symptoms}` };
 
+      // If tool use happened, prepend those turns so follow-up passes have full context
+      const toolTurns = data._tool_context ? [
+        { role: 'tool_use'    as const, tool_use_id: data._tool_context.tool_call.tool_use_id, name: data._tool_context.tool_call.name, input: data._tool_context.tool_call.input },
+        { role: 'tool_result' as const, tool_use_id: data._tool_context.tool_call.tool_use_id, content: data._tool_context.tool_result },
+      ] : [];
+
       if (data.cause) {
         const aiTurn = { role: 'ai' as const, content: data.cause };
-        setDiagConversation([userTurn, aiTurn]);
+        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
         setDiagCause(data.cause);
         setDiagDetail(data.detail ?? null);
         setDiagDetailOpen(false);
@@ -646,7 +652,7 @@ export default function DashboardPage() {
         await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
       } else if (data.questions?.length) {
         const aiTurn = { role: 'ai' as const, content: data.questions.join('\n') };
-        setDiagConversation([userTurn, aiTurn]);
+        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
         setDiagQuestions(data.questions);
         setDiagStage('questions');
         setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));

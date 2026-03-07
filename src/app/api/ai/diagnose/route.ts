@@ -137,7 +137,11 @@ export async function POST(request: NextRequest) {
       }),
     });
     const data2 = await response2.json();
-    return NextResponse.json(data2, { status: response2.status });
+    // Return tool context so frontend can include it in future conversation turns
+    return NextResponse.json(
+      { ...data2, _tool_context: { tool_call: data.tool_call, tool_result: toolResult } },
+      { status: response2.status }
+    );
   }
 
   return NextResponse.json(data, { status: response.status });
