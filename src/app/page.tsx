@@ -889,25 +889,36 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Priority + Date Due (two-column row) */}
-              <div className="grid grid-cols-2 gap-3">
+              {/* Priority + Status + Date Due (three-column row) */}
+              <div className="grid grid-cols-3 gap-3">
                 <div className="form-control">
                   <label className="label py-0">
                     <span className="label-text text-xs font-semibold">Priority</span>
                   </label>
-                  <div className="flex gap-1">
-                    {(['high', 'low'] as const).map(p => (
-                      <button
-                        key={p}
-                        className={`btn btn-xs flex-1 capitalize ${priority === p
-                          ? p === 'high' ? 'btn-error' : 'btn-success'
-                          : 'btn-outline'}`}
-                        onClick={() => { setPriority(prev => prev === p ? '' : p); markDirty(); }}
-                      >
-                        {p}
-                      </button>
-                    ))}
-                  </div>
+                  <select
+                    className="select select-bordered select-sm text-sm w-full"
+                    value={priority}
+                    onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }}
+                  >
+                    <option value="">—</option>
+                    <option value="high">High</option>
+                    <option value="low">Low</option>
+                  </select>
+                </div>
+
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Status</span>
+                  </label>
+                  <select
+                    className="select select-bordered select-sm text-sm w-full"
+                    value={status}
+                    onChange={e => { setStatus(e.target.value as 'pending' | 'in_progress' | 'resolved'); markDirty(); }}
+                  >
+                    <option value="pending">Queue</option>
+                    <option value="in_progress">In Progress</option>
+                    <option value="resolved">Complete</option>
+                  </select>
                 </div>
 
                 <div className="form-control">
@@ -937,33 +948,6 @@ export default function DashboardPage() {
                       }
                     />
                   </div>
-                </div>
-              </div>
-
-              {/* Status */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Status</span>
-                </label>
-                <div className="flex gap-1">
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'pending' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => { setStatus('pending'); markDirty(); }}
-                  >
-                    Queue
-                  </button>
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
-                    onClick={() => { setStatus('in_progress'); markDirty(); }}
-                  >
-                    In&nbsp;Progress
-                  </button>
-                  <button
-                    className={`btn btn-xs flex-1 ${status === 'resolved' ? 'btn-success' : 'btn-outline'}`}
-                    onClick={() => { setStatus('resolved'); markDirty(); }}
-                  >
-                    Complete
-                  </button>
                 </div>
               </div>
 
