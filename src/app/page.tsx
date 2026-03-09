@@ -1030,24 +1030,6 @@ export default function DashboardPage() {
                 </div>
                 {/* Ask the AI + attach file */}
                 <div className="mt-2 space-y-2">
-                  <div className="flex gap-2 items-center">
-                    <button
-                      className="btn btn-primary btn-sm flex-1"
-                      onClick={handleDiagnose}
-                      disabled={diagnosing}
-                    >
-                      {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                      {diagnosing ? 'Thinking…' : 'Ask the AI'}
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm text-base-content/40 hover:text-base-content"
-                      title="Attach a file"
-                      onClick={() => setAttachOpen(o => !o)}
-                      type="button"
-                    >
-                      📎
-                    </button>
-                  </div>
                   {attachOpen && (
                     <div className="rounded-box border border-base-300 p-2 space-y-1">
                       <p className="text-xs text-base-content/50">Attach a file (image, text, PDF)</p>
@@ -1069,6 +1051,24 @@ export default function DashboardPage() {
                       )}
                     </div>
                   )}
+                  <div className="flex gap-2 items-center">
+                    <button
+                      className="btn btn-primary btn-sm flex-1"
+                      onClick={handleDiagnose}
+                      disabled={diagnosing}
+                    >
+                      {diagnosing && <span className="loading loading-spinner loading-xs" />}
+                      {diagnosing ? 'Thinking…' : 'Ask the AI'}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm text-base-content/40 hover:text-base-content"
+                      title="Attach a file"
+                      onClick={() => setAttachOpen(o => !o)}
+                      type="button"
+                    >
+                      📎
+                    </button>
+                  </div>
                 </div>
               </div>
 
