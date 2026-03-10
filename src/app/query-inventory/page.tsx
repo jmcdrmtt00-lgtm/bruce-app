@@ -148,6 +148,30 @@ export default function QueryInventoryPage() {
   const [extraFields, setExtraFields]     = useState<FieldDef[]>([]);
   const [showMoreCols, setShowMoreCols]   = useState(false);
 
+  // Silently discover extra fields whenever the asset type is visible
+  useEffect(() => {
+    if (mode !== 'table') return;
+    let cancelled = false;
+    fetch('/api/assets/download')
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled || !data.assets) return;
+        const filtered = (data.assets as AssetResult[]).filter((a: AssetResult) => a.category === tableCategory);
+        const seen = new Set<string>();
+        const extras: FieldDef[] = [];
+        for (const row of filtered) {
+          if (row.extra && typeof row.extra === 'object') {
+            for (const k of Object.keys(row.extra as Record<string, unknown>)) {
+              if (!seen.has(k)) { seen.add(k); extras.push({ key: `extra.${k}`, label: toLabel(k) }); }
+            }
+          }
+        }
+        setExtraFields(extras);
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+  }, [mode, tableCategory]);
+
   function toggleCol(key: string, checked: boolean) {
     setSelectedCols(prev => {
       const next = new Set(prev);
@@ -192,7 +216,7 @@ export default function QueryInventoryPage() {
 
   // All available fields = standard + any extra fields discovered after Populate
   const allAvailableFields = [...ALL_FIELDS, ...extraFields];
-  const needsMore      = allAvailableFields.length >= 15;
+  const needsMore      = allAvailableFields.length > 15;
   const primaryFields  = needsMore ? allAvailableFields.slice(0, 14) : allAvailableFields;
   const moreFields     = needsMore ? allAvailableFields.slice(14)    : [];
   const activeCols     = allAvailableFields.filter(f => selectedCols.has(f.key));
