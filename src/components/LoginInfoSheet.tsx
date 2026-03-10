@@ -4,6 +4,7 @@ import { GeneratedOutput } from '@/types';
 import { ROLES, SYSTEM_LABELS } from '@/data/roles';
 import { SITES } from '@/data/sites';
 import { COMPANY_NAME, EMAIL_DOMAIN, TEMP_PASSWORD } from '@/data/customerConfig';
+import { formatDate } from '@/lib/formatDate';
 
 interface Props {
   output: GeneratedOutput;
@@ -63,7 +64,7 @@ export default function LoginInfoSheet({ output }: Props) {
             <span className="badge badge-primary">{role.label}</span>
             <span className="badge badge-ghost">{site.label}</span>
             {hire.startDate && (
-              <span className="badge badge-ghost">Start: {hire.startDate}</span>
+              <span className="badge badge-ghost">Start: {formatDate(hire.startDate)}</span>
             )}
           </div>
         </div>
