@@ -515,11 +515,13 @@ export default function DashboardPage() {
       if (!makeMap.has(make)) makeMap.set(make, []);
       makeMap.get(make)!.push(asset);
     }
-    return Array.from(makeMap.entries()).map(([make, units]) => ({
-      make,
-      available: units.filter(u => !u.assigned_to),
-      expanded: false,
-    }));
+    return Array.from(makeMap.entries())
+      .map(([make, units]) => ({
+        make,
+        available: units.filter(u => !u.assigned_to),
+        expanded: false,
+      }))
+      .sort((a, b) => a.make.localeCompare(b.make));
   }
 
   function pickProposed(groups: AssetGroup[]): string {
