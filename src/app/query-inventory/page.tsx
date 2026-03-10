@@ -192,7 +192,7 @@ export default function QueryInventoryPage() {
 
   // All available fields = standard + any extra fields discovered after Populate
   const allAvailableFields = [...ALL_FIELDS, ...extraFields];
-  const needsMore      = allAvailableFields.length > 15;
+  const needsMore      = allAvailableFields.length >= 15;
   const primaryFields  = needsMore ? allAvailableFields.slice(0, 14) : allAvailableFields;
   const moreFields     = needsMore ? allAvailableFields.slice(14)    : [];
   const activeCols     = allAvailableFields.filter(f => selectedCols.has(f.key));
