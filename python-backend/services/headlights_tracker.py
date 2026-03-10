@@ -92,6 +92,27 @@ def _update(
             with urllib.request.urlopen(req, timeout=5) as _:
                 pass
 
+        # Insert per-event rows for time-window queries
+        events = []
+        if sessions:
+            events.append({"app_id": "bruce", "email": user_email, "event_type": "session", "count": sessions})
+        if uploads:
+            events.append({"app_id": "bruce", "email": user_email, "event_type": "upload",  "count": uploads})
+        if clicks:
+            events.append({"app_id": "bruce", "email": user_email, "event_type": "click",   "count": clicks})
+        if input_tokens or output_tokens:
+            events.append({"app_id": "bruce", "email": user_email, "event_type": "tokens",
+                           "count": 1, "input_tokens": input_tokens, "output_tokens": output_tokens})
+        for evt in events:
+            req = urllib.request.Request(
+                f"{url}/rest/v1/user_activity_events",
+                data=json.dumps(evt).encode(),
+                headers={**_headers(key), "Prefer": "return=minimal"},
+                method="POST",
+            )
+            with urllib.request.urlopen(req, timeout=5) as _:
+                pass
+
     except Exception as e:
         print(f"[headlights_tracker] Failed to update: {e}")
 
