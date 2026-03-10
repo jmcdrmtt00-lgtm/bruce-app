@@ -347,8 +347,8 @@ export default function DashboardPage() {
 
     // Normalize screen → problem type ID, default to 'general'
     const rawScreen = task.screen || '';
-    const typeId = normalizeScreenToTypeId(rawScreen);
-    setSelectedType(typeId || 'general');
+    const typeId = normalizeScreenToTypeId(rawScreen) || 'general';
+    setSelectedType(typeId);
 
     setInfoDone('');
     setIssues('');
@@ -369,11 +369,9 @@ export default function DashboardPage() {
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
 
     // Set infoRequired from type fields immediately
-    if (typeId && TASK_TYPES[typeId]) {
-      setInfoRequired(`Information needed: ${TASK_TYPES[typeId].fields.join(', ')}`);
-    } else {
-      setInfoRequired('');
-    }
+    setInfoRequired(TASK_TYPES[typeId]
+      ? `Information needed: ${TASK_TYPES[typeId].fields.join(', ')}`
+      : '');
 
     // Load updates
     fetch(`/api/issues/${task.id}/updates`)
