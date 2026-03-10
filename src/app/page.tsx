@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ExternalLink, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
@@ -1318,14 +1317,8 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* View details link + delete */}
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/issues/${selectedTask.id}`}
-                  className="btn btn-ghost btn-xs gap-1 flex-1"
-                >
-                  <ExternalLink className="w-3 h-3" /> View full details
-                </Link>
+              {/* Delete */}
+              <div className="flex justify-end">
                 <button
                   className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
                   onClick={handleDelete}
