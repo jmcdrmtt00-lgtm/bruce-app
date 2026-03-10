@@ -1134,14 +1134,11 @@ export default function DashboardPage() {
                       {(['Computer', 'Phone', 'iPad'] as const).map(cat => {
                         const catState = cat === 'Computer' ? computer : cat === 'Phone' ? phone : ipad;
                         const setCat   = cat === 'Computer' ? setComputer : cat === 'Phone' ? setPhone : setIpad;
-                        const { groups, approved, proposed, newMake, ownsThis } = catState;
+                        const { groups, approved, newMake, ownsThis } = catState;
+                        const visibleGroups = groups.filter(g => g.make !== '(Unknown)');
                         return (
                           <div key={cat} className="space-y-1">
-                            {/* Proposed line */}
-                            <p className="text-xs font-semibold text-base-content/50">
-                              Proposed {cat.toLowerCase()}:{' '}
-                              <span className="text-base-content">{proposed || '—'}</span>
-                            </p>
+                            <p className="text-xs font-semibold text-base-content/50">{cat}</p>
 
                             {approved ? (
                               <p className="text-sm text-success">
@@ -1151,7 +1148,7 @@ export default function DashboardPage() {
                             ) : (
                               <>
                                 {/* One row per make */}
-                                {groups.map(group => {
+                                {visibleGroups.map(group => {
                                   const { make, available, expanded } = group;
                                   const hasAvail = available.length > 0;
                                   const first    = available[0];
@@ -1191,7 +1188,7 @@ export default function DashboardPage() {
                                                 ...prev,
                                                 groups: prev.groups.map(g => g.make === make ? { ...g, expanded: !g.expanded } : g),
                                               }))}
-                                            >{expanded ? 'Hide' : 'Show these'}</button>
+                                            >{expanded ? 'Hide' : `Show these (${available.length})`}</button>
                                           )
                                         ) : (
                                           <button
