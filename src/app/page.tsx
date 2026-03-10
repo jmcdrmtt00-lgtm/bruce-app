@@ -2,8 +2,7 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
-import { ExternalLink, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
@@ -18,7 +17,25 @@ interface UnassignedAsset {
   os: string | null;
   ram: string | null;
   site: string;
+  assigned_to?: string | null;
 }
+
+interface AssetGroup {
+  make: string;
+  available: UnassignedAsset[];  // unassigned units of this make
+  expanded: boolean;
+}
+
+interface CategoryState {
+  groups:   AssetGroup[];
+  approved: UnassignedAsset | null;
+  proposed: string;   // make name randomly chosen as the proposal
+  newMake:  string;   // "Buy this" free-text input
+  ownsThis: string;   // "Onboard owns this" free-text input
+}
+
+const emptyCat = (): CategoryState =>
+  ({ groups: [], approved: null, proposed: '', newMake: '', ownsThis: '' });
 
 const SITE_LABELS: Record<string, string> = {
   holden:          'Holden',
@@ -195,13 +212,10 @@ export default function DashboardPage() {
   const [diagAnswer,       setDiagAnswer]       = useState('');
   const [attachOpen,        setAttachOpen]        = useState(false);
   const [attachedFile,      setAttachedFile]      = useState<File | null>(null);
-  const [onboardingData,    setOnboardingData]    = useState<Record<string, string> | null>(null);
-  const [computerProposals, setComputerProposals] = useState<UnassignedAsset[]>([]);
-  const [computerApproved,  setComputerApproved]  = useState<UnassignedAsset | null>(null);
-  const [phoneProposals,    setPhoneProposals]    = useState<UnassignedAsset[]>([]);
-  const [phoneApproved,     setPhoneApproved]     = useState<UnassignedAsset | null>(null);
-  const [ipadProposals,     setIpadProposals]     = useState<UnassignedAsset[]>([]);
-  const [ipadApproved,      setIpadApproved]      = useState<UnassignedAsset | null>(null);
+  const [onboardingData, setOnboardingData] = useState<Record<string, string> | null>(null);
+  const [computer, setComputer] = useState<CategoryState>(emptyCat());
+  const [phone,    setPhone]    = useState<CategoryState>(emptyCat());
+  const [ipad,     setIpad]     = useState<CategoryState>(emptyCat());
 
   // Autosave bookkeeping
   const panelDirtyRef     = useRef(false);
@@ -330,9 +344,7 @@ export default function DashboardPage() {
     setAttachOpen(false);
     setAttachedFile(null);
     setOnboardingData(null);
-    setComputerProposals([]); setComputerApproved(null);
-    setPhoneProposals([]);    setPhoneApproved(null);
-    setIpadProposals([]);     setIpadApproved(null);
+    setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
@@ -347,8 +359,8 @@ export default function DashboardPage() {
 
     // Normalize screen → problem type ID, default to 'general'
     const rawScreen = task.screen || '';
-    const typeId = normalizeScreenToTypeId(rawScreen);
-    setSelectedType(typeId || 'general');
+    const typeId = normalizeScreenToTypeId(rawScreen) || 'general';
+    setSelectedType(typeId);
 
     setInfoDone('');
     setIssues('');
@@ -361,19 +373,15 @@ export default function DashboardPage() {
     setDiagConversation([]);
     setDiagAnswer('');
     setOnboardingData(null);
-    setComputerProposals([]); setComputerApproved(null);
-    setPhoneProposals([]);    setPhoneApproved(null);
-    setIpadProposals([]);     setIpadApproved(null);
+    setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
     setSelectedTask(task);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
 
     // Set infoRequired from type fields immediately
-    if (typeId && TASK_TYPES[typeId]) {
-      setInfoRequired(`Information needed: ${TASK_TYPES[typeId].fields.join(', ')}`);
-    } else {
-      setInfoRequired('');
-    }
+    setInfoRequired(TASK_TYPES[typeId]
+      ? `Information needed: ${TASK_TYPES[typeId].fields.join(', ')}`
+      : '');
 
     // Load updates
     fetch(`/api/issues/${task.id}/updates`)
@@ -499,40 +507,27 @@ export default function DashboardPage() {
     markDirty();
   }
 
-  function assetLabel(asset: UnassignedAsset, fallback: string): string {
-    const desc = [asset.make, asset.model].filter(Boolean).join(' ');
-    return desc || (asset.asset_number ? `Asset #${asset.asset_number}` : fallback);
-  }
-
-  function assetSummary(asset: UnassignedAsset, fallback: string): string {
-    const parts = [assetLabel(asset, fallback)];
-    if (asset.os)           parts.push(`OS: ${asset.os}`);
-    if (asset.ram)          parts.push(`Memory: ${asset.ram}`);
-    if (asset.asset_number) parts.push(`Asset# ${asset.asset_number}`);
-    return parts.join(', ');
-  }
-
-  function groupByMakeModel(assets: UnassignedAsset[]): UnassignedAsset[] {
-    if (assets.length === 0) return [];
-    // Prefer assets with both make+model, then make-only, then neither
-    const tier = (a: UnassignedAsset) => (a.make && a.model ? 0 : a.make ? 1 : 2);
-    const sorted = [...assets].sort((a, b) => {
-      const t = tier(a) - tier(b);
-      return t !== 0 ? t : Math.random() - 0.5; // random within same tier
-    });
-    const result: UnassignedAsset[] = [sorted[0]];
-    const seenKeys    = new Set([`${sorted[0].make ?? ''}|${sorted[0].model ?? ''}`]);
-    const makesWithModel = new Set(sorted[0].make && sorted[0].model ? [sorted[0].make] : []);
-    for (const asset of sorted.slice(1)) {
-      const key = `${asset.make ?? ''}|${asset.model ?? ''}`;
-      if (seenKeys.has(key)) continue;
-      // Skip make-only assets when that make already appears with a model
-      if (asset.make && !asset.model && makesWithModel.has(asset.make)) continue;
-      seenKeys.add(key);
-      if (asset.make && asset.model) makesWithModel.add(asset.make);
-      result.push(asset);
+  function buildAssetGroups(assets: UnassignedAsset[]): AssetGroup[] {
+    const makeMap = new Map<string, UnassignedAsset[]>();
+    for (const asset of assets) {
+      const make = asset.make || '(Unknown)';
+      if (!makeMap.has(make)) makeMap.set(make, []);
+      makeMap.get(make)!.push(asset);
     }
-    return result;
+    return Array.from(makeMap.entries())
+      .map(([make, units]) => ({
+        make,
+        available: units.filter(u => !u.assigned_to),
+        expanded: false,
+      }))
+      .sort((a, b) => a.make.localeCompare(b.make));
+  }
+
+  function pickProposed(groups: AssetGroup[]): string {
+    const pool = groups.filter(g => g.available.length > 0);
+    const src  = pool.length > 0 ? pool : groups;
+    if (src.length === 0) return '';
+    return src[Math.floor(Math.random() * src.length)].make;
   }
 
   async function handleApproveAsset(
@@ -548,9 +543,8 @@ export default function DashboardPage() {
         body: JSON.stringify({ assigned_to: fullName }),
       });
       if (!res.ok) throw new Error();
-      if (category === 'Computer') setComputerApproved(asset);
-      else if (category === 'Phone') setPhoneApproved(asset);
-      else if (category === 'iPad')  setIpadApproved(asset);
+      const setter = category === 'Computer' ? setComputer : category === 'Phone' ? setPhone : setIpad;
+      setter(prev => ({ ...prev, approved: asset }));
       toast.success(`${category} assigned to ${fullName}!`);
     } catch {
       toast.error('Could not assign asset — try again.');
@@ -582,24 +576,25 @@ export default function DashboardPage() {
         if (data.structured_data !== undefined) {
           localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
           setOnboardingData(data.structured_data);
-          setComputerApproved(null); setPhoneApproved(null); setIpadApproved(null);
+          setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
 
-          // Fetch unassigned Computer, Phone, iPad at the new hire's site in parallel
+          // Fetch ALL (assigned + unassigned) assets at the new hire's site in parallel
           const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
           if (siteLabel) {
             const [compRes, phoneRes, ipadRes] = await Promise.all([
-              fetch(`/api/assets/unassigned?site=${encodeURIComponent(siteLabel)}&category=Computer`),
-              fetch(`/api/assets/unassigned?site=${encodeURIComponent(siteLabel)}&category=Phone`),
-              fetch(`/api/assets/unassigned?site=${encodeURIComponent(siteLabel)}&category=iPad`),
+              fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
+              fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
+              fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
             ]);
             const [compData, phoneData, ipadData] = await Promise.all([
               compRes.json(), phoneRes.json(), ipadRes.json(),
             ]);
-            setComputerProposals(groupByMakeModel(compData.assets ?? []));
-            setPhoneProposals(groupByMakeModel(phoneData.assets ?? []));
-            setIpadProposals(groupByMakeModel(ipadData.assets ?? []));
-          } else {
-            setComputerProposals([]); setPhoneProposals([]); setIpadProposals([]);
+            const compGroups  = buildAssetGroups(compData.assets ?? []);
+            const phoneGroups = buildAssetGroups(phoneData.assets ?? []);
+            const ipadGroups  = buildAssetGroups(ipadData.assets ?? []);
+            setComputer(prev => ({ ...prev, groups: compGroups,  proposed: pickProposed(compGroups)  }));
+            setPhone   (prev => ({ ...prev, groups: phoneGroups, proposed: pickProposed(phoneGroups) }));
+            setIpad    (prev => ({ ...prev, groups: ipadGroups,  proposed: pickProposed(ipadGroups)  }));
           }
           setDiagStage('cause');
         }
@@ -1030,24 +1025,6 @@ export default function DashboardPage() {
                 </div>
                 {/* Ask the AI + attach file */}
                 <div className="mt-2 space-y-2">
-                  <div className="flex gap-2 items-center">
-                    <button
-                      className="btn btn-primary btn-sm flex-1"
-                      onClick={handleDiagnose}
-                      disabled={diagnosing}
-                    >
-                      {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                      {diagnosing ? 'Thinking…' : 'Ask the AI'}
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm text-base-content/40 hover:text-base-content"
-                      title="Attach a file"
-                      onClick={() => setAttachOpen(o => !o)}
-                      type="button"
-                    >
-                      📎
-                    </button>
-                  </div>
                   {attachOpen && (
                     <div className="rounded-box border border-base-300 p-2 space-y-1">
                       <p className="text-xs text-base-content/50">Attach a file (image, text, PDF)</p>
@@ -1069,6 +1046,24 @@ export default function DashboardPage() {
                       )}
                     </div>
                   )}
+                  <div className="flex gap-2 items-center">
+                    <button
+                      className="btn btn-primary btn-sm flex-1"
+                      onClick={handleDiagnose}
+                      disabled={diagnosing}
+                    >
+                      {diagnosing && <span className="loading loading-spinner loading-xs" />}
+                      {diagnosing ? 'Thinking…' : 'Ask the AI'}
+                    </button>
+                    <button
+                      className="btn btn-ghost btn-sm text-base-content/40 hover:text-base-content"
+                      title="Attach a file"
+                      onClick={() => setAttachOpen(o => !o)}
+                      type="button"
+                    >
+                      📎
+                    </button>
+                  </div>
                 </div>
               </div>
 
@@ -1137,50 +1132,124 @@ export default function DashboardPage() {
                   {diagStage === 'cause' && selectedType === 'onboarding' && onboardingData && (
                     <div className="rounded-box p-3 bg-primary/10 space-y-4">
 
-                      {/* Helper: render one asset category section */}
                       {(['Computer', 'Phone', 'iPad'] as const).map(cat => {
-                        const proposals = cat === 'Computer' ? computerProposals : cat === 'Phone' ? phoneProposals : ipadProposals;
-                        const approved  = cat === 'Computer' ? computerApproved  : cat === 'Phone' ? phoneApproved  : ipadApproved;
-                        const label     = cat === 'iPad' ? 'iPad' : cat === 'Computer' ? 'Computer' : 'Phone';
+                        const catState = cat === 'Computer' ? computer : cat === 'Phone' ? phone : ipad;
+                        const setCat   = cat === 'Computer' ? setComputer : cat === 'Phone' ? setPhone : setIpad;
+                        const { groups, approved, newMake, ownsThis } = catState;
+                        const visibleGroups = groups.filter(g => g.make !== '(Unknown)');
                         return (
                           <div key={cat} className="space-y-1">
-                            <p className="text-xs font-semibold text-base-content/50">Proposed {label.toLowerCase()}:</p>
+                            <p className="text-xs font-semibold text-base-content/50">{cat}</p>
+
                             {approved ? (
                               <p className="text-sm text-success">
-                                ✓ {[approved.make, approved.model].filter(Boolean).join(' ') || label}
+                                ✓ {approved.make || cat}
                                 {approved.asset_number ? ` — Asset #${approved.asset_number}` : ''} assigned
                               </p>
-                            ) : proposals.length === 0 ? (
-                              <p className="text-xs text-base-content/40">None available at this site</p>
                             ) : (
                               <>
-                                {/* Primary */}
-                                <div className="bg-base-100 rounded p-2 flex items-center justify-between gap-2">
-                                  <p className="text-sm">{assetSummary(proposals[0], label)}</p>
-                                  <button
-                                    className="btn btn-primary btn-xs shrink-0"
-                                    onClick={() => handleApproveAsset(proposals[0], cat)}
-                                  >
-                                    Approve
-                                  </button>
-                                </div>
-                                {/* Alternatives — one per distinct make/model */}
-                                {proposals.slice(1).length > 0 && (
-                                  <div className="space-y-1 pt-1">
-                                    <p className="text-xs text-base-content/40">Alternatives:</p>
-                                    {proposals.slice(1).map(asset => (
-                                      <div key={asset.id} className="flex items-center justify-between bg-base-100 rounded px-2 py-1 gap-2">
-                                        <span className="text-xs">{assetSummary(asset, label)}</span>
-                                        <button
-                                          className="btn btn-outline btn-xs shrink-0"
-                                          onClick={() => handleApproveAsset(asset, cat)}
-                                        >
-                                          Use this
-                                        </button>
+                                {/* One row per make */}
+                                {visibleGroups.map(group => {
+                                  const { make, available, expanded } = group;
+                                  const hasAvail = available.length > 0;
+                                  const first    = available[0];
+                                  return (
+                                    <div key={make}>
+                                      <div className="bg-base-100 rounded p-2 flex items-center justify-between gap-2">
+                                        {hasAvail ? (
+                                          <div className="text-sm min-w-0">
+                                            <span className="font-medium">{make}</span>
+                                            {available.length === 1 ? (
+                                              <span className="text-base-content/60 text-xs ml-1">
+                                                {[first.model, first.ram].filter(Boolean).join(', ')}
+                                                {first.asset_number ? ` #${first.asset_number}` : ''}
+                                              </span>
+                                            ) : (
+                                              <span className="text-base-content/60 text-xs ml-1">
+                                                {first.asset_number ? `#${first.asset_number}` : ''}
+                                              </span>
+                                            )}
+                                          </div>
+                                        ) : (
+                                          <div className="text-sm min-w-0">
+                                            <span className="font-medium">{make}</span>
+                                            <span className="text-base-content/40 text-xs ml-1">(none available)</span>
+                                          </div>
+                                        )}
+                                        {hasAvail ? (
+                                          available.length === 1 ? (
+                                            <button
+                                              className="btn btn-primary btn-xs shrink-0"
+                                              onClick={() => handleApproveAsset(first, cat)}
+                                            >Approve</button>
+                                          ) : (
+                                            <button
+                                              className="btn btn-outline btn-xs shrink-0"
+                                              onClick={() => setCat(prev => ({
+                                                ...prev,
+                                                groups: prev.groups.map(g => g.make === make ? { ...g, expanded: !g.expanded } : g),
+                                              }))}
+                                            >{expanded ? 'Hide' : `Show these (${available.length})`}</button>
+                                          )
+                                        ) : (
+                                          <button
+                                            className="btn btn-outline btn-xs shrink-0"
+                                            onClick={() => setCat(prev => ({ ...prev, newMake: make }))}
+                                          >Buy this</button>
+                                        )}
                                       </div>
-                                    ))}
-                                  </div>
-                                )}
+                                      {/* Expanded individual units */}
+                                      {expanded && (
+                                        <div className="pl-2 pt-1 space-y-1">
+                                          {available.map(asset => (
+                                            <div key={asset.id} className="bg-base-100 rounded px-2 py-1 flex items-center justify-between gap-2">
+                                              <span className="text-xs">
+                                                {[asset.model, asset.ram].filter(Boolean).join(', ')}
+                                                {asset.asset_number ? ` #${asset.asset_number}` : ''}
+                                              </span>
+                                              <button
+                                                className="btn btn-primary btn-xs shrink-0"
+                                                onClick={() => handleApproveAsset(asset, cat)}
+                                              >Approve</button>
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })}
+
+                                {/* Buy this (new make) */}
+                                <div className="flex gap-1 items-center pt-1">
+                                  <input
+                                    type="text"
+                                    className="input input-bordered input-xs flex-1"
+                                    placeholder="Buy this — make not yet at this site"
+                                    value={newMake}
+                                    onChange={e => setCat(prev => ({ ...prev, newMake: e.target.value }))}
+                                  />
+                                  <button
+                                    className="btn btn-outline btn-xs shrink-0"
+                                    disabled={!newMake.trim()}
+                                    onClick={() => toast(`Noted: order ${newMake} for ${cat}`)}
+                                  >Buy this</button>
+                                </div>
+
+                                {/* Onboard owns this */}
+                                <div className="flex gap-1 items-center">
+                                  <input
+                                    type="text"
+                                    className="input input-bordered input-xs flex-1"
+                                    placeholder="Onboard owns this — make/model"
+                                    value={ownsThis}
+                                    onChange={e => setCat(prev => ({ ...prev, ownsThis: e.target.value }))}
+                                  />
+                                  <button
+                                    className="btn btn-outline btn-xs shrink-0 text-[10px]"
+                                    disabled={!ownsThis.trim()}
+                                    onClick={() => toast(`Noted: employee owns their ${cat} (${ownsThis})`)}
+                                  >Owns this</button>
+                                </div>
                               </>
                             )}
                           </div>
@@ -1248,14 +1317,8 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              {/* View details link + delete */}
-              <div className="flex items-center gap-2">
-                <Link
-                  href={`/issues/${selectedTask.id}`}
-                  className="btn btn-ghost btn-xs gap-1 flex-1"
-                >
-                  <ExternalLink className="w-3 h-3" /> View full details
-                </Link>
+              {/* Delete */}
+              <div className="flex justify-end">
                 <button
                   className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
                   onClick={handleDelete}

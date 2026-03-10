@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown, ChevronUp } from 'lucide-react';
+import { formatDate } from '@/lib/formatDate';
 import toast from 'react-hot-toast';
 
 interface AskResult {
@@ -75,7 +76,7 @@ export default function AskAiPage() {
   function formatCell(val: unknown): string {
     if (val === null || val === undefined) return '—';
     if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) {
-      return new Date(val).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      return formatDate(val) || val;
     }
     return String(val);
   }

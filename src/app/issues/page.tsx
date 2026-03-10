@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Plus, ChevronRight, AlertCircle, Clock, CheckCircle2, UserPlus, Wrench } from 'lucide-react';
 import { Incident } from '@/types';
+import { formatDate } from '@/lib/formatDate';
 
 const STATUS_CONFIG = {
   pending:     { label: 'Queue',       className: 'badge-info'    },
@@ -12,9 +13,6 @@ const STATUS_CONFIG = {
   resolved:    { label: 'Resolved',    className: 'badge-success' },
 };
 
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
-}
 
 export default function IssuesPage() {
   useEffect(() => { fetch("/api/track-click", { method: "POST" }).catch(() => {}); }, []);

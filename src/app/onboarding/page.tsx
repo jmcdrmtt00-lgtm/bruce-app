@@ -7,6 +7,7 @@ import OnboardingChecklist from '@/components/OnboardingChecklist';
 import { NewHire, GeneratedOutput } from '@/types';
 import { ROLES } from '@/data/roles';
 import { SITES } from '@/data/sites';
+import { formatDate } from '@/lib/formatDate';
 
 interface AssetPreview {
   asset_number: string | null;
@@ -144,7 +145,7 @@ export default function OnboardingPage() {
     { label: 'Name',          value: `${hire.firstName} ${hire.lastName}`.trim() },
     { label: 'Role',          value: roleLabel },
     { label: 'Site',          value: siteLabel },
-    { label: 'Start date',    value: hire.startDate || '—' },
+    { label: 'Start date',    value: formatDate(hire.startDate) || '—' },
     { label: 'Asset #',       value: hire.nextAssetNumber || '—' },
     { label: 'Computer name', value: hire.computerName || '—' },
     ...(hire.notes ? [{ label: 'Notes', value: hire.notes }] : []),

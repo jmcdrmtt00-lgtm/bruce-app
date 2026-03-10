@@ -4,12 +4,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { ChevronRight, UserPlus, Wrench } from 'lucide-react';
 import { Incident } from '@/types';
-
-function formatDate(iso: string) {
-  return new Date(iso).toLocaleDateString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-  });
-}
+import { formatDate } from '@/lib/formatDate';
 
 export default function HistoryPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
