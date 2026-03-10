@@ -24,6 +24,7 @@ interface AssetResult {
   price?: number;
   site?: string;
   status?: string;
+  extra?: Record<string, unknown> | null;
   [key: string]: unknown;
 }
 
@@ -57,7 +58,16 @@ const DEFAULT_COLS = new Set([
   'assigned_to', 'name', 'site', 'make', 'model', 'os', 'serial_number', 'asset_number', 'purchased',
 ]);
 
+function toLabel(key: string) {
+  return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase());
+}
+
 function cellValue(row: AssetResult, key: string): string {
+  if (key.startsWith('extra.')) {
+    const subkey = key.slice(6);
+    const v = row.extra?.[subkey];
+    return v !== null && v !== undefined ? String(v) : '';
+  }
   const v = row[key];
   if (v === null || v === undefined) return '';
   if (DATE_KEYS.has(key)) return formatDate(v as string) ?? '';
@@ -135,6 +145,8 @@ export default function QueryInventoryPage() {
   const [selectedCols, setSelectedCols]   = useState<Set<string>>(new Set(DEFAULT_COLS));
   const [tableRows, setTableRows]         = useState<AssetResult[]>([]);
   const [tableLoading, setTableLoading]   = useState(false);
+  const [extraFields, setExtraFields]     = useState<FieldDef[]>([]);
+  const [showMoreCols, setShowMoreCols]   = useState(false);
 
   function toggleCol(key: string, checked: boolean) {
     setSelectedCols(prev => {
@@ -148,11 +160,28 @@ export default function QueryInventoryPage() {
     if (selectedCols.size === 0) { toast.error('Select at least one column.'); return; }
     setTableLoading(true);
     setTableRows([]);
+    setExtraFields([]);
+    setShowMoreCols(false);
     try {
       const res = await fetch('/api/assets/download');
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || 'Failed to load assets');
       const filtered = (data.assets as AssetResult[]).filter(a => a.category === tableCategory);
+
+      // Collect extra JSONB field keys that appear in any row
+      const seen = new Set<string>();
+      const extras: FieldDef[] = [];
+      for (const row of filtered) {
+        if (row.extra && typeof row.extra === 'object') {
+          for (const k of Object.keys(row.extra)) {
+            if (!seen.has(k)) {
+              seen.add(k);
+              extras.push({ key: `extra.${k}`, label: toLabel(k) });
+            }
+          }
+        }
+      }
+      setExtraFields(extras);
       setTableRows(filtered);
       if (filtered.length === 0) toast.error(`No ${tableCategory} assets found.`);
     } catch (e) {
@@ -161,52 +190,64 @@ export default function QueryInventoryPage() {
     setTableLoading(false);
   }
 
+  // All available fields = standard + any extra fields discovered after Populate
+  const allAvailableFields = [...ALL_FIELDS, ...extraFields];
+  const needsMore      = allAvailableFields.length > 15;
+  const primaryFields  = needsMore ? allAvailableFields.slice(0, 14) : allAvailableFields;
+  const moreFields     = needsMore ? allAvailableFields.slice(14)    : [];
+  const activeCols     = allAvailableFields.filter(f => selectedCols.has(f.key));
+
   function downloadExcel() {
     if (!tableRows.length) return;
-    const cols = ALL_FIELDS.filter(f => selectedCols.has(f.key));
+    const cols    = allAvailableFields.filter(f => selectedCols.has(f.key));
     const headers = cols.map(f => f.label);
-    const rows = tableRows.map(r => cols.map(f => cellValue(r, f.key)));
+    const rows    = tableRows.map(r => cols.map(f => cellValue(r, f.key)));
     const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, tableCategory);
     XLSX.writeFile(wb, `${tableCategory}_${new Date().toISOString().split('T')[0]}.xlsx`);
   }
 
-  const activeCols = ALL_FIELDS.filter(f => selectedCols.has(f.key));
-
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <main className="min-h-screen bg-base-200 py-8 px-4">
+    <main className="min-h-screen bg-base-200 py-4 px-4">
       <div className="max-w-5xl mx-auto">
+
+        {/* Page title — centered, above card */}
+        <h1 className="text-2xl font-bold text-center mb-4">Query Inventory</h1>
+
         <div className="card bg-base-100 shadow">
           <div className="card-body p-5 space-y-4">
 
-            {/* Header + mode toggle */}
-            <div className="flex items-center justify-between flex-wrap gap-2">
-              <h1 className="text-2xl font-bold">Query Inventory</h1>
-              <div className="tabs tabs-boxed">
+            {/* Mode selector — prominent two-option choice */}
+            <div className="grid grid-cols-2 gap-3">
+              {([
+                { id: 'ask'   as const, title: 'Ask a Question', sub: 'Natural language query'   },
+                { id: 'table' as const, title: 'Build a Table',  sub: 'Choose columns & export'  },
+              ]).map(opt => (
                 <button
-                  className={`tab ${mode === 'ask' ? 'tab-active' : ''}`}
-                  onClick={() => setMode('ask')}
+                  key={opt.id}
+                  onClick={() => setMode(opt.id)}
+                  className={`rounded-xl border-2 p-4 text-left transition-all ${
+                    mode === opt.id
+                      ? 'border-primary bg-primary/10'
+                      : 'border-base-300 hover:border-base-400 bg-base-100'
+                  }`}
                 >
-                  Ask a Question
+                  <div className={`font-semibold text-sm ${mode === opt.id ? 'text-primary' : 'text-base-content'}`}>
+                    {opt.title}
+                    {mode === opt.id && (
+                      <span className="ml-2 inline-block w-2 h-2 rounded-full bg-primary align-middle" />
+                    )}
+                  </div>
+                  <div className="text-xs text-base-content/50 mt-0.5">{opt.sub}</div>
                 </button>
-                <button
-                  className={`tab ${mode === 'table' ? 'tab-active' : ''}`}
-                  onClick={() => setMode('table')}
-                >
-                  Build a Table
-                </button>
-              </div>
+              ))}
             </div>
 
             {/* ── Ask mode ── */}
             {mode === 'ask' && (
               <>
-                <p className="text-base-content/60 text-sm">
-                  Ask a question about your IT inventory in plain English.
-                </p>
-
                 <div className="flex gap-2">
                   <input
                     type="text"
@@ -297,9 +338,6 @@ export default function QueryInventoryPage() {
             {/* ── Build Table mode ── */}
             {mode === 'table' && (
               <div className="space-y-4">
-                <p className="text-base-content/60 text-sm">
-                  Choose an asset type and the columns you want, then click Populate.
-                </p>
 
                 {/* Asset type + action buttons */}
                 <div className="flex items-center gap-3 flex-wrap">
@@ -307,7 +345,12 @@ export default function QueryInventoryPage() {
                   <select
                     className="select select-bordered select-sm"
                     value={tableCategory}
-                    onChange={e => { setTableCategory(e.target.value); setTableRows([]); }}
+                    onChange={e => {
+                      setTableCategory(e.target.value);
+                      setTableRows([]);
+                      setExtraFields([]);
+                      setShowMoreCols(false);
+                    }}
                   >
                     {ASSET_CATEGORIES.map(c => <option key={c}>{c}</option>)}
                   </select>
@@ -327,15 +370,19 @@ export default function QueryInventoryPage() {
                     </button>
                   )}
                   {tableRows.length > 0 && (
-                    <span className="text-sm text-base-content/50">{tableRows.length} row{tableRows.length !== 1 ? 's' : ''}</span>
+                    <span className="text-sm text-base-content/50">
+                      {tableRows.length} row{tableRows.length !== 1 ? 's' : ''}
+                    </span>
                   )}
                 </div>
 
                 {/* Column selector */}
                 <div className="border border-base-300 rounded-lg p-3">
                   <p className="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-2">Columns</p>
-                  <div className="grid grid-cols-3 sm:grid-cols-5 gap-x-4 gap-y-2">
-                    {ALL_FIELDS.map(f => (
+
+                  {/* Primary fields — up to 14 checkboxes + optional More button as 15th slot */}
+                  <div className="grid grid-cols-5 gap-x-4 gap-y-2">
+                    {primaryFields.map(f => (
                       <label key={f.key} className="flex items-center gap-2 cursor-pointer">
                         <input
                           type="checkbox"
@@ -346,7 +393,35 @@ export default function QueryInventoryPage() {
                         <span className="text-sm">{f.label}</span>
                       </label>
                     ))}
+
+                    {needsMore && (
+                      <button
+                        onClick={() => setShowMoreCols(v => !v)}
+                        className="btn btn-outline btn-xs btn-primary self-center justify-self-start"
+                      >
+                        {showMoreCols ? '− Less' : '+ More'}
+                      </button>
+                    )}
                   </div>
+
+                  {/* Expanded extra fields */}
+                  {showMoreCols && moreFields.length > 0 && (
+                    <div className="mt-3 pt-3 border-t border-base-200">
+                      <div className="grid grid-cols-5 gap-x-4 gap-y-2">
+                        {moreFields.map(f => (
+                          <label key={f.key} className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              className="checkbox checkbox-sm"
+                              checked={selectedCols.has(f.key)}
+                              onChange={e => toggleCol(f.key, e.target.checked)}
+                            />
+                            <span className="text-sm">{f.label}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                 </div>
 
                 {/* Results table */}
