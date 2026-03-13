@@ -1,64 +1,11 @@
 'use client';
 
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import SimulateTicketModal from '@/components/SimulateTicketModal';
+import { Incident } from '@/types';
 import { formatDate } from '@/lib/formatDate';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
-
-// ── Mock data — replaced with real DB fetch once triage backend is built ──────
-// Task numbers are in the same sequence as regular tasks (no conflicts).
-
-interface Ticket {
-  id: string;
-  // Real tasks get a numeric task_number (assigned as max(task_number)+1 when triage passes).
-  // Pre-task tickets get a temporary string ID like "T1", "T2" until they become real tasks.
-  task_number: string;
-  subject: string;
-  requester: string;
-  ticketStatus: 'in_progress' | 'pending_reply' | 'draft_questions';
-  received_at: string;
-  emailBody: string;
-  priority?: 'high' | 'low';
-  date_due?: string;
-}
-
-const MOCK_TICKETS: Ticket[] = [
-  {
-    // This ticket passed triage — it's a real task with source='ticket' in the incidents table.
-    // Task number is whatever max(task_number)+1 was when it was created.
-    // It also appears on the Dashboard.
-    id: 'mock-8',
-    task_number: '8',
-    subject: 'Printer offline at nurses station — 2nd floor Holden',
-    requester: 'Maria.Santos@oriolhealthcare.com',
-    ticketStatus: 'in_progress',
-    received_at: '2026-03-13',
-    emailBody: 'The printer by the nurses station on the 2nd floor has been offline since this morning. We can\'t print medication labels. Please help ASAP.',
-    priority: 'high',
-  },
-  {
-    // Pre-task: not enough info yet. Clarifying questions were sent to Diane.
-    id: 'pre-T1',
-    task_number: 'T1',
-    subject: 'Can\'t log into PCC',
-    requester: 'Diane.Nguyen@oriolhealthcare.com',
-    ticketStatus: 'pending_reply',
-    received_at: '2026-03-12',
-    emailBody: 'Hi Diane,\n\nThank you for reaching out about your PCC login issue. Before I investigate, could you please answer a few quick questions?\n\n1. Which computer are you using when you get the error?\n2. Are you able to log in on a different computer?\n3. Have you recently changed your PCC password or had it reset?\n\nThanks,\nIT Buddy',
-  },
-  {
-    // Pre-task: AI has drafted clarifying questions for Bruce to review before sending.
-    id: 'pre-T2',
-    task_number: 'T2',
-    subject: 'Computer running very slowly',
-    requester: 'Tom.Rivera@oriolhealthcare.com',
-    ticketStatus: 'draft_questions',
-    received_at: '2026-03-13',
-    emailBody: 'My computer has been running very slowly for the past few days. Everything takes forever to load.',
-  },
-];
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
@@ -105,7 +52,7 @@ function VoiceButton({ listening, onToggle }: { listening: boolean; onToggle: ()
 // ── Ticket table ───────────────────────────────────────────────────────────────
 
 function TicketTable({ tickets, onRowClick, selectedId, showHeader = true }: {
-  tickets: Ticket[]; onRowClick: (t: Ticket) => void;
+  tickets: Incident[]; onRowClick: (t: Incident) => void;
   selectedId: string | null; showHeader?: boolean;
 }) {
   if (tickets.length === 0) {
@@ -118,9 +65,9 @@ function TicketTable({ tickets, onRowClick, selectedId, showHeader = true }: {
           <thead>
             <tr>
               <th className="w-8">#</th>
-              <th>Subject</th>
+              <th>Task Name</th>
               <th className="w-24">Requester</th>
-              <th className="w-24 text-center">Received</th>
+              <th className="w-24 text-center">Target Date</th>
             </tr>
           </thead>
         )}
@@ -131,9 +78,9 @@ function TicketTable({ tickets, onRowClick, selectedId, showHeader = true }: {
               onClick={() => onRowClick(ticket)}
             >
               <td className="text-base-content/40 text-xs">{ticket.task_number}</td>
-              <td><p className="truncate font-medium text-sm">{ticket.subject}</p></td>
-              <td className="text-xs text-base-content/70 truncate max-w-0">{ticket.requester.split('@')[0]}</td>
-              <td className="text-center text-xs text-base-content/70">{formatDate(ticket.received_at)}</td>
+              <td><p className="truncate font-medium text-sm">{ticket.title || ticket.description.slice(0, 60)}</p></td>
+              <td className="text-xs text-base-content/70 truncate max-w-0">{ticket.reported_by || ''}</td>
+              <td className="text-center text-xs text-base-content/70">{formatDate(ticket.date_due)}</td>
             </tr>
           ))}
         </tbody>
@@ -145,21 +92,28 @@ function TicketTable({ tickets, onRowClick, selectedId, showHeader = true }: {
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function TicketsPage() {
-  const [showSimulate, setShowSimulate] = useState(false);
+  const [tickets, setTickets] = useState<Incident[]>([]);
+
+  // Add Ticket modal
+  const [showAddModal,  setShowAddModal]  = useState(false);
+  const [newSubject,    setNewSubject]    = useState('');
+  const [newRequester,  setNewRequester]  = useState('');
+  const [newPriority,   setNewPriority]   = useState<'high' | 'low' | ''>('');
+  const [addingTicket,  setAddingTicket]  = useState(false);
 
   // Panel state — mirrors Dashboard exactly
-  const [taskNumber,   setTaskNumber]  = useState('');
-  const [taskName,     setTaskName]    = useState('');
-  const [priority,     setPriority]    = useState<'high' | 'low' | ''>('');
-  const [dateDue,      setDateDue]     = useState('');
-  const [status,       setStatus]      = useState<'pending' | 'in_progress' | 'resolved'>('pending');
-  const [requester,    setRequester]   = useState('');
+  const [taskNumber,   setTaskNumber]   = useState('');
+  const [taskName,     setTaskName]     = useState('');
+  const [priority,     setPriority]     = useState<'high' | 'low' | ''>('');
+  const [dateDue,      setDateDue]      = useState('');
+  const [status,       setStatus]       = useState<'pending' | 'in_progress' | 'resolved'>('pending');
+  const [requester,    setRequester]    = useState('');
   const [selectedType, setSelectedType] = useState('general');
   const [infoRequired, setInfoRequired] = useState('');
-  const [infoDone,     setInfoDone]    = useState('');
-  const [issues,       setIssues]      = useState('');
-  const [selectedTicket, setSelectedTicket] = useState<Ticket | null>(null);
-  const [saveStatus,   setSaveStatus]  = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [infoDone,     setInfoDone]     = useState('');
+  const [issues,       setIssues]       = useState('');
+  const [selectedTicket, setSelectedTicket] = useState<Incident | null>(null);
+  const [saveStatus,   setSaveStatus]   = useState<'idle' | 'saving' | 'saved'>('idle');
 
   // AI state
   const [diagnosing,       setDiagnosing]       = useState(false);
@@ -195,14 +149,31 @@ export default function TicketsPage() {
   const issuesRecRef       = useRef<unknown>(null);
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
 
-  // Autosave — stubs until real ticket backend is wired
+  const loadTickets = useCallback(() => {
+    fetch('/api/issues')
+      .then(r => r.json())
+      .then(data => setTickets((data.incidents ?? []).filter((i: Incident) => i.source === 'ticket')))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => { loadTickets(); }, [loadTickets]);
+
+  // Autosave main fields
   useEffect(() => {
     if (!panelDirtyRef.current || !selectedTicket) return;
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-    saveTimerRef.current = setTimeout(() => {
-      // TODO: PATCH /api/issues/${selectedTicket.id} once tickets are in the DB
-      setSaveStatus('saved');
-      setTimeout(() => setSaveStatus('idle'), 2000);
+    saveTimerRef.current = setTimeout(async () => {
+      setSaveStatus('saving');
+      try {
+        await fetch(`/api/issues/${selectedTicket.id}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null, reported_by: requester.trim() || null }),
+        });
+        loadTickets();
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      } catch { setSaveStatus('idle'); }
     }, 1500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -213,8 +184,17 @@ export default function TicketsPage() {
   async function saveUpdate(type: string, note: string, lastRef: React.MutableRefObject<string>) {
     const trimmed = note.trim();
     if (trimmed === lastRef.current || !selectedTicket) return;
-    // TODO: POST /api/issues/${selectedTicket.id}/updates once tickets are in the DB
-    lastRef.current = trimmed;
+    setSaveStatus('saving');
+    try {
+      await fetch(`/api/issues/${selectedTicket.id}/updates`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ type, note: trimmed }),
+      });
+      lastRef.current = trimmed;
+      setSaveStatus('saved');
+      setTimeout(() => setSaveStatus('idle'), 2000);
+    } catch { setSaveStatus('idle'); }
   }
 
   function resetPanel() {
@@ -228,25 +208,80 @@ export default function TicketsPage() {
     savedDetailsRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
   }
 
-  function loadTicket(ticket: Ticket) {
-    setTaskNumber(ticket.task_number);
-    setTaskName(ticket.subject);
+  function loadTicket(ticket: Incident) {
+    setTaskNumber(String(ticket.task_number));
+    setTaskName(ticket.title || ticket.description);
     setPriority(ticket.priority || '');
     setDateDue(ticket.date_due || '');
-    setStatus(ticket.ticketStatus === 'in_progress' ? 'in_progress' : 'pending');
-    setRequester(ticket.requester);
-    // Email body → "Information to send to the AI"
-    setInfoDone(ticket.emailBody);
-    savedInfoDoneRef.current = ticket.emailBody;
-    setInfoRequired('');
-    setIssues('');
-    setSelectedType('general');
+    const s = ticket.status === 'open' ? 'pending' : ticket.status;
+    setStatus(s as 'pending' | 'in_progress' | 'resolved');
+    setRequester(ticket.reported_by || '');
+    const typeId = normalizeScreenToTypeId(ticket.screen || '') || 'general';
+    setSelectedType(typeId);
+    setInfoRequired(TASK_TYPES[typeId] ? `Information needed: ${TASK_TYPES[typeId].fields.join(', ')}` : '');
+    setInfoDone(''); setIssues('');
     setDiagStage('idle'); setDiagCause(null); setDiagDetail(null);
     setDiagDetailOpen(false); setDiagQuestions(null); setDiagSteps(null);
     setDiagConversation([]); setDiagAnswer('');
     setSelectedTicket(ticket);
     panelDirtyRef.current = false;
-    savedDetailsRef.current = ''; savedIssuesRef.current = '';
+    savedDetailsRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
+
+    fetch(`/api/issues/${ticket.id}/updates`)
+      .then(r => r.json())
+      .then(({ updates }: { updates: { type: string; note: string }[] }) => {
+        const latest = (t: string) => updates.find(u => u.type === t)?.note ?? '';
+        const progress = latest('progress') || ticket.description;
+        setInfoDone(progress);
+        savedInfoDoneRef.current = progress;
+        const details = latest('details');
+        if (details) { setInfoRequired(details); savedDetailsRef.current = details; }
+        const issuesNote = latest('issues');
+        if (issuesNote) { setIssues(issuesNote); savedIssuesRef.current = issuesNote; }
+      })
+      .catch(() => {
+        setInfoDone(ticket.description);
+        savedInfoDoneRef.current = ticket.description;
+      });
+  }
+
+  async function handleAddTicket() {
+    if (!newSubject.trim()) return;
+    setAddingTicket(true);
+    try {
+      const res = await fetch('/api/issues', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: newSubject.trim(),
+          description: newSubject.trim(),
+          reported_by: newRequester.trim() || null,
+          priority: newPriority || null,
+          status: 'pending',
+          source: 'ticket',
+        }),
+      });
+      if (res.ok) {
+        loadTickets();
+        setShowAddModal(false);
+        setNewSubject(''); setNewRequester(''); setNewPriority('');
+        toast.success('Ticket added');
+      } else {
+        toast.error('Could not create ticket');
+      }
+    } catch { toast.error('Could not create ticket'); }
+    setAddingTicket(false);
+  }
+
+  async function handleDelete() {
+    if (!selectedTicket) return;
+    if (!confirm('Delete this ticket?')) return;
+    try {
+      await fetch(`/api/issues/${selectedTicket.id}`, { method: 'DELETE' });
+      resetPanel();
+      loadTickets();
+      toast.success('Ticket deleted');
+    } catch { toast.error('Could not delete ticket'); }
   }
 
   // Voice helpers
@@ -369,9 +404,15 @@ export default function TicketsPage() {
     setDiagnosing(false);
   }
 
-  const inProcess      = useMemo(() => MOCK_TICKETS.filter(t => t.ticketStatus === 'in_progress'), []);
-  const pendingReply   = useMemo(() => MOCK_TICKETS.filter(t => t.ticketStatus === 'pending_reply'), []);
-  const draftQuestions = useMemo(() => MOCK_TICKETS.filter(t => t.ticketStatus === 'draft_questions'), []);
+  const inProgress = useMemo(() =>
+    tickets.filter(t => t.status === 'in_progress')
+      .sort((a, b) => (a.priority === 'high' ? 0 : 1) - (b.priority === 'high' ? 0 : 1)),
+  [tickets]);
+
+  const inQueue = useMemo(() =>
+    tickets.filter(t => t.status === 'pending' || t.status === 'open')
+      .sort((a, b) => a.task_number - b.task_number),
+  [tickets]);
 
   return (
     <main className="min-h-screen bg-base-200 px-8 py-4">
@@ -381,26 +422,22 @@ export default function TicketsPage() {
         <div className="space-y-6">
           <div>
             <h2 className="text-lg font-bold mb-2">Tasks in process</h2>
-            <TicketTable tickets={inProcess} onRowClick={loadTicket} selectedId={selectedTicket?.id ?? null} />
+            <TicketTable tickets={inProgress} onRowClick={loadTicket} selectedId={selectedTicket?.id ?? null} />
           </div>
           <div>
-            <h2 className="text-lg font-bold mb-2">Questions sent to Requester</h2>
-            <TicketTable tickets={pendingReply} onRowClick={loadTicket} selectedId={selectedTicket?.id ?? null} showHeader={false} />
-          </div>
-          <div>
-            <h2 className="text-lg font-bold mb-2">Draft questions for Bruce to review</h2>
-            <TicketTable tickets={draftQuestions} onRowClick={loadTicket} selectedId={selectedTicket?.id ?? null} showHeader={false} />
+            <h2 className="text-lg font-bold mb-2">Tasks in the queue</h2>
+            <TicketTable tickets={inQueue} onRowClick={loadTicket} selectedId={selectedTicket?.id ?? null} showHeader={false} />
           </div>
         </div>
 
-        {/* Right — panel (mirrors Dashboard exactly) */}
+        {/* Right — panel */}
         <div className="lg:sticky lg:top-4">
           <div className="card bg-base-100 shadow">
             <div className="card-body p-4 space-y-2">
 
               <div className="flex justify-between items-center">
-                <button className="btn btn-primary btn-sm" onClick={() => setShowSimulate(true)}>
-                  + Simulate Ticket Creation
+                <button className="btn btn-primary btn-sm" onClick={() => setShowAddModal(true)}>
+                  + Add Ticket
                 </button>
                 {selectedTicket && (
                   <button className="btn btn-ghost btn-xs text-base-content/40" onClick={resetPanel}>clear</button>
@@ -535,7 +572,7 @@ export default function TicketsPage() {
                 </div>
               </div>
 
-              {/* Information to send to the AI (pre-filled from email body) */}
+              {/* Information to send to the AI (pre-filled from ticket description) */}
               <div className="form-control">
                 <label className="label py-0"><span className="label-text text-xs font-semibold">Information to send to the AI</span></label>
                 <div className="flex gap-1 items-start">
@@ -626,7 +663,7 @@ export default function TicketsPage() {
                   <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
                     value={issues} onChange={e => setIssues(e.target.value)}
-                    onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
+                    onBlur={() => saveUpdate('issues', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
                     placeholder="Any issues or comments..."
                   />
                   <VoiceButton
@@ -644,7 +681,7 @@ export default function TicketsPage() {
 
               {/* Delete */}
               <div className="flex justify-end">
-                <button className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent" title="Delete ticket">
+                <button className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent" title="Delete ticket" onClick={handleDelete}>
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -663,11 +700,45 @@ export default function TicketsPage() {
 
       </div>
 
-      <SimulateTicketModal
-        isOpen={showSimulate}
-        onClose={() => setShowSimulate(false)}
-        onSubmitted={() => {/* will reload real tickets once backend is wired */}}
-      />
+      {/* Add Ticket modal */}
+      {showAddModal && (
+        <div className="modal modal-open">
+          <div className="modal-box max-w-sm">
+            <h3 className="font-bold text-lg mb-4">Add Ticket</h3>
+            <div className="space-y-3">
+              <div className="form-control">
+                <label className="label py-0"><span className="label-text text-xs font-semibold">Subject *</span></label>
+                <input className="input input-bordered input-sm w-full" placeholder="Brief description of the issue"
+                  value={newSubject} onChange={e => setNewSubject(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') handleAddTicket(); }} autoFocus />
+              </div>
+              <div className="form-control">
+                <label className="label py-0"><span className="label-text text-xs font-semibold">Requester</span></label>
+                <input className="input input-bordered input-sm w-full" placeholder="Name or email"
+                  value={newRequester} onChange={e => setNewRequester(e.target.value)} />
+              </div>
+              <div className="form-control">
+                <label className="label py-0"><span className="label-text text-xs font-semibold">Priority</span></label>
+                <select className="select select-bordered select-sm w-full" value={newPriority}
+                  onChange={e => setNewPriority(e.target.value as 'high' | 'low' | '')}>
+                  <option value="">—</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+            </div>
+            <div className="modal-action">
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddModal(false); setNewSubject(''); setNewRequester(''); setNewPriority(''); }}>
+                Cancel
+              </button>
+              <button className="btn btn-primary btn-sm" onClick={handleAddTicket} disabled={addingTicket || !newSubject.trim()}>
+                {addingTicket && <span className="loading loading-spinner loading-xs" />}
+                Add Ticket
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
