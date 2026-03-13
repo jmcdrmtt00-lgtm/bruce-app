@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Incident } from '@/types';
+import { Incident, IncidentUpdate } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
 
@@ -192,10 +192,14 @@ export default function DashboardPage() {
   const [requester, setRequester] = useState('');
 
   // Add task modal state
-  const [showAddModal,   setShowAddModal]   = useState(false);
-  const [newTaskName,    setNewTaskName]    = useState('');
-  const [newTaskStatus,  setNewTaskStatus]  = useState<'pending' | 'in_progress'>('pending');
-  const [newTaskDetails, setNewTaskDetails] = useState('');
+  const [showAddModal,     setShowAddModal]     = useState(false);
+  const [newTaskName,      setNewTaskName]      = useState('');
+  const [newTaskStatus,    setNewTaskStatus]    = useState<'pending' | 'in_progress'>('pending');
+  const [newTaskDetails,   setNewTaskDetails]   = useState('');
+  const [newTaskRequester, setNewTaskRequester] = useState('');
+  const [newTaskPriority,  setNewTaskPriority]  = useState<'high' | 'low' | ''>('');
+  const [allUpdates,       setAllUpdates]       = useState<IncidentUpdate[]>([]);
+  const [historyOpen,      setHistoryOpen]      = useState(false);
   const [infoRequired, setInfoRequired] = useState('');
   const [infoDone, setInfoDone]         = useState('');
   const [issues, setIssues]             = useState('');
@@ -351,6 +355,7 @@ export default function DashboardPage() {
     setAttachedFile(null);
     setOnboardingData(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
+    setAllUpdates([]); setHistoryOpen(false);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
@@ -381,6 +386,7 @@ export default function DashboardPage() {
     setDiagAnswer('');
     setOnboardingData(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
+    setAllUpdates([]); setHistoryOpen(false);
     setSelectedTask(task);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
@@ -393,8 +399,9 @@ export default function DashboardPage() {
     // Load updates
     fetch(`/api/issues/${task.id}/updates`)
       .then(r => r.json())
-      .then(({ updates }: { updates: { type: string; note: string; created_at?: string }[] }) => {
-        const latest = (t: string) => updates.find(u => u.type === t)?.note ?? '';
+      .then(({ updates }: { updates: IncidentUpdate[] }) => {
+        setAllUpdates(updates);
+        const latest = (t: string) => updates.filter(u => u.type === t).at(-1)?.note ?? '';
 
         const progress = latest('progress');
         setInfoDone(progress);
@@ -405,7 +412,6 @@ export default function DashboardPage() {
           setInfoRequired(details);
           savedDetailsRef.current = details;
         }
-
       })
       .catch(() => {});
   }
@@ -741,7 +747,7 @@ export default function DashboardPage() {
       const res = await fetch('/api/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTaskName.trim(), status: newTaskStatus }),
+        body: JSON.stringify({ title: newTaskName.trim(), status: newTaskStatus, reported_by: newTaskRequester.trim() || null, priority: newTaskPriority || null, description: newTaskDetails.trim() || newTaskName.trim() }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -753,9 +759,8 @@ export default function DashboardPage() {
           });
         }
         setShowAddModal(false);
-        setNewTaskName('');
-        setNewTaskStatus('pending');
-        setNewTaskDetails('');
+        setNewTaskName(''); setNewTaskStatus('pending');
+        setNewTaskDetails(''); setNewTaskRequester(''); setNewTaskPriority('');
         loadTasks();
         loadTask(data.incident);
       }
@@ -1354,6 +1359,28 @@ export default function DashboardPage() {
               </div>
 
               {/* Delete */}
+              {/* Update history */}
+              {allUpdates.length > 0 && (
+                <div>
+                  <button className="text-xs text-primary underline" onClick={() => setHistoryOpen(o => !o)}>
+                    {historyOpen ? 'Hide history' : `View history (${allUpdates.length} entries)`}
+                  </button>
+                  {historyOpen && (
+                    <div className="mt-2 space-y-1 max-h-48 overflow-y-auto border border-base-200 rounded-box p-2">
+                      {allUpdates.map((u, i) => (
+                        <div key={i} className="text-xs border-b border-base-200 last:border-0 pb-1 last:pb-0">
+                          <span className="font-semibold text-base-content/50 mr-1">
+                            {u.type === 'details' ? 'Task details' : u.type === 'progress' ? 'Info sent to AI' : u.type === 'ai_response' ? 'IT Buddy' : u.type === 'user_reply' ? 'Reply' : u.type}
+                          </span>
+                          <span className="text-base-content/30">{u.created_at ? new Date(u.created_at).toLocaleString() : ''}</span>
+                          <p className="text-base-content/70 whitespace-pre-wrap mt-0.5">{u.note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <div className="flex justify-end">
                 <button
                   className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
@@ -1382,36 +1409,44 @@ export default function DashboardPage() {
         <dialog className="modal modal-open">
           <div className="modal-box max-w-sm">
             <h3 className="font-semibold mb-3">Add task</h3>
-            <input
-              className="input input-bordered input-sm w-full mb-2"
-              placeholder="Task name..."
-              value={newTaskName}
-              onChange={e => setNewTaskName(e.target.value)}
-              autoFocus
-              onKeyDown={e => e.key === 'Enter' && handleAddTask()}
-            />
-            <AutoTextarea
-              className="textarea textarea-bordered textarea-sm w-full mb-3 text-sm"
-              value={newTaskDetails}
-              onChange={e => setNewTaskDetails(e.target.value)}
-              placeholder="Task details..."
-            />
-            <div className="flex gap-1 mb-4">
-              <button
-                className={`btn btn-xs flex-1 ${newTaskStatus === 'pending' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setNewTaskStatus('pending')}
-              >
-                Queue
-              </button>
-              <button
-                className={`btn btn-xs flex-1 ${newTaskStatus === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setNewTaskStatus('in_progress')}
-              >
-                In Progress
-              </button>
+            <div className="space-y-2 mb-3">
+              <input
+                className="input input-bordered input-sm w-full"
+                placeholder="Task name *"
+                value={newTaskName}
+                onChange={e => setNewTaskName(e.target.value)}
+                autoFocus
+                onKeyDown={e => e.key === 'Enter' && handleAddTask()}
+              />
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  className="input input-bordered input-sm w-full"
+                  placeholder="Requester"
+                  value={newTaskRequester}
+                  onChange={e => setNewTaskRequester(e.target.value)}
+                />
+                <select className="select select-bordered select-sm w-full" value={newTaskPriority}
+                  onChange={e => setNewTaskPriority(e.target.value as 'high' | 'low' | '')}>
+                  <option value="">Priority —</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+              <AutoTextarea
+                className="textarea textarea-bordered textarea-sm w-full text-sm"
+                value={newTaskDetails}
+                onChange={e => setNewTaskDetails(e.target.value)}
+                placeholder="Task details..."
+              />
+              <div className="flex gap-1">
+                <button className={`btn btn-xs flex-1 ${newTaskStatus === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setNewTaskStatus('pending')}>Queue</button>
+                <button className={`btn btn-xs flex-1 ${newTaskStatus === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setNewTaskStatus('in_progress')}>In Progress</button>
+              </div>
             </div>
             <div className="modal-action mt-0">
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal(false)}>Cancel</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddModal(false); setNewTaskName(''); setNewTaskStatus('pending'); setNewTaskDetails(''); setNewTaskRequester(''); setNewTaskPriority(''); }}>Cancel</button>
               <button className="btn btn-primary btn-sm" onClick={handleAddTask} disabled={!newTaskName.trim()}>Save</button>
             </div>
           </div>

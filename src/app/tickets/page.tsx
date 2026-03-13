@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Incident } from '@/types';
+import { Incident, IncidentUpdate } from '@/types';
 import { formatDate } from '@/lib/formatDate';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 
@@ -95,11 +95,15 @@ export default function TicketsPage() {
   const [tickets, setTickets] = useState<Incident[]>([]);
 
   // Add Ticket modal
-  const [showAddModal,  setShowAddModal]  = useState(false);
-  const [newSubject,    setNewSubject]    = useState('');
-  const [newRequester,  setNewRequester]  = useState('');
-  const [newPriority,   setNewPriority]   = useState<'high' | 'low' | ''>('');
-  const [addingTicket,  setAddingTicket]  = useState(false);
+  const [showAddModal,     setShowAddModal]     = useState(false);
+  const [newTaskName,      setNewTaskName]      = useState('');
+  const [newTaskRequester, setNewTaskRequester] = useState('');
+  const [newTaskPriority,  setNewTaskPriority]  = useState<'high' | 'low' | ''>('');
+  const [newTaskDetails,   setNewTaskDetails]   = useState('');
+  const [newTaskStatus,    setNewTaskStatus]    = useState<'pending' | 'in_progress'>('pending');
+  const [addingTicket,     setAddingTicket]     = useState(false);
+  const [allUpdates,       setAllUpdates]       = useState<IncidentUpdate[]>([]);
+  const [historyOpen,      setHistoryOpen]      = useState(false);
 
   // Panel state — mirrors Dashboard exactly
   const [taskNumber,   setTaskNumber]   = useState('');
@@ -204,6 +208,7 @@ export default function TicketsPage() {
     setDiagStage('idle'); setDiagCause(null); setDiagDetail(null);
     setDiagDetailOpen(false); setDiagQuestions(null); setDiagSteps(null);
     setDiagConversation([]); setDiagAnswer('');
+    setAllUpdates([]); setHistoryOpen(false);
     panelDirtyRef.current = false;
     savedDetailsRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
   }
@@ -223,14 +228,16 @@ export default function TicketsPage() {
     setDiagStage('idle'); setDiagCause(null); setDiagDetail(null);
     setDiagDetailOpen(false); setDiagQuestions(null); setDiagSteps(null);
     setDiagConversation([]); setDiagAnswer('');
+    setAllUpdates([]); setHistoryOpen(false);
     setSelectedTicket(ticket);
     panelDirtyRef.current = false;
     savedDetailsRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
 
     fetch(`/api/issues/${ticket.id}/updates`)
       .then(r => r.json())
-      .then(({ updates }: { updates: { type: string; note: string }[] }) => {
-        const latest = (t: string) => updates.find(u => u.type === t)?.note ?? '';
+      .then(({ updates }: { updates: IncidentUpdate[] }) => {
+        setAllUpdates(updates);
+        const latest = (t: string) => updates.filter(u => u.type === t).at(-1)?.note ?? '';
         const progress = latest('progress') || ticket.description;
         setInfoDone(progress);
         savedInfoDoneRef.current = progress;
@@ -246,25 +253,26 @@ export default function TicketsPage() {
   }
 
   async function handleAddTicket() {
-    if (!newSubject.trim()) return;
+    if (!newTaskName.trim()) return;
     setAddingTicket(true);
     try {
       const res = await fetch('/api/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          title: newSubject.trim(),
-          description: newSubject.trim(),
-          reported_by: newRequester.trim() || null,
-          priority: newPriority || null,
-          status: 'pending',
+          title: newTaskName.trim(),
+          description: newTaskDetails.trim() || newTaskName.trim(),
+          reported_by: newTaskRequester.trim() || null,
+          priority: newTaskPriority || null,
+          status: newTaskStatus,
           source: 'ticket',
         }),
       });
       if (res.ok) {
         loadTickets();
         setShowAddModal(false);
-        setNewSubject(''); setNewRequester(''); setNewPriority('');
+        setNewTaskName(''); setNewTaskRequester(''); setNewTaskPriority('');
+        setNewTaskDetails(''); setNewTaskStatus('pending');
         toast.success('Ticket added');
       } else {
         toast.error('Could not create ticket');
@@ -679,6 +687,28 @@ export default function TicketsPage() {
                 </div>
               </div>
 
+              {/* Update history */}
+              {allUpdates.length > 0 && (
+                <div>
+                  <button className="text-xs text-primary underline" onClick={() => setHistoryOpen(o => !o)}>
+                    {historyOpen ? 'Hide history' : `View history (${allUpdates.length} entries)`}
+                  </button>
+                  {historyOpen && (
+                    <div className="mt-2 space-y-1 max-h-48 overflow-y-auto border border-base-200 rounded-box p-2">
+                      {allUpdates.map((u, i) => (
+                        <div key={i} className="text-xs border-b border-base-200 last:border-0 pb-1 last:pb-0">
+                          <span className="font-semibold text-base-content/50 mr-1">
+                            {u.type === 'details' ? 'Task details' : u.type === 'progress' ? 'Info sent to AI' : u.type === 'ai_response' ? 'IT Buddy' : u.type === 'user_reply' ? 'Reply' : u.type}
+                          </span>
+                          <span className="text-base-content/30">{u.created_at ? new Date(u.created_at).toLocaleString() : ''}</span>
+                          <p className="text-base-content/70 whitespace-pre-wrap mt-0.5">{u.note}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Delete */}
               <div className="flex justify-end">
                 <button className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent" title="Delete ticket" onClick={handleDelete}>
@@ -704,34 +734,36 @@ export default function TicketsPage() {
       {showAddModal && (
         <div className="modal modal-open">
           <div className="modal-box max-w-sm">
-            <h3 className="font-bold text-lg mb-4">Add Ticket</h3>
-            <div className="space-y-3">
-              <div className="form-control">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Subject *</span></label>
-                <input className="input input-bordered input-sm w-full" placeholder="Brief description of the issue"
-                  value={newSubject} onChange={e => setNewSubject(e.target.value)}
-                  onKeyDown={e => { if (e.key === 'Enter') handleAddTicket(); }} autoFocus />
-              </div>
-              <div className="form-control">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Requester</span></label>
-                <input className="input input-bordered input-sm w-full" placeholder="Name or email"
-                  value={newRequester} onChange={e => setNewRequester(e.target.value)} />
-              </div>
-              <div className="form-control">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Priority</span></label>
-                <select className="select select-bordered select-sm w-full" value={newPriority}
-                  onChange={e => setNewPriority(e.target.value as 'high' | 'low' | '')}>
-                  <option value="">—</option>
+            <h3 className="font-semibold mb-3">Add ticket</h3>
+            <div className="space-y-2 mb-3">
+              <input className="input input-bordered input-sm w-full" placeholder="Task name *"
+                value={newTaskName} onChange={e => setNewTaskName(e.target.value)} autoFocus
+                onKeyDown={e => { if (e.key === 'Enter') handleAddTicket(); }} />
+              <div className="grid grid-cols-2 gap-2">
+                <input className="input input-bordered input-sm w-full" placeholder="Requester"
+                  value={newTaskRequester} onChange={e => setNewTaskRequester(e.target.value)} />
+                <select className="select select-bordered select-sm w-full" value={newTaskPriority}
+                  onChange={e => setNewTaskPriority(e.target.value as 'high' | 'low' | '')}>
+                  <option value="">Priority —</option>
                   <option value="high">High</option>
                   <option value="low">Low</option>
                 </select>
               </div>
+              <AutoTextarea className="textarea textarea-bordered textarea-sm w-full text-sm"
+                value={newTaskDetails} onChange={e => setNewTaskDetails(e.target.value)}
+                placeholder="Task details (or paste email body)..." />
+              <div className="flex gap-1">
+                <button className={`btn btn-xs flex-1 ${newTaskStatus === 'pending' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setNewTaskStatus('pending')}>Queue</button>
+                <button className={`btn btn-xs flex-1 ${newTaskStatus === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
+                  onClick={() => setNewTaskStatus('in_progress')}>In Progress</button>
+              </div>
             </div>
-            <div className="modal-action">
-              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddModal(false); setNewSubject(''); setNewRequester(''); setNewPriority(''); }}>
+            <div className="modal-action mt-0">
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddModal(false); setNewTaskName(''); setNewTaskRequester(''); setNewTaskPriority(''); setNewTaskDetails(''); setNewTaskStatus('pending'); }}>
                 Cancel
               </button>
-              <button className="btn btn-primary btn-sm" onClick={handleAddTicket} disabled={addingTicket || !newSubject.trim()}>
+              <button className="btn btn-primary btn-sm" onClick={handleAddTicket} disabled={addingTicket || !newTaskName.trim()}>
                 {addingTicket && <span className="loading loading-spinner loading-xs" />}
                 Add Ticket
               </button>
