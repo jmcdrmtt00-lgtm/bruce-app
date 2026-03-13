@@ -27,7 +27,7 @@ export interface Incident {
   description: string;
   reported_by: string | null;
   status: 'open' | 'in_progress' | 'resolved' | 'pending';
-  source: 'issue' | 'onboarding';
+  source: 'issue' | 'onboarding' | 'ticket';
   onboarding_session_id: string | null;
   priority: 'high' | 'low' | null;
   screen: string | null;

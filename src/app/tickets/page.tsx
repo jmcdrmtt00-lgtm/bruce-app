@@ -12,7 +12,9 @@ import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 
 interface Ticket {
   id: string;
-  task_number: number;
+  // Real tasks get a numeric task_number (assigned as max(task_number)+1 when triage passes).
+  // Pre-task tickets get a temporary string ID like "T1", "T2" until they become real tasks.
+  task_number: string;
   subject: string;
   requester: string;
   ticketStatus: 'in_progress' | 'pending_reply' | 'draft_questions';
@@ -24,8 +26,11 @@ interface Ticket {
 
 const MOCK_TICKETS: Ticket[] = [
   {
-    id: 'mock-47',
-    task_number: 47,
+    // This ticket passed triage — it's a real task with source='ticket' in the incidents table.
+    // Task number is whatever max(task_number)+1 was when it was created.
+    // It also appears on the Dashboard.
+    id: 'mock-8',
+    task_number: '8',
     subject: 'Printer offline at nurses station — 2nd floor Holden',
     requester: 'Maria.Santos@oriolhealthcare.com',
     ticketStatus: 'in_progress',
@@ -34,8 +39,9 @@ const MOCK_TICKETS: Ticket[] = [
     priority: 'high',
   },
   {
-    id: 'mock-48',
-    task_number: 48,
+    // Pre-task: not enough info yet. Clarifying questions were sent to Diane.
+    id: 'pre-T1',
+    task_number: 'T1',
     subject: 'Can\'t log into PCC',
     requester: 'Diane.Nguyen@oriolhealthcare.com',
     ticketStatus: 'pending_reply',
@@ -43,8 +49,9 @@ const MOCK_TICKETS: Ticket[] = [
     emailBody: 'Hi Bruce, I am getting an error when I try to log into PCC on my computer. It just says "invalid credentials" but I know my password is right.',
   },
   {
-    id: 'mock-49',
-    task_number: 49,
+    // Pre-task: AI has drafted clarifying questions for Bruce to review before sending.
+    id: 'pre-T2',
+    task_number: 'T2',
     subject: 'Computer running very slowly',
     requester: 'Tom.Rivera@oriolhealthcare.com',
     ticketStatus: 'draft_questions',
@@ -222,7 +229,7 @@ export default function TicketsPage() {
   }
 
   function loadTicket(ticket: Ticket) {
-    setTaskNumber(String(ticket.task_number));
+    setTaskNumber(ticket.task_number);
     setTaskName(ticket.subject);
     setPriority(ticket.priority || '');
     setDateDue(ticket.date_due || '');
