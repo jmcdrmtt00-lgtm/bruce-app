@@ -1,8 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
-import { ROLES } from '@/data/roles';
-import { SITES } from '@/data/sites';
 
 async function getClient() {
   const cookieStore = await cookies();
@@ -41,32 +39,6 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-
-  // Auto-create a linked incident so onboarding shows up in the activity feed
-  const roleLabel = ROLES[hire.role as keyof typeof ROLES]?.label ?? hire.role;
-  const siteLabel = SITES[hire.site as keyof typeof SITES]?.label ?? hire.site;
-  const fullName = `${hire.firstName} ${hire.lastName}`;
-
-  // Deduplicate: skip if an onboarding incident for this person already exists
-  const { data: existing } = await supabase
-    .from('incidents')
-    .select('id')
-    .eq('user_id', user.id)
-    .eq('source', 'onboarding')
-    .eq('title', `New hire onboarding: ${fullName}`)
-    .limit(1);
-
-  if (!existing || existing.length === 0) {
-    await supabase.from('incidents').insert({
-      user_id: user.id,
-      source: 'onboarding',
-      onboarding_session_id: session.id,
-      title: `New hire onboarding: ${fullName}`,
-      description: `${roleLabel} at ${siteLabel}${hire.startDate ? `, starting ${hire.startDate}` : ''}. Login: ${loginId}${hire.notes ? `\n\nNotes: ${hire.notes}` : ''}`,
-      reported_by: null,
-      status: 'in_progress',
-    });
-  }
 
   return NextResponse.json({ id: session.id });
 }
