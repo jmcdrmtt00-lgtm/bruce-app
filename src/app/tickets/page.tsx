@@ -46,7 +46,7 @@ const MOCK_TICKETS: Ticket[] = [
     requester: 'Diane.Nguyen@oriolhealthcare.com',
     ticketStatus: 'pending_reply',
     received_at: '2026-03-12',
-    emailBody: 'Hi Bruce, I am getting an error when I try to log into PCC on my computer. It just says "invalid credentials" but I know my password is right.',
+    emailBody: 'Hi Diane,\n\nThank you for reaching out about your PCC login issue. Before I investigate, could you please answer a few quick questions?\n\n1. Which computer are you using when you get the error?\n2. Are you able to log in on a different computer?\n3. Have you recently changed your PCC password or had it reset?\n\nThanks,\nIT Buddy',
   },
   {
     // Pre-task: AI has drafted clarifying questions for Bruce to review before sending.
