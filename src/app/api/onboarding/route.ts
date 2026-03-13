@@ -47,15 +47,26 @@ export async function POST(request: NextRequest) {
   const siteLabel = SITES[hire.site as keyof typeof SITES]?.label ?? hire.site;
   const fullName = `${hire.firstName} ${hire.lastName}`;
 
-  await supabase.from('incidents').insert({
-    user_id: user.id,
-    source: 'onboarding',
-    onboarding_session_id: session.id,
-    title: `New hire onboarding: ${fullName}`,
-    description: `${roleLabel} at ${siteLabel}${hire.startDate ? `, starting ${hire.startDate}` : ''}. Login: ${loginId}${hire.notes ? `\n\nNotes: ${hire.notes}` : ''}`,
-    reported_by: null,
-    status: 'in_progress',
-  });
+  // Deduplicate: skip if an onboarding incident for this person already exists
+  const { data: existing } = await supabase
+    .from('incidents')
+    .select('id')
+    .eq('user_id', user.id)
+    .eq('source', 'onboarding')
+    .eq('title', `New hire onboarding: ${fullName}`)
+    .limit(1);
+
+  if (!existing || existing.length === 0) {
+    await supabase.from('incidents').insert({
+      user_id: user.id,
+      source: 'onboarding',
+      onboarding_session_id: session.id,
+      title: `New hire onboarding: ${fullName}`,
+      description: `${roleLabel} at ${siteLabel}${hire.startDate ? `, starting ${hire.startDate}` : ''}. Login: ${loginId}${hire.notes ? `\n\nNotes: ${hire.notes}` : ''}`,
+      reported_by: null,
+      status: 'in_progress',
+    });
+  }
 
   return NextResponse.json({ id: session.id });
 }
