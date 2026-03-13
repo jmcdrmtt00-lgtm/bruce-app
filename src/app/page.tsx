@@ -83,8 +83,9 @@ function TaskTable({
           <tr>
             <th className="w-8">#</th>
             <th>Task Name</th>
-            <th className="w-24 text-center">{variant === 'inProgress' ? 'Priority' : 'Source'}</th>
-            <th className="w-28 text-center">Date Due</th>
+            {variant === 'inProgress' && <th className="w-14 text-center">Pri</th>}
+            <th className="w-24">Requester</th>
+            <th className="w-24 text-center">Target Date</th>
           </tr>
         </thead>
         <tbody>
@@ -100,18 +101,17 @@ function TaskTable({
                   {task.title || task.description.slice(0, 60)}
                 </p>
               </td>
-              <td className="text-center">
-                {variant === 'inProgress' ? (
-                  task.priority && (
+              {variant === 'inProgress' && (
+                <td className="text-center">
+                  {task.priority && (
                     <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
                       {PRIORITY_LABEL[task.priority]}
                     </span>
-                  )
-                ) : (
-                  task.auto_suggested && (
-                    <span className="text-xs text-base-content/60 whitespace-nowrap">IT Buddy</span>
-                  )
-                )}
+                  )}
+                </td>
+              )}
+              <td className="text-xs text-base-content/70 truncate max-w-0">
+                {task.reported_by || ''}
               </td>
               <td className="text-center text-xs text-base-content/70">
                 {formatDate(task.date_due)}
@@ -187,6 +187,7 @@ export default function DashboardPage() {
   const [priority, setPriority]   = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]     = useState('');
   const [status, setStatus]       = useState<'pending' | 'in_progress' | 'resolved'>('pending');
+  const [requester, setRequester] = useState('');
 
   // Add task modal state
   const [showAddModal,   setShowAddModal]   = useState(false);
@@ -232,6 +233,7 @@ export default function DashboardPage() {
   const [listeningInfoRequired, setListeningInfoRequired] = useState(false);
   const [listeningInfoDone,     setListeningInfoDone]     = useState(false);
   const [listeningIssues,       setListeningIssues]       = useState(false);
+  const [listeningRequester,    setListeningRequester]    = useState(false);
 
   const numRecRef           = useRef<unknown>(null);
   const nameRecRef          = useRef<unknown>(null);
@@ -239,6 +241,7 @@ export default function DashboardPage() {
   const infoRequiredRecRef  = useRef<unknown>(null);
   const infoDoneRecRef      = useRef<unknown>(null);
   const issuesRecRef        = useRef<unknown>(null);
+  const requesterRecRef     = useRef<unknown>(null);
 
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
 
@@ -266,7 +269,7 @@ export default function DashboardPage() {
           await fetch(`/api/issues/${selectedTask.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null }),
+            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null, reported_by: requester.trim() || null }),
           });
           loadTasks();
         }
@@ -276,7 +279,7 @@ export default function DashboardPage() {
     }, 1500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskName, priority, dateDue, status, selectedType]);
+  }, [taskName, priority, dateDue, status, selectedType, requester]);
 
   // Save a textarea as an incident_update on blur (only if changed since last save)
   async function saveUpdate(type: string, note: string, lastRef: React.MutableRefObject<string>) {
@@ -328,6 +331,7 @@ export default function DashboardPage() {
     setPriority('');
     setDateDue('');
     setStatus('pending');
+    setRequester('');
     setInfoRequired('');
     setInfoDone('');
     setIssues('');
@@ -356,6 +360,7 @@ export default function DashboardPage() {
     setDateDue(task.date_due || '');
     const s = task.status === 'open' ? 'pending' : task.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
+    setRequester(task.reported_by || '');
 
     // Normalize screen → problem type ID, default to 'general'
     const rawScreen = task.screen || '';
@@ -808,7 +813,6 @@ export default function DashboardPage() {
 
           {/* Queue */}
           <div>
-            <h2 className="text-lg font-bold mb-2">Tasks in the queue</h2>
             <TaskTable tasks={queue} onRowClick={loadTask} variant="queue" />
             <button
               className="btn btn-outline btn-sm w-full mt-2"
@@ -918,7 +922,7 @@ export default function DashboardPage() {
 
                 <div className="form-control">
                   <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Date Due</span>
+                    <span className="label-text text-xs font-semibold">Target Date</span>
                   </label>
                   <div className="flex gap-1">
                     <input
@@ -946,21 +950,50 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Task type */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Task type</span>
-                </label>
-                <select
-                  className="select select-bordered select-sm text-sm w-full"
-                  value={selectedType}
-                  onChange={e => selectProblemType(e.target.value)}
-                >
-                  {QUICK_TASK_TYPES.map(t => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
-                  ))}
-                </select>
-
+              {/* Requester + Task type */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Requester</span>
+                  </label>
+                  <div className="flex gap-1">
+                    <input
+                      className="input input-bordered input-sm flex-1 min-w-0"
+                      value={requester}
+                      onChange={e => { setRequester(e.target.value); markDirty(); }}
+                      placeholder=""
+                    />
+                    <VoiceButton
+                      listening={listeningRequester}
+                      onToggle={() => listeningRequester
+                        ? stopVoice(requesterRecRef as React.MutableRefObject<unknown>, setListeningRequester)
+                        : startVoice(
+                            wrapVoiceResult(
+                              text => setRequester(prev => prev ? `${prev} ${text}` : text),
+                              () => setRequester('')
+                            ),
+                            setListeningRequester,
+                            requesterRecRef as React.MutableRefObject<unknown>,
+                            true
+                          )
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Task type</span>
+                  </label>
+                  <select
+                    className="select select-bordered select-sm text-sm w-full"
+                    value={selectedType}
+                    onChange={e => selectProblemType(e.target.value)}
+                  >
+                    {QUICK_TASK_TYPES.map(t => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
               {/* Task details */}
@@ -1064,37 +1097,6 @@ export default function DashboardPage() {
                       📎
                     </button>
                   </div>
-                </div>
-              </div>
-
-              {/* Issues / Comments */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Issues / Comments</span>
-                </label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    value={issues}
-                    onChange={e => setIssues(e.target.value)}
-                    onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
-                    placeholder="Any issues or comments..."
-                  />
-                  <VoiceButton
-                    listening={listeningIssues}
-                    onToggle={() => listeningIssues
-                      ? stopVoice(issuesRecRef as React.MutableRefObject<unknown>, setListeningIssues)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setIssues(prev => prev ? `${prev} ${text}` : text),
-                            () => setIssues('')
-                          ),
-                          setListeningIssues,
-                          issuesRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
                 </div>
               </div>
 
@@ -1316,6 +1318,37 @@ export default function DashboardPage() {
                   )}
                 </div>
               )}
+
+              {/* Issues / Comments */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">Issues / Comments</span>
+                </label>
+                <div className="flex gap-1 items-start">
+                  <AutoTextarea
+                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                    value={issues}
+                    onChange={e => setIssues(e.target.value)}
+                    onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
+                    placeholder="Any issues or comments..."
+                  />
+                  <VoiceButton
+                    listening={listeningIssues}
+                    onToggle={() => listeningIssues
+                      ? stopVoice(issuesRecRef as React.MutableRefObject<unknown>, setListeningIssues)
+                      : startVoice(
+                          wrapVoiceResult(
+                            text => setIssues(prev => prev ? `${prev} ${text}` : text),
+                            () => setIssues('')
+                          ),
+                          setListeningIssues,
+                          issuesRecRef as React.MutableRefObject<unknown>,
+                          true
+                        )
+                    }
+                  />
+                </div>
+              </div>
 
               {/* Delete */}
               <div className="flex justify-end">

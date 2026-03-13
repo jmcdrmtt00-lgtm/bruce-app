@@ -1,212 +1,527 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp } from 'lucide-react';
+import Link from 'next/link';
+import { ChevronDown, ChevronUp, Download } from 'lucide-react';
 import { formatDate } from '@/lib/formatDate';
 import toast from 'react-hot-toast';
+import * as XLSX from 'xlsx';
 
-interface AskResult {
-  rephrasing:        string;
-  lookupDescription: string | null;
-  answer:            string;
-  sql:               string | null;
-  supportingData:    Record<string, unknown>[];
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared voice helper
+// ─────────────────────────────────────────────────────────────────────────────
+
+function startVoiceRec(onResult: (t: string) => void, onEnd: () => void, onError?: () => void): { stop: () => void } {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+  if (!SR) { toast.error('Voice input requires Chrome.'); throw new Error('no SR'); }
+  const r = new SR();
+  r.continuous = false;
+  r.interimResults = false;
+  r.onresult = (e: { results: SpeechRecognitionResultList }) => {
+    const text = Array.from(e.results).map((res: SpeechRecognitionResult) => res[0].transcript).join(' ');
+    onResult(text);
+  };
+  r.onend = onEnd;
+  r.onerror = onError ?? onEnd;
+  r.start();
+  return r;
 }
 
-export default function AskAiPage() {
-  useEffect(() => { fetch('/api/track-click', { method: 'POST' }).catch(() => {}); }, []);
+function VoiceToggle({ listening, onToggle }: { listening: boolean; onToggle: () => void }) {
+  return (
+    <button
+      className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listening ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
+      onClick={onToggle}
+    >
+      {listening ? 'listening' : 'not listening'}
+    </button>
+  );
+}
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 1 — Query Inventory
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AssetResult {
+  id?: string; category?: string; assigned_to?: string; name?: string; notes?: string;
+  make?: string; model?: string; os?: string; serial_number?: string; asset_number?: string;
+  ram?: string; purchased?: string; install_date?: string; warranty_expires?: string;
+  price?: number; site?: string; status?: string; extra?: Record<string, unknown> | null;
+  [key: string]: unknown;
+}
+
+const ASSET_CATEGORIES = ['Computer', 'iPad', 'Phone', 'Network', 'Camera', 'Printer', 'Other'];
+
+interface FieldDef { key: string; label: string }
+
+const ALL_FIELDS: FieldDef[] = [
+  { key: 'assigned_to', label: 'Assigned To' }, { key: 'name', label: 'Name' },
+  { key: 'site', label: 'Site' }, { key: 'status', label: 'Status' },
+  { key: 'make', label: 'Make' }, { key: 'model', label: 'Model' },
+  { key: 'os', label: 'OS' }, { key: 'ram', label: 'RAM' },
+  { key: 'serial_number', label: 'Serial Number' }, { key: 'asset_number', label: 'Asset Number' },
+  { key: 'purchased', label: 'Purchased' }, { key: 'price', label: 'Price' },
+  { key: 'install_date', label: 'Install Date' }, { key: 'warranty_expires', label: 'Warranty Expires' },
+  { key: 'notes', label: 'Notes' },
+];
+
+const DATE_KEYS = new Set(['purchased', 'install_date', 'warranty_expires']);
+const DEFAULT_COLS = new Set(['assigned_to', 'name', 'site', 'make', 'model', 'os', 'serial_number', 'asset_number', 'purchased']);
+
+function toLabel(key: string) { return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
+
+function cellValue(row: AssetResult, key: string): string {
+  if (key.startsWith('extra.')) {
+    const v = row.extra?.[key.slice(6)];
+    return v !== null && v !== undefined ? String(v) : '';
+  }
+  const v = row[key];
+  if (v === null || v === undefined) return '';
+  if (DATE_KEYS.has(key)) return formatDate(v as string) ?? '';
+  return String(v);
+}
+
+function QueryInventorySection() {
+  const [mode, setMode] = useState<'ask' | 'table'>('ask');
   const [question, setQuestion] = useState('');
-  const [loading,  setLoading]  = useState(false);
-  const [result,   setResult]   = useState<AskResult | null>(null);
-  const [showSql,  setShowSql]  = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<AssetResult[]>([]);
+  const [sql, setSql] = useState('');
+  const [showSql, setShowSql] = useState(false);
+  const [message, setMessage] = useState('');
   const [listening, setListening] = useState(false);
-  const recRef = useRef<unknown>(null);
+  const recRef = useRef<{ stop: () => void } | null>(null);
 
-  function startVoice() {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { toast.error('Voice input requires Chrome.'); return; }
-    const r = new SR();
-    r.continuous = false;
-    r.interimResults = false;
-    r.onresult = (e: { results: SpeechRecognitionResultList }) => {
-      const text = Array.from(e.results).map((res: SpeechRecognitionResult) => res[0].transcript).join(' ');
-      setQuestion(text);
-    };
-    r.onend = () => setListening(false);
-    r.start();
-    recRef.current = r;
-    setListening(true);
-  }
+  const [tableCategory, setTableCategory] = useState('Computer');
+  const [selectedCols, setSelectedCols] = useState<Set<string>>(new Set(DEFAULT_COLS));
+  const [tableRows, setTableRows] = useState<AssetResult[]>([]);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [extraFields, setExtraFields] = useState<FieldDef[]>([]);
+  const [showMoreCols, setShowMoreCols] = useState(false);
 
-  function stopVoice() {
-    (recRef.current as { stop: () => void } | null)?.stop();
-    setListening(false);
-  }
-
-  async function handleAsk() {
-    if (!question.trim()) { toast.error('Enter a question first.'); return; }
-    setLoading(true);
-    setResult(null);
-    setShowSql(false);
-    try {
-      const res = await fetch('/api/ask-ai', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: question.trim() }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        toast.error(data.error || 'Request failed.');
-      } else {
-        setResult(data);
+  useEffect(() => {
+    if (mode !== 'table') return;
+    let cancelled = false;
+    fetch('/api/assets/download').then(r => r.json()).then(data => {
+      if (cancelled || !data.assets) return;
+      const filtered = (data.assets as AssetResult[]).filter((a: AssetResult) => a.category === tableCategory);
+      const seen = new Set<string>();
+      const extras: FieldDef[] = [];
+      for (const row of filtered) {
+        if (row.extra && typeof row.extra === 'object') {
+          for (const k of Object.keys(row.extra as Record<string, unknown>)) {
+            if (!seen.has(k)) { seen.add(k); extras.push({ key: `extra.${k}`, label: toLabel(k) }); }
+          }
+        }
       }
-    } catch {
-      toast.error('Request failed.');
-    }
+      setExtraFields(extras);
+    }).catch(() => {});
+    return () => { cancelled = true; };
+  }, [mode, tableCategory]);
+
+  function stopVoice() { recRef.current?.stop(); setListening(false); }
+
+  async function handleQuery() {
+    if (!question.trim()) { toast.error('Enter a question first.'); return; }
+    setLoading(true); setResults([]); setSql(''); setMessage('');
+    try {
+      const res = await fetch('/api/query/assets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: question.trim() }) });
+      const data = await res.json();
+      if (!res.ok) { setMessage(data.error || 'Query failed.'); if (data.sql) setSql(data.sql); }
+      else { setSql(data.sql ?? ''); setResults(data.results ?? []); if ((data.results ?? []).length === 0) setMessage('No matching inventory records found.'); }
+    } catch { setMessage('Query failed.'); }
     setLoading(false);
   }
 
-  // Derive column headers from the first row of supporting data
-  const dataColumns = result?.supportingData?.length
-    ? Object.keys(result.supportingData[0])
-    : [];
+  function toggleCol(key: string, checked: boolean) {
+    setSelectedCols(prev => { const next = new Set(prev); if (checked) next.add(key); else next.delete(key); return next; });
+  }
+
+  async function handlePopulate() {
+    if (selectedCols.size === 0) { toast.error('Select at least one column.'); return; }
+    setTableLoading(true); setTableRows([]); setExtraFields([]); setShowMoreCols(false);
+    try {
+      const res = await fetch('/api/assets/download');
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || 'Failed to load assets');
+      const filtered = (data.assets as AssetResult[]).filter(a => a.category === tableCategory);
+      const seen = new Set<string>(); const extras: FieldDef[] = [];
+      for (const row of filtered) {
+        if (row.extra && typeof row.extra === 'object') {
+          for (const k of Object.keys(row.extra)) {
+            if (!seen.has(k)) { seen.add(k); extras.push({ key: `extra.${k}`, label: toLabel(k) }); }
+          }
+        }
+      }
+      setExtraFields(extras); setTableRows(filtered);
+      if (filtered.length === 0) toast.error(`No ${tableCategory} assets found.`);
+    } catch (e) { toast.error(e instanceof Error ? e.message : 'Failed to load assets'); }
+    setTableLoading(false);
+  }
+
+  const allAvailableFields = [...ALL_FIELDS, ...extraFields];
+  const needsMore = allAvailableFields.length > 15;
+  const primaryFields = needsMore ? allAvailableFields.slice(0, 14) : allAvailableFields;
+  const moreFields = needsMore ? allAvailableFields.slice(14) : [];
+  const activeCols = allAvailableFields.filter(f => selectedCols.has(f.key));
+
+  function downloadExcel() {
+    if (!tableRows.length) return;
+    const cols = allAvailableFields.filter(f => selectedCols.has(f.key));
+    const ws = XLSX.utils.aoa_to_sheet([cols.map(f => f.label), ...tableRows.map(r => cols.map(f => cellValue(r, f.key)))]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, tableCategory);
+    XLSX.writeFile(wb, `${tableCategory}_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+
+  return (
+    <div className="card bg-base-100 shadow">
+      <div className="card-body p-5 space-y-4">
+        <h2 className="text-xl font-bold">Query Inventory</h2>
+
+        <div className="grid grid-cols-2 gap-3">
+          {([
+            { id: 'ask' as const, title: 'Ask a Question', sub: 'Natural language query' },
+            { id: 'table' as const, title: 'Build a Table', sub: 'Choose columns & export' },
+          ]).map(opt => (
+            <button key={opt.id} onClick={() => setMode(opt.id)} className={`rounded-xl border-2 p-4 text-left transition-all ${mode === opt.id ? 'border-primary bg-primary/10' : 'border-base-300 hover:border-base-400 bg-base-100'}`}>
+              <div className={`font-semibold text-sm ${mode === opt.id ? 'text-primary' : 'text-base-content'}`}>
+                {opt.title}{mode === opt.id && <span className="ml-2 inline-block w-2 h-2 rounded-full bg-primary align-middle" />}
+              </div>
+              <div className="text-xs text-base-content/50 mt-0.5">{opt.sub}</div>
+            </button>
+          ))}
+        </div>
+
+        {mode === 'ask' && (
+          <>
+            <div className="flex gap-2">
+              <input type="text" className="input input-bordered flex-1" placeholder='e.g. "Show me all the people with a ThinkCentre Mini"' value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleQuery()} />
+              <VoiceToggle listening={listening} onToggle={() => {
+                if (listening) { stopVoice(); return; }
+                try { recRef.current = startVoiceRec(t => setQuestion(t), () => setListening(false)); setListening(true); } catch { setListening(false); }
+              }} />
+              <button className="btn btn-primary" onClick={handleQuery} disabled={loading}>{loading ? <span className="loading loading-spinner loading-sm" /> : 'Ask'}</button>
+            </div>
+            {sql && (
+              <div>
+                <button className="flex items-center gap-1 text-xs text-base-content/40 hover:text-base-content/70" onClick={() => setShowSql(v => !v)}>
+                  {showSql ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}{showSql ? 'Hide' : 'Show'} generated query
+                </button>
+                {showSql && <pre className="mt-1 text-xs bg-base-200 rounded p-3 overflow-x-auto whitespace-pre-wrap">{sql}</pre>}
+              </div>
+            )}
+            {message && <p className="text-sm text-base-content/50 text-center">{message}</p>}
+            {results.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="table table-sm bg-base-100 w-full">
+                  <thead><tr><th>Name / Location</th><th>Category</th><th>Make / Model</th><th>OS</th><th>Site</th><th>Purchased</th></tr></thead>
+                  <tbody>
+                    {results.map((r, i) => (
+                      <tr key={r.id ?? i} className="hover">
+                        <td><p className="font-medium text-sm">{r.assigned_to ?? r.name ?? '—'}</p>{r.assigned_to && r.name && <p className="text-xs text-base-content/50">{r.name}</p>}{r.notes && <p className="text-xs text-base-content/50">{r.notes}</p>}</td>
+                        <td className="text-xs text-base-content/50">{r.category ?? '—'}</td>
+                        <td className="text-sm">{[r.make, r.model].filter(Boolean).join(' ')}{r.ram && <span className="text-xs text-base-content/50 ml-1">· {r.ram}</span>}</td>
+                        <td className="text-sm">{r.os ?? '—'}</td>
+                        <td className="text-sm">{r.site ?? '—'}</td>
+                        <td className="text-sm text-base-content/60">{formatDate(r.purchased)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </>
+        )}
+
+        {mode === 'table' && (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 flex-wrap">
+              <label className="text-sm font-medium whitespace-nowrap">Asset Type</label>
+              <select className="select select-bordered select-sm" value={tableCategory} onChange={e => { setTableCategory(e.target.value); setTableRows([]); setExtraFields([]); setShowMoreCols(false); }}>
+                {ASSET_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+              </select>
+              <button className="btn btn-primary btn-sm" onClick={handlePopulate} disabled={tableLoading || selectedCols.size === 0}>
+                {tableLoading ? <span className="loading loading-spinner loading-xs" /> : 'Populate'}
+              </button>
+              {tableRows.length > 0 && <button className="btn btn-sm gap-1" onClick={downloadExcel}><Download className="w-4 h-4" />Download Excel</button>}
+              {tableRows.length > 0 && <span className="text-sm text-base-content/50">{tableRows.length} row{tableRows.length !== 1 ? 's' : ''}</span>}
+            </div>
+            <div className="border border-base-300 rounded-lg p-3">
+              <p className="text-xs font-semibold text-base-content/50 uppercase tracking-wide mb-2">Columns</p>
+              <div className="grid grid-cols-5 gap-x-4 gap-y-2">
+                {primaryFields.map(f => (
+                  <label key={f.key} className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" className="checkbox checkbox-sm" checked={selectedCols.has(f.key)} onChange={e => toggleCol(f.key, e.target.checked)} />
+                    <span className="text-sm">{f.label}</span>
+                  </label>
+                ))}
+                {needsMore && <button onClick={() => setShowMoreCols(v => !v)} className="btn btn-outline btn-xs btn-primary self-center justify-self-start">{showMoreCols ? '− Less' : '+ More'}</button>}
+              </div>
+              {showMoreCols && moreFields.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-base-200">
+                  <div className="grid grid-cols-5 gap-x-4 gap-y-2">
+                    {moreFields.map(f => (
+                      <label key={f.key} className="flex items-center gap-2 cursor-pointer">
+                        <input type="checkbox" className="checkbox checkbox-sm" checked={selectedCols.has(f.key)} onChange={e => toggleCol(f.key, e.target.checked)} />
+                        <span className="text-sm">{f.label}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+            {tableRows.length > 0 && activeCols.length > 0 && (
+              <div className="overflow-x-auto">
+                <table className="table table-sm bg-base-100 w-full">
+                  <thead><tr>{activeCols.map(f => <th key={f.key}>{f.label}</th>)}</tr></thead>
+                  <tbody>{tableRows.map((r, i) => <tr key={i} className="hover">{activeCols.map(f => <td key={f.key} className="text-sm">{cellValue(r, f.key) || '—'}</td>)}</tr>)}</tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 2 — Query Completed Tasks
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface TaskResult {
+  id?: string; task_number?: number; title?: string; reported_by?: string;
+  status?: string; date_completed?: string; priority?: string; [key: string]: unknown;
+}
+
+interface SimResult { id: string; task_number: number; title: string; similarity: string; }
+
+function QueryTasksSection() {
+  const [question, setQuestion] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [results, setResults] = useState<TaskResult[]>([]);
+  const [sql, setSql] = useState('');
+  const [showSql, setShowSql] = useState(false);
+  const [message, setMessage] = useState('');
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<{ stop: () => void } | null>(null);
+
+  const [simName, setSimName] = useState('');
+  const [simElab, setSimElab] = useState('');
+  const [simLoading, setSimLoading] = useState(false);
+  const [simResults, setSimResults] = useState<SimResult[]>([]);
+  const [simMessage, setSimMessage] = useState('');
+
+  function stopVoice() { recRef.current?.stop(); setListening(false); }
+
+  async function handleQuery() {
+    if (!question.trim()) { toast.error('Enter a question first.'); return; }
+    setLoading(true); setResults([]); setSql(''); setMessage('');
+    try {
+      const res = await fetch('/api/query/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: question.trim() }) });
+      const data = await res.json();
+      if (!res.ok) { setMessage(data.error || 'Query failed.'); if (data.sql) setSql(data.sql); }
+      else { setSql(data.sql ?? ''); setResults(data.results ?? []); if ((data.results ?? []).length === 0) setMessage('No matching tasks found.'); }
+    } catch { setMessage('Query failed.'); }
+    setLoading(false);
+  }
+
+  async function handleFindSimilar() {
+    if (!simName.trim()) { toast.error('Enter a task name to search.'); return; }
+    setSimLoading(true); setSimResults([]); setSimMessage('');
+    try {
+      const res = await fetch('/api/similar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskName: simName.trim(), elaboration: simElab.trim() }) });
+      const data = await res.json();
+      if (!res.ok) setSimMessage(data.error || 'Search failed.');
+      else { setSimResults(data.results ?? []); if ((data.results ?? []).length === 0) setSimMessage(data.message || 'No similar tasks found.'); }
+    } catch { setSimMessage('Search failed.'); }
+    setSimLoading(false);
+  }
+
+  return (
+    <div className="space-y-4">
+      <div className="card bg-base-100 shadow">
+        <div className="card-body p-5 space-y-4">
+          <h2 className="text-xl font-bold">Query Completed Tasks</h2>
+          <p className="text-base-content/60 text-sm">Ask a question in plain English — IT Buddy will find the answer from your task history.</p>
+          <div className="flex gap-2">
+            <input type="text" className="input input-bordered flex-1" placeholder='e.g. "When did I last replace a hard drive?"' value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleQuery()} />
+            <VoiceToggle listening={listening} onToggle={() => {
+              if (listening) { stopVoice(); return; }
+              try { recRef.current = startVoiceRec(t => setQuestion(t), () => setListening(false)); setListening(true); } catch { setListening(false); }
+            }} />
+            <button className="btn btn-primary" onClick={handleQuery} disabled={loading}>{loading ? <span className="loading loading-spinner loading-sm" /> : 'Ask'}</button>
+          </div>
+          {sql && (
+            <div>
+              <button className="flex items-center gap-1 text-xs text-base-content/40 hover:text-base-content/70" onClick={() => setShowSql(v => !v)}>
+                {showSql ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}{showSql ? 'Hide' : 'Show'} generated query
+              </button>
+              {showSql && <pre className="mt-1 text-xs bg-base-200 rounded p-3 overflow-x-auto whitespace-pre-wrap">{sql}</pre>}
+            </div>
+          )}
+          {message && <p className="text-sm text-base-content/50 text-center">{message}</p>}
+          {results.length > 0 && (
+            <div className="space-y-2">
+              {results.map((r, i) => (
+                <div key={r.id ?? i} className="card bg-base-200 shadow-sm">
+                  <div className="card-body py-3 px-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="flex-1 min-w-0">
+                        <p className="font-semibold text-sm truncate">{r.task_number ? `#${r.task_number} ` : ''}{r.title ?? JSON.stringify(r)}</p>
+                        <div className="flex gap-3 mt-1 text-xs text-base-content/50">
+                          {r.reported_by && <span>{r.reported_by}</span>}
+                          {r.date_completed && <span>Completed {formatDate(r.date_completed)}</span>}
+                          {r.status && r.status !== 'resolved' && <span className="capitalize">{r.status.replace('_', ' ')}</span>}
+                        </div>
+                      </div>
+                      {r.id && <Link href={`/issues/${r.id}`} className="btn btn-outline btn-xs shrink-0">Review Task</Link>}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="card bg-base-100 shadow">
+        <div className="card-body p-5 space-y-3">
+          <h3 className="text-lg font-semibold">Find Similar Tasks in the Past</h3>
+          <input type="text" className="input input-bordered input-sm w-full" placeholder="Task name" value={simName} onChange={e => setSimName(e.target.value)} />
+          <textarea className="textarea textarea-bordered textarea-sm w-full text-sm" rows={2} placeholder="Elaborate on what kind of similarity you're looking for..." value={simElab} onChange={e => setSimElab(e.target.value)} />
+          <button className="btn btn-outline btn-sm w-full" onClick={handleFindSimilar} disabled={simLoading}>{simLoading ? <span className="loading loading-spinner loading-sm" /> : 'Find'}</button>
+          {simMessage && <p className="text-xs text-base-content/50 text-center">{simMessage}</p>}
+          {simResults.length > 0 && (
+            <div className="space-y-2">
+              {simResults.map(r => (
+                <div key={r.id} className="bg-base-200 rounded-lg p-3">
+                  <Link href={`/issues/${r.id}`} className="text-sm font-medium hover:text-primary">#{r.task_number} {r.title}</Link>
+                  <p className="text-xs text-base-content/60 mt-0.5">{r.similarity}</p>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Section 3 — Ask the AI (general advisor)
+// ─────────────────────────────────────────────────────────────────────────────
+
+interface AskResult {
+  rephrasing: string; lookupDescription: string | null; answer: string;
+  sql: string | null; supportingData: Record<string, unknown>[];
+}
+
+function AskAdvisorSection() {
+  const [question, setQuestion] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [result, setResult] = useState<AskResult | null>(null);
+  const [showSql, setShowSql] = useState(false);
+  const [listening, setListening] = useState(false);
+  const recRef = useRef<{ stop: () => void } | null>(null);
+
+  function stopVoice() { recRef.current?.stop(); setListening(false); }
+
+  async function handleAsk() {
+    if (!question.trim()) { toast.error('Enter a question first.'); return; }
+    setLoading(true); setResult(null); setShowSql(false);
+    try {
+      const res = await fetch('/api/ask-ai', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: question.trim() }) });
+      const data = await res.json();
+      if (!res.ok) toast.error(data.error || 'Request failed.');
+      else setResult(data);
+    } catch { toast.error('Request failed.'); }
+    setLoading(false);
+  }
+
+  const dataColumns = result?.supportingData?.length ? Object.keys(result.supportingData[0]) : [];
 
   function formatCell(val: unknown): string {
     if (val === null || val === undefined) return '—';
-    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) {
-      return formatDate(val) || val;
-    }
+    if (typeof val === 'string' && /^\d{4}-\d{2}-\d{2}/.test(val)) return formatDate(val) || val;
     return String(val);
   }
 
   return (
-    <main className="min-h-screen bg-base-200 py-8 px-4">
-      <div className="max-w-3xl mx-auto space-y-4">
-
-        {/* Input card */}
-        <div className="card bg-base-100 shadow">
-          <div className="card-body p-5 space-y-4">
-            <h1 className="text-2xl font-bold">Ask the AI</h1>
-            <p className="text-base-content/60 text-sm">
-              Ask anything about your IT tasks or environment — IT Buddy will answer using your current in-progress tasks as context.
-            </p>
-
-            <div className="flex gap-2">
-              <input
-                type="text"
-                className="input input-bordered flex-1"
-                placeholder='e.g. "Which of my tasks should I tackle first?"'
-                value={question}
-                onChange={e => setQuestion(e.target.value)}
-                onKeyDown={e => e.key === 'Enter' && !loading && handleAsk()}
-              />
-              <button
-                className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${
-                  listening
-                    ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200'
-                    : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'
-                }`}
-                onClick={() => listening ? stopVoice() : startVoice()}
-              >
-                {listening ? 'listening' : 'not listening'}
-              </button>
-              <button
-                className="btn btn-primary"
-                onClick={handleAsk}
-                disabled={loading}
-              >
-                {loading ? <span className="loading loading-spinner loading-sm" /> : 'Ask'}
-              </button>
-            </div>
+    <div className="space-y-3">
+      <div className="card bg-base-100 shadow">
+        <div className="card-body p-5 space-y-4">
+          <h2 className="text-xl font-bold">Ask the AI</h2>
+          <p className="text-base-content/60 text-sm">Ask anything about your IT tasks or environment — IT Buddy will answer using your current in-progress tasks as context.</p>
+          <div className="flex gap-2">
+            <input type="text" className="input input-bordered flex-1" placeholder='e.g. "Which of my tasks should I tackle first?"' value={question} onChange={e => setQuestion(e.target.value)} onKeyDown={e => e.key === 'Enter' && !loading && handleAsk()} />
+            <VoiceToggle listening={listening} onToggle={() => {
+              if (listening) { stopVoice(); return; }
+              try { recRef.current = startVoiceRec(t => setQuestion(t), () => setListening(false)); setListening(true); } catch { setListening(false); }
+            }} />
+            <button className="btn btn-primary" onClick={handleAsk} disabled={loading}>{loading ? <span className="loading loading-spinner loading-sm" /> : 'Ask'}</button>
           </div>
         </div>
+      </div>
 
-        {/* Results */}
-        {result && (
-          <div className="space-y-3">
-
-            {/* Rephrasing */}
+      {result && (
+        <>
+          <div className="card bg-base-100 shadow">
+            <div className="card-body p-5">
+              <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wide mb-1">I interpreted your question as</p>
+              <p className="text-base-content/80 italic">{result.rephrasing}</p>
+            </div>
+          </div>
+          <div className="card bg-base-100 shadow">
+            <div className="card-body p-5">
+              <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wide mb-2">My advice</p>
+              <p className="text-sm text-base-content leading-relaxed whitespace-pre-wrap">{result.answer}</p>
+            </div>
+          </div>
+          {result.supportingData.length > 0 && (
             <div className="card bg-base-100 shadow">
               <div className="card-body p-5">
                 <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wide mb-1">
-                  I interpreted your question as
+                  {result.lookupDescription ? `I looked up: ${result.lookupDescription}` : 'Supporting data'}
                 </p>
-                <p className="text-base-content/80 italic">{result.rephrasing}</p>
-              </div>
-            </div>
-
-            {/* Answer */}
-            <div className="card bg-base-100 shadow">
-              <div className="card-body p-5">
-                <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wide mb-2">
-                  My advice
-                </p>
-                <p className="text-sm text-base-content leading-relaxed whitespace-pre-wrap">
-                  {result.answer}
-                </p>
-              </div>
-            </div>
-
-            {/* Supporting data */}
-            {result.supportingData.length > 0 && (
-              <div className="card bg-base-100 shadow">
-                <div className="card-body p-5">
-                  <p className="text-xs font-semibold text-base-content/40 uppercase tracking-wide mb-1">
-                    {result.lookupDescription
-                      ? `I looked up: ${result.lookupDescription}`
-                      : 'Supporting data'}
-                  </p>
-                  <div className="overflow-x-auto">
-                    <table className="table table-sm w-full">
-                      <thead>
-                        <tr>
-                          {dataColumns.map(col => (
-                            <th key={col} className="text-xs capitalize">
-                              {col.replace(/_/g, ' ')}
-                            </th>
-                          ))}
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {result.supportingData.map((row, i) => (
-                          <tr key={i} className="hover">
-                            {dataColumns.map(col => (
-                              <td key={col} className="text-sm">
-                                {formatCell(row[col])}
-                              </td>
-                            ))}
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                <div className="overflow-x-auto">
+                  <table className="table table-sm w-full">
+                    <thead><tr>{dataColumns.map(col => <th key={col} className="text-xs capitalize">{col.replace(/_/g, ' ')}</th>)}</tr></thead>
+                    <tbody>{result.supportingData.map((row, i) => <tr key={i} className="hover">{dataColumns.map(col => <td key={col} className="text-sm">{formatCell(row[col])}</td>)}</tr>)}</tbody>
+                  </table>
                 </div>
               </div>
-            )}
+            </div>
+          )}
+          {result.sql && (
+            <div>
+              <button className="flex items-center gap-1 text-xs text-base-content/40 hover:text-base-content/70" onClick={() => setShowSql(v => !v)}>
+                {showSql ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}{showSql ? 'Hide' : 'Show'} generated query
+              </button>
+              {showSql && <pre className="mt-1 text-xs bg-base-200 rounded p-3 overflow-x-auto whitespace-pre-wrap">{result.sql}</pre>}
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
 
-            {/* Generated SQL (collapsible) */}
-            {result.sql && (
-              <div>
-                <button
-                  className="flex items-center gap-1 text-xs text-base-content/40 hover:text-base-content/70"
-                  onClick={() => setShowSql(v => !v)}
-                >
-                  {showSql ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-                  {showSql ? 'Hide' : 'Show'} generated query
-                </button>
-                {showSql && (
-                  <pre className="mt-1 text-xs bg-base-200 rounded p-3 overflow-x-auto whitespace-pre-wrap">
-                    {result.sql}
-                  </pre>
-                )}
-              </div>
-            )}
+// ─────────────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────────────
 
-          </div>
-        )}
+export default function AskAiPage() {
+  useEffect(() => { fetch('/api/track-click', { method: 'POST' }).catch(() => {}); }, []);
 
+  return (
+    <main className="min-h-screen bg-base-200 py-8 px-4">
+      <div className="max-w-5xl mx-auto space-y-10">
+        <QueryInventorySection />
+        <QueryTasksSection />
+        <AskAdvisorSection />
       </div>
     </main>
   );
