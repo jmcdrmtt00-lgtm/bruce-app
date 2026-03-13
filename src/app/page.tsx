@@ -79,15 +79,17 @@ function TaskTable({
   return (
     <div className="overflow-x-auto rounded-box shadow">
       <table className="table table-xs table-fixed bg-base-100 w-full">
-        <thead>
-          <tr>
-            <th className="w-8">#</th>
-            <th>Task Name</th>
-            {variant === 'inProgress' && <th className="w-14 text-center">Pri</th>}
-            <th className="w-24">Requester</th>
-            <th className="w-24 text-center">Target Date</th>
-          </tr>
-        </thead>
+        {variant === 'inProgress' && (
+          <thead>
+            <tr>
+              <th className="w-8">#</th>
+              <th>Task Name</th>
+              <th className="w-14 text-center">Pri</th>
+              <th className="w-24">Requester</th>
+              <th className="w-24 text-center">Target Date</th>
+            </tr>
+          </thead>
+        )}
         <tbody>
           {tasks.map(task => (
             <tr
@@ -813,6 +815,7 @@ export default function DashboardPage() {
 
           {/* Queue */}
           <div>
+            <h2 className="text-lg font-bold mb-2">Tasks in the queue</h2>
             <TaskTable tasks={queue} onRowClick={loadTask} variant="queue" />
             <button
               className="btn btn-outline btn-sm w-full mt-2"
