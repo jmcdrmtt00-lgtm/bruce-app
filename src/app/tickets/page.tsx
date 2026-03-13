@@ -53,10 +53,12 @@ function TicketTable({
   tickets,
   onRowClick,
   selectedId,
+  showHeader = true,
 }: {
   tickets: Ticket[];
   onRowClick: (t: Ticket) => void;
   selectedId: string | null;
+  showHeader?: boolean;
 }) {
   if (tickets.length === 0) {
     return (
@@ -68,14 +70,16 @@ function TicketTable({
   return (
     <div className="overflow-x-auto rounded-box shadow">
       <table className="table table-xs table-fixed bg-base-100 w-full">
-        <thead>
-          <tr>
-            <th className="w-8">#</th>
-            <th>Subject</th>
-            <th className="w-24">Requester</th>
-            <th className="w-24 text-center">Received</th>
-          </tr>
-        </thead>
+        {showHeader && (
+          <thead>
+            <tr>
+              <th className="w-8">#</th>
+              <th>Subject</th>
+              <th className="w-24">Requester</th>
+              <th className="w-24 text-center">Received</th>
+            </tr>
+          </thead>
+        )}
         <tbody>
           {tickets.map(ticket => (
             <tr
@@ -121,13 +125,13 @@ export default function TicketsPage() {
           {/* Questions sent to Requester */}
           <div>
             <h2 className="text-lg font-bold mb-2">Questions sent to Requester</h2>
-            <TicketTable tickets={pendingReply} onRowClick={setSelected} selectedId={selected?.id ?? null} />
+            <TicketTable tickets={pendingReply} onRowClick={setSelected} selectedId={selected?.id ?? null} showHeader={false} />
           </div>
 
           {/* Draft questions for Bruce to review */}
           <div>
             <h2 className="text-lg font-bold mb-2">Draft questions for Bruce to review</h2>
-            <TicketTable tickets={draftQuestions} onRowClick={setSelected} selectedId={selected?.id ?? null} />
+            <TicketTable tickets={draftQuestions} onRowClick={setSelected} selectedId={selected?.id ?? null} showHeader={false} />
           </div>
 
         </div>
