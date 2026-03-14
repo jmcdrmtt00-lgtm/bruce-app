@@ -97,10 +97,10 @@ export default function TicketsPage() {
   // Add Ticket modal
   const [showAddModal,     setShowAddModal]     = useState(false);
   const [newTaskName,      setNewTaskName]      = useState('');
+  const [newTaskDetails,   setNewTaskDetails]   = useState('');
   const [newTaskRequester, setNewTaskRequester] = useState('');
   const [newTaskPriority,  setNewTaskPriority]  = useState<'high' | 'low' | ''>('');
-  const [newTaskDetails,   setNewTaskDetails]   = useState('');
-  const [newTaskStatus,    setNewTaskStatus]    = useState<'pending' | 'in_progress'>('pending');
+  const [newTaskType,      setNewTaskType]      = useState('');
   const [addingTicket,     setAddingTicket]     = useState(false);
   const [allUpdates,       setAllUpdates]       = useState<IncidentUpdate[]>([]);
   const [historyOpen,      setHistoryOpen]      = useState(false);
@@ -264,15 +264,16 @@ export default function TicketsPage() {
           description: newTaskDetails.trim() || newTaskName.trim(),
           reported_by: newTaskRequester.trim() || null,
           priority: newTaskPriority || null,
-          status: newTaskStatus,
+          status: 'pending',
           source: 'ticket',
+          screen: newTaskType || null,
         }),
       });
       if (res.ok) {
         loadTickets();
         setShowAddModal(false);
-        setNewTaskName(''); setNewTaskRequester(''); setNewTaskPriority('');
-        setNewTaskDetails(''); setNewTaskStatus('pending');
+        setNewTaskName(''); setNewTaskDetails('');
+        setNewTaskRequester(''); setNewTaskPriority(''); setNewTaskType('');
         toast.success('Ticket added');
       } else {
         toast.error('Could not create ticket');
@@ -737,8 +738,10 @@ export default function TicketsPage() {
             <h3 className="font-semibold mb-3">Add ticket</h3>
             <div className="space-y-2 mb-3">
               <input className="input input-bordered input-sm w-full" placeholder="Task name *"
-                value={newTaskName} onChange={e => setNewTaskName(e.target.value)} autoFocus
-                onKeyDown={e => { if (e.key === 'Enter') handleAddTicket(); }} />
+                value={newTaskName} onChange={e => setNewTaskName(e.target.value)} autoFocus />
+              <AutoTextarea className="textarea textarea-bordered textarea-sm w-full text-sm"
+                value={newTaskDetails} onChange={e => setNewTaskDetails(e.target.value)}
+                placeholder="Task details (or paste email body) *" />
               <div className="grid grid-cols-2 gap-2">
                 <input className="input input-bordered input-sm w-full" placeholder="Requester"
                   value={newTaskRequester} onChange={e => setNewTaskRequester(e.target.value)} />
@@ -749,21 +752,21 @@ export default function TicketsPage() {
                   <option value="low">Low</option>
                 </select>
               </div>
-              <AutoTextarea className="textarea textarea-bordered textarea-sm w-full text-sm"
-                value={newTaskDetails} onChange={e => setNewTaskDetails(e.target.value)}
-                placeholder="Task details (or paste email body)..." />
-              <div className="flex gap-1">
-                <button className={`btn btn-xs flex-1 ${newTaskStatus === 'pending' ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setNewTaskStatus('pending')}>Queue</button>
-                <button className={`btn btn-xs flex-1 ${newTaskStatus === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
-                  onClick={() => setNewTaskStatus('in_progress')}>In Progress</button>
-              </div>
+              <select className="select select-bordered select-sm w-full" value={newTaskType}
+                onChange={e => setNewTaskType(e.target.value)}>
+                <option value="">Select task type *</option>
+                <option value="problem_to_fix">Problem to fix</option>
+                <option value="ticket_to_fix">Ticket to fix</option>
+                <option value="onboarding_offboarding">Onboarding/Offboarding</option>
+                <option value="decision_to_make">Decision to make</option>
+                <option value="project_to_manage">Project to manage</option>
+              </select>
             </div>
             <div className="modal-action mt-0">
-              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddModal(false); setNewTaskName(''); setNewTaskRequester(''); setNewTaskPriority(''); setNewTaskDetails(''); setNewTaskStatus('pending'); }}>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddModal(false); setNewTaskName(''); setNewTaskDetails(''); setNewTaskRequester(''); setNewTaskPriority(''); setNewTaskType(''); }}>
                 Cancel
               </button>
-              <button className="btn btn-primary btn-sm" onClick={handleAddTicket} disabled={addingTicket || !newTaskName.trim()}>
+              <button className="btn btn-primary btn-sm" onClick={handleAddTicket} disabled={addingTicket || !newTaskName.trim() || !newTaskDetails.trim() || !newTaskType}>
                 {addingTicket && <span className="loading loading-spinner loading-xs" />}
                 Add Ticket
               </button>
