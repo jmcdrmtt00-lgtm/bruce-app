@@ -557,33 +557,9 @@ export default function TicketsPage() {
                 </div>
               </div>
 
-              {/* Task details */}
+              {/* Problem to fix (infoDone — tickets are always ticket_to_fix) */}
               <div className="form-control">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Task details</span></label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    value={infoRequired}
-                    onChange={e => setInfoRequired(e.target.value)}
-                    onBlur={() => saveUpdate('details', infoRequired, savedDetailsRef)}
-                    placeholder="What information is needed or what does the checklist say..."
-                  />
-                  <VoiceButton
-                    listening={listeningInfoRequired}
-                    onToggle={() => listeningInfoRequired
-                      ? stopVoice(infoRequiredRecRef as React.MutableRefObject<unknown>, setListeningInfoRequired)
-                      : startVoice(
-                          wrapVoiceResult(t => setInfoRequired(prev => prev ? `${prev} ${t}` : t), () => setInfoRequired('')),
-                          setListeningInfoRequired, infoRequiredRecRef as React.MutableRefObject<unknown>, true
-                        )
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* Information to send to the AI (pre-filled from ticket description) */}
-              <div className="form-control">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Information to send to the AI</span></label>
+                <label className="label py-0"><span className="label-text text-xs font-semibold">Problem to fix</span></label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"

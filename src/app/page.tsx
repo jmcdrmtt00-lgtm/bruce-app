@@ -1007,12 +1007,10 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Task details */}
-              <div className="form-control">
+              {/* Task details — only for onboarding/offboarding */}
+              {selectedType === 'onboarding_offboarding' && <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">
-                    {selectedType === 'onboarding_offboarding' ? 'Information needed' : 'Task details'}
-                  </span>
+                  <span className="label-text text-xs font-semibold">Information needed</span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
@@ -1038,12 +1036,17 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
-              </div>
+              </div>}
 
-              {/* Information to send to the AI */}
+              {/* infoDone — label varies by task type */}
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Information to send to the AI</span>
+                  <span className="label-text text-xs font-semibold">
+                    {selectedType === 'problem_to_fix' || selectedType === 'ticket_to_fix' ? 'Problem to fix'
+                      : selectedType === 'decision_to_make' ? 'Decision to make'
+                      : selectedType === 'project_to_manage' ? 'Project to manage'
+                      : 'Information to send to the AI'}
+                  </span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
