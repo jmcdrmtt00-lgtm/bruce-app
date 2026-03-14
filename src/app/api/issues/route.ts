@@ -11,17 +11,26 @@ async function getClient() {
   );
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await getClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const { data, error } = await supabase
+  const source = request.nextUrl.searchParams.get('source');
+
+  let query = supabase
     .from('incidents')
     .select('*')
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
+  if (source === 'ticket') {
+    query = query.eq('source', 'ticket');
+  } else if (source === 'issue') {
+    query = query.neq('source', 'ticket');
+  }
+
+  const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ incidents: data });
 }

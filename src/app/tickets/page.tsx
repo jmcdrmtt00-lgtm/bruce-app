@@ -154,9 +154,9 @@ export default function TicketsPage() {
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
 
   const loadTickets = useCallback(() => {
-    fetch('/api/issues')
+    fetch('/api/issues?source=ticket')
       .then(r => r.json())
-      .then(data => setTickets((data.incidents ?? []).filter((i: Incident) => i.source === 'ticket')))
+      .then(data => setTickets(data.incidents ?? []))
       .catch(() => {});
   }, []);
 

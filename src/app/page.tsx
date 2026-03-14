@@ -252,7 +252,7 @@ export default function DashboardPage() {
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
 
   const loadTasks = useCallback(() => {
-    fetch('/api/issues')
+    fetch('/api/issues?source=issue')
       .then(r => r.json())
       .then(data => { setTasks(data.incidents ?? []); setLoading(false); })
       .catch(() => setLoading(false));

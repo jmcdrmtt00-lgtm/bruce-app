@@ -265,12 +265,19 @@ const TASK_COLUMN_MAP: Record<string, string> = {
   'task number':        'task_number',
   'task name':          'task_name',
   'name':               'task_name',
+  'requester':          'requester',
+  'urgency':            'priority',
   'priority':           'priority',
   'date due':           'date_due',
   'due date':           'date_due',
+  'target date':        'date_due',
   'status':             'status',
+  'task type':          'task_type',
   'information needed': 'information_needed',
   'info needed':        'information_needed',
+  'problem to fix':     'problem_to_fix',
+  'decision to make':   'decision_to_make',
+  'project to manage':  'project_to_manage',
   'results':            'results',
   'issues/comments':    'issues_comments',
   'issues':             'issues_comments',
@@ -280,10 +287,15 @@ const TASK_COLUMN_MAP: Record<string, string> = {
 interface TaskRow {
   task_number?: string;
   task_name?: string;
+  requester?: string;
   priority?: string;
   date_due?: string;
   status?: string;
+  task_type?: string;
   information_needed?: string;
+  problem_to_fix?: string;
+  decision_to_make?: string;
+  project_to_manage?: string;
   results?: string;
   issues_comments?: string;
 }
