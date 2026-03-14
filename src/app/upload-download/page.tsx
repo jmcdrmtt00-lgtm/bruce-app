@@ -305,12 +305,15 @@ interface IssuesComment { timestamp: string; text: string; }
 interface DownloadTask {
   task_number: number | null;
   task_name: string | null;
+  requester: string | null;
   priority: string | null;
   date_due: string | null;
   status: string | null;
+  task_type: string | null;
   information_needed: string | null;
-  results: string | null;
-  issues_comments: IssuesComment[];
+  problem_to_fix: string | null;
+  decision_to_make: string | null;
+  project_to_manage: string | null;
 }
 
 function fmtTaskDate(val: unknown): string | null {
@@ -358,11 +361,12 @@ async function downloadTasks() {
   if (!res.ok) throw new Error(data.error || 'Download failed');
   const tasks: DownloadTask[] = data.tasks;
   if (tasks.length === 0) throw new Error('No tasks in database yet.');
-  const headers = ['Task #', 'Task Name', 'Priority', 'Date Due', 'Status', 'Information Needed', 'Results', 'Issues/Comments'];
+  const headers = ['Task #', 'Task Name', 'Requester', 'Urgency', 'Target Date', 'Status', 'Task type', 'Information Needed', 'Problem to fix', 'Decision to make', 'Project to manage'];
   const rows = [headers, ...tasks.map(t => [
-    t.task_number ?? '', t.task_name ?? '', t.priority ?? '', t.date_due ?? '',
-    t.status ?? '', t.information_needed ?? '', t.results ?? '',
-    (t.issues_comments ?? []).map(c => `${c.timestamp}: ${c.text}`).join(' | '),
+    t.task_number ?? '', t.task_name ?? '', t.requester ?? '', t.priority ?? '',
+    t.date_due ?? '', t.status ?? '', t.task_type ?? '',
+    t.information_needed ?? '', t.problem_to_fix ?? '',
+    t.decision_to_make ?? '', t.project_to_manage ?? '',
   ])];
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(rows), 'Tasks');
