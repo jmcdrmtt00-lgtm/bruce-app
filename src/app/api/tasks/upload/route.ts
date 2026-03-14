@@ -110,12 +110,12 @@ export async function POST(request: NextRequest) {
     .eq('user_id', user.id);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
-  // Insert new incidents — rows with a Task # go to the Dashboard (source='issue'),
-  // rows without a Task # are nurse-submitted tickets (source='ticket')
-  let issueCounter = 0;
+  // Insert new incidents — ticket_to_fix task type → source='ticket' (Tickets tab + Dashboard),
+  // all other types → source='issue' (Dashboard only)
   const incidentRows = tasks.map(t => {
+    const screen = normalizeTaskType(t.task_type);
+    const isTicket = screen === 'ticket_to_fix';
     const hasTaskNumber = t.task_number !== null && t.task_number !== undefined && String(t.task_number).trim() !== '';
-    if (hasTaskNumber) issueCounter++;
     return {
       user_id:        user.id,
       task_number:    hasTaskNumber ? Number(t.task_number) : null,
@@ -125,8 +125,8 @@ export async function POST(request: NextRequest) {
       priority:       normalizePriority(t.priority),
       date_due:       t.date_due || null,
       status:         normalizeStatus(t.status),
-      screen:         normalizeTaskType(t.task_type),
-      source:         hasTaskNumber ? 'issue' : 'ticket',
+      screen,
+      source:         isTicket ? 'ticket' : 'issue',
       auto_suggested: false,
       date_completed: normalizeStatus(t.status) === 'resolved'
         ? (t.date_due || new Date().toISOString().split('T')[0])
@@ -152,8 +152,8 @@ export async function POST(request: NextRequest) {
   const updates: { incident_id: string; user_id: string; type: string; note: string }[] = [];
   for (let i = 0; i < tasks.length; i++) {
     const t = tasks[i];
-    const hasTaskNumber = t.task_number !== null && t.task_number !== undefined && String(t.task_number).trim() !== '';
-    const taskNum = hasTaskNumber ? Number(t.task_number) : null;
+    const taskNum = (t.task_number !== null && t.task_number !== undefined && String(t.task_number).trim() !== '')
+      ? Number(t.task_number) : null;
     const incidentId = (taskNum !== null ? idByTaskNumber.get(taskNum) : null) ?? inserted?.[i]?.id;
     if (!incidentId) continue;
 
@@ -182,5 +182,6 @@ export async function POST(request: NextRequest) {
   }
 
   const ticketCount = incidentRows.filter(r => r.source === 'ticket').length;
-  return NextResponse.json({ inserted: incidentRows.length, issues: issueCounter, tickets: ticketCount });
+  const issueCount  = incidentRows.filter(r => r.source === 'issue').length;
+  return NextResponse.json({ inserted: incidentRows.length, issues: issueCount, tickets: ticketCount });
 }
