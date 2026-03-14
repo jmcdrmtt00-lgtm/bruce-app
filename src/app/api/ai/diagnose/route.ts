@@ -103,8 +103,9 @@ export async function POST(request: NextRequest) {
 
   const data = await response.json();
 
+  // DEV: second-call (tool use) path disabled until core features are stable
   // If Claude wants to look up an asset, execute the query and call back
-  if (data.tool_call) {
+  if (false && data.tool_call) {
     const searchTerm: string = data.tool_call.input?.search_term ?? '';
     let toolResult = 'No matching assets found.';
 
