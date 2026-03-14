@@ -2,6 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
+export const maxDuration = 60;
+
 const PYTHON_BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
 
 // Which asset categories are relevant for each problem type
@@ -77,15 +79,27 @@ export async function POST(request: NextRequest) {
     ? await fetchInventoryContext(supabase, user.id, body.problem_type)
     : '';
 
-  const response = await fetch(`${PYTHON_BACKEND_URL}/api/diagnose`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      ...body,
-      user_email: user.email ?? '',
-      inventory_context: inventoryContext || null,
-    }),
-  });
+  let response: Response;
+  try {
+    response = await fetch(`${PYTHON_BACKEND_URL}/api/diagnose`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        ...body,
+        user_email: user.email ?? '',
+        inventory_context: inventoryContext || null,
+      }),
+    });
+  } catch (err) {
+    console.error('[diagnose] Backend unreachable:', err);
+    return NextResponse.json({ error: 'AI backend is unavailable — please try again.' }, { status: 503 });
+  }
+
+  if (!response.ok) {
+    const text = await response.text().catch(() => '');
+    console.error('[diagnose] Backend error:', response.status, text.slice(0, 200));
+    return NextResponse.json({ error: `AI backend returned ${response.status}` }, { status: 502 });
+  }
 
   const data = await response.json();
 
@@ -126,18 +140,30 @@ export async function POST(request: NextRequest) {
     }
 
     // Second call: pass tool result back to Python
-    const response2 = await fetch(`${PYTHON_BACKEND_URL}/api/diagnose`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        ...body,
-        user_email: user.email ?? '',
-        tool_call: data.tool_call,
-        tool_result: toolResult,
-      }),
-    });
+    let response2: Response;
+    try {
+      response2 = await fetch(`${PYTHON_BACKEND_URL}/api/diagnose`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...body,
+          user_email: user.email ?? '',
+          tool_call: data.tool_call,
+          tool_result: toolResult,
+        }),
+      });
+    } catch (err) {
+      console.error('[diagnose] Backend unreachable on second call:', err);
+      return NextResponse.json({ error: 'AI backend is unavailable — please try again.' }, { status: 503 });
+    }
+
+    if (!response2.ok) {
+      const text = await response2.text().catch(() => '');
+      console.error('[diagnose] Backend error on second call:', response2.status, text.slice(0, 200));
+      return NextResponse.json({ error: `AI backend returned ${response2.status}` }, { status: 502 });
+    }
+
     const data2 = await response2.json();
-    // Return tool context so frontend can include it in future conversation turns
     return NextResponse.json(
       { ...data2, _tool_context: { tool_call: data.tool_call, tool_result: toolResult } },
       { status: response2.status }

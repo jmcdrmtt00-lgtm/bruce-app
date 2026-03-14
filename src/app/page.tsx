@@ -650,7 +650,9 @@ export default function DashboardPage() {
         { role: 'tool_result' as const, tool_use_id: data._tool_context.tool_call.tool_use_id, content: data._tool_context.tool_result },
       ] : [];
 
-      if (data.cause) {
+      if (!res.ok || data.error) {
+        toast.error(data.error || `AI error (${res.status}) — try again.`);
+      } else if (data.cause) {
         const aiTurn = { role: 'ai' as const, content: data.cause };
         setDiagConversation([userTurn, ...toolTurns, aiTurn]);
         setDiagCause(data.cause);
@@ -666,8 +668,9 @@ export default function DashboardPage() {
         setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
         await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
       }
-    } catch {
-      toast.error('Could not get AI response — try again.');
+    } catch (err) {
+      console.error('[diagnose]', err);
+      toast.error('Could not reach the AI — try again.');
     }
     setDiagnosing(false);
   }
