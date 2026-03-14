@@ -266,7 +266,7 @@ export default function TicketsPage() {
           priority: newTaskPriority || null,
           status: 'pending',
           source: 'ticket',
-          screen: newTaskType || null,
+          screen: 'ticket_to_fix',
         }),
       });
       if (res.ok) {
@@ -752,21 +752,12 @@ export default function TicketsPage() {
                   <option value="low">Low</option>
                 </select>
               </div>
-              <select className="select select-bordered select-sm w-full" value={newTaskType}
-                onChange={e => setNewTaskType(e.target.value)}>
-                <option value="">Select task type *</option>
-                <option value="problem_to_fix">Problem to fix</option>
-                <option value="ticket_to_fix">Ticket to fix</option>
-                <option value="onboarding_offboarding">Onboarding/Offboarding</option>
-                <option value="decision_to_make">Decision to make</option>
-                <option value="project_to_manage">Project to manage</option>
-              </select>
             </div>
             <div className="modal-action mt-0">
               <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddModal(false); setNewTaskName(''); setNewTaskDetails(''); setNewTaskRequester(''); setNewTaskPriority(''); setNewTaskType(''); }}>
                 Cancel
               </button>
-              <button className="btn btn-primary btn-sm" onClick={handleAddTicket} disabled={addingTicket || !newTaskName.trim() || !newTaskDetails.trim() || !newTaskType}>
+              <button className="btn btn-primary btn-sm" onClick={handleAddTicket} disabled={addingTicket || !newTaskName.trim() || !newTaskDetails.trim()}>
                 {addingTicket && <span className="loading loading-spinner loading-xs" />}
                 Add Ticket
               </button>
