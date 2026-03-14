@@ -493,7 +493,7 @@ export default function TicketsPage() {
               {/* Priority + Status + Target Date */}
               <div className="grid grid-cols-3 gap-3">
                 <div className="form-control">
-                  <label className="label py-0"><span className="label-text text-xs font-semibold">Priority</span></label>
+                  <label className="label py-0"><span className="label-text text-xs font-semibold">Urgency</span></label>
                   <select className="select select-bordered select-sm text-sm w-full" value={priority}
                     onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }}>
                     <option value="">—</option>
@@ -747,7 +747,7 @@ export default function TicketsPage() {
                   value={newTaskRequester} onChange={e => setNewTaskRequester(e.target.value)} />
                 <select className="select select-bordered select-sm w-full" value={newTaskPriority}
                   onChange={e => setNewTaskPriority(e.target.value as 'high' | 'low' | '')}>
-                  <option value="">Priority —</option>
+                  <option value="">Urgency —</option>
                   <option value="high">High</option>
                   <option value="low">Low</option>
                 </select>

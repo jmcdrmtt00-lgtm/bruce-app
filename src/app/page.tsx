@@ -903,7 +903,7 @@ export default function DashboardPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="form-control">
                   <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Priority</span>
+                    <span className="label-text text-xs font-semibold">Urgency</span>
                   </label>
                   <select
                     className="select select-bordered select-sm text-sm w-full"
@@ -1437,7 +1437,7 @@ export default function DashboardPage() {
                 />
                 <select className="select select-bordered select-sm w-full" value={newTaskPriority}
                   onChange={e => setNewTaskPriority(e.target.value as 'high' | 'low' | '')}>
-                  <option value="">Priority —</option>
+                  <option value="">Urgency —</option>
                   <option value="high">High</option>
                   <option value="low">Low</option>
                 </select>
