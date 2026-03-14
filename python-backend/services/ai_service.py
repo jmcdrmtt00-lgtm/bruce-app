@@ -325,8 +325,8 @@ async def diagnose(
             symptoms = (information or "").strip() or "No symptoms provided."
             messages = [{"role": "user", "content": f"Symptoms: {symptoms}"}]
 
-        # Tool use: general tasks (all passes, so Claude retains access across follow-ups)
-        use_tools = (problem_type == "general" and tool_result is None)
+        # Tool use: all problem types (prompt always references lookup_asset for device mentions)
+        use_tools = tool_result is None
 
         if tool_call and tool_result is not None:
             # Second pass: append tool use + result to message history, then get final diagnosis
