@@ -250,7 +250,7 @@ export default function DashboardPage() {
   const loadTasks = useCallback(() => {
     fetch('/api/issues')
       .then(r => r.json())
-      .then(data => { setTasks((data.incidents ?? []).filter((i: Incident) => i.task_number !== null)); setLoading(false); })
+      .then(data => { setTasks((data.incidents ?? []).filter((i: Incident) => i.task_number != null)); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -367,7 +367,7 @@ export default function DashboardPage() {
 
     // Normalize screen → problem type ID, default to 'general'
     const rawScreen = task.screen || '';
-    const typeId = normalizeScreenToTypeId(rawScreen) || 'general';
+    const typeId = normalizeScreenToTypeId(rawScreen) || 'problem_to_fix';
     setSelectedType(typeId);
 
     setInfoDone('');
@@ -564,7 +564,7 @@ export default function DashboardPage() {
     if (!selectedType) return;
 
     // Onboarding: use AI to extract structured data, then show asset proposal
-    if (selectedType === 'onboarding') {
+    if (selectedType === 'onboarding' || selectedType === 'onboarding_offboarding') {
       if (!infoDone.trim() && !infoRequired.trim()) {
         router.push('/onboarding');
         return;
@@ -1143,7 +1143,7 @@ export default function DashboardPage() {
                   )}
 
                   {/* Cause stage — onboarding: asset proposals */}
-                  {diagStage === 'cause' && selectedType === 'onboarding' && onboardingData && (
+                  {diagStage === 'cause' && (selectedType === 'onboarding' || selectedType === 'onboarding_offboarding') && onboardingData && (
                     <div className="rounded-box p-3 bg-primary/10 space-y-4">
 
                       {(['Computer', 'Phone', 'iPad'] as const).map(cat => {
