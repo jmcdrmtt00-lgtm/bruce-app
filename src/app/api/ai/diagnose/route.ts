@@ -103,42 +103,14 @@ export async function POST(request: NextRequest) {
 
   const data = await response.json();
 
-  // DEV: second-call (tool use) path disabled until core features are stable
   // If Claude wants to look up an asset, execute the query and call back
-  if (false && data.tool_call) {
+  if (data.tool_call) {
     const searchTerm: string = data.tool_call.input?.search_term ?? '';
-    let toolResult = 'No matching assets found.';
 
-    if (searchTerm) {
-      const { data: assets } = await supabase
-        .from('assets')
-        .select('asset_number, category, assigned_to, name, make, model, os, ram, purchased, warranty_expires')
-        .eq('user_id', user.id)
-        .eq('status', 'active')
-        .or(`assigned_to.ilike.%${searchTerm}%,name.ilike.%${searchTerm}%`);
-
-      if (assets && assets.length > 0) {
-        const today = new Date();
-        toolResult = assets.map((a: Record<string, string | null>) => {
-          const parts: string[] = [
-            a.assigned_to ?? '',
-            a.name ?? '',
-            a.category ?? '',
-            [a.make, a.model].filter(Boolean).join(' '),
-          ].filter(Boolean);
-          if (a.purchased) {
-            const yr = a.purchased.split('-').map(Number);
-            const purchased = new Date(yr[0], yr[1] - 1, yr[2]);
-            const years = Math.floor((today.getTime() - purchased.getTime()) / (365.25 * 24 * 3600 * 1000));
-            parts.push(`purchased ${a.purchased} (${years} year${years !== 1 ? 's' : ''} old)`);
-          }
-          if (a.warranty_expires) parts.push(`warranty expires ${a.warranty_expires}`);
-          if (a.os)  parts.push(`OS: ${a.os}`);
-          if (a.ram) parts.push(`RAM: ${a.ram}`);
-          return parts.join(', ');
-        }).join('\n');
-      }
-    }
+    // DEV MODE: skip the real DB lookup; ask Claude to describe what it would have checked
+    const toolResult = searchTerm
+      ? `[Asset lookup not yet enabled] You were about to search the inventory for "${searchTerm}". Please continue your response and, in plain conversational language (no technical jargon), add a brief note like: "By the way, once this feature is fully enabled I'll also check the asset inventory for [describe what you were looking for and why in one friendly sentence]."`
+      : `[Asset lookup not yet enabled] Please continue your response without the inventory data.`;
 
     // Second call: pass tool result back to Python
     let response2: Response;
