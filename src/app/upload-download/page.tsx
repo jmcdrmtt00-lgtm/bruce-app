@@ -517,7 +517,7 @@ function TasksSection() {
   const [fileName, setFileName] = useState('');
   const [rows, setRows] = useState<TaskRow[]>([]);
   const [uploading, setUploading] = useState(false);
-  const [uploadResult, setUploadResult] = useState<{ inserted: number } | null>(null);
+  const [uploadResult, setUploadResult] = useState<{ inserted: number; issues?: number; tickets?: number } | null>(null);
   const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   async function handleDownload() {
@@ -608,7 +608,7 @@ function TasksSection() {
         <div className="card bg-base-100 shadow">
           <div className="card-body p-5">
             <div className="flex items-center gap-2 text-success font-semibold"><CheckCircle className="w-5 h-5" /> Upload complete</div>
-            <p className="text-sm text-base-content/70 mt-1">{uploadResult.inserted} tasks loaded.</p>
+            <p className="text-sm text-base-content/70 mt-1">{uploadResult.inserted} tasks loaded — {uploadResult.issues ?? '?'} dashboard tasks, {uploadResult.tickets ?? '?'} tickets.</p>
           </div>
         </div>
       )}
