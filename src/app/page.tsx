@@ -841,7 +841,7 @@ export default function DashboardPage() {
               <div className="flex justify-between items-center">
                 <button
                   className="btn btn-primary btn-sm"
-                  onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskStatus('pending'); setNewTaskDetails(''); }}
+                  onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskDetails(''); }}
                 >
                   + Add task
                 </button>
