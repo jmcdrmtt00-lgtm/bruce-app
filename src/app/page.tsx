@@ -250,7 +250,7 @@ export default function DashboardPage() {
   const loadTasks = useCallback(() => {
     fetch('/api/issues')
       .then(r => r.json())
-      .then(data => { setTasks(data.incidents ?? []); setLoading(false); })
+      .then(data => { setTasks((data.incidents ?? []).filter((i: Incident) => i.task_number !== null)); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
