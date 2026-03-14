@@ -1007,7 +1007,9 @@ export default function DashboardPage() {
               {/* Task details */}
               <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Task details</span>
+                  <span className="label-text text-xs font-semibold">
+                    {selectedType === 'onboarding_offboarding' ? 'Information needed' : 'Task details'}
+                  </span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
