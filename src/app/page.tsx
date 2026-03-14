@@ -79,17 +79,15 @@ function TaskTable({
   return (
     <div className="overflow-x-auto rounded-box shadow">
       <table className="table table-xs table-fixed bg-base-100 w-full">
-        {variant === 'inProgress' && (
-          <thead>
-            <tr>
-              <th className="w-8">#</th>
-              <th>Task Name</th>
-              <th className="w-14 text-center">Pri</th>
-              <th className="w-24">Requester</th>
-              <th className="w-24 text-center">Target Date</th>
-            </tr>
-          </thead>
-        )}
+        <thead>
+          <tr>
+            <th className="w-8">#</th>
+            <th>Task Name</th>
+            <th className="w-14 text-center">Urgency</th>
+            <th className="w-24">Requester</th>
+            <th className="w-24 text-center">Target Date</th>
+          </tr>
+        </thead>
         <tbody>
           {tasks.map(task => (
             <tr
@@ -103,15 +101,13 @@ function TaskTable({
                   {task.title || task.description.slice(0, 60)}
                 </p>
               </td>
-              {variant === 'inProgress' && (
-                <td className="text-center">
-                  {task.priority && (
-                    <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
-                      {PRIORITY_LABEL[task.priority]}
-                    </span>
-                  )}
-                </td>
-              )}
+              <td className="text-center">
+                {task.priority && (
+                  <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
+                    {PRIORITY_LABEL[task.priority]}
+                  </span>
+                )}
+              </td>
               <td className="text-xs text-base-content/70 truncate max-w-0">
                 {task.reported_by || ''}
               </td>
