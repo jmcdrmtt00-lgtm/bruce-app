@@ -69,27 +69,22 @@ function TaskTable({
   onRowClick: (task: Incident) => void;
   variant: 'inProgress' | 'queue';
 }) {
-  if (tasks.length === 0) {
-    return (
-      <div className="bg-base-100 rounded-box shadow p-4 text-center text-base-content/40 text-sm">
-        No tasks
-      </div>
-    );
-  }
   return (
     <div className="overflow-x-auto rounded-box shadow">
       <table className="table table-xs table-fixed bg-base-100 w-full">
         <thead>
           <tr>
             <th className="w-8">#</th>
-            <th>Task Name</th>
+            <th className="text-left">Task Name</th>
             <th className="w-14 text-center">Urgency</th>
             <th className="w-24">Requester</th>
             <th className="w-24 text-center">Target Date</th>
           </tr>
         </thead>
         <tbody>
-          {tasks.map(task => (
+          {tasks.length === 0 ? (
+            <tr><td colSpan={5} className="text-center text-base-content/40 text-sm py-3">No tasks</td></tr>
+          ) : tasks.map(task => (
             <tr
               key={task.id}
               className="hover cursor-pointer [&>td]:py-0.5"

@@ -51,28 +51,25 @@ function VoiceButton({ listening, onToggle }: { listening: boolean; onToggle: ()
 
 // ── Ticket table ───────────────────────────────────────────────────────────────
 
-function TicketTable({ tickets, onRowClick, selectedId, showHeader = true }: {
+function TicketTable({ tickets, onRowClick, selectedId }: {
   tickets: Incident[]; onRowClick: (t: Incident) => void;
-  selectedId: string | null; showHeader?: boolean;
+  selectedId: string | null;
 }) {
-  if (tickets.length === 0) {
-    return <div className="bg-base-100 rounded-box shadow p-4 text-center text-base-content/40 text-sm">None</div>;
-  }
   return (
     <div className="overflow-x-auto rounded-box shadow">
       <table className="table table-xs table-fixed bg-base-100 w-full">
-        {showHeader && (
-          <thead>
-            <tr>
-              <th className="w-8">#</th>
-              <th>Task Name</th>
-              <th className="w-24">Requester</th>
-              <th className="w-24 text-center">Target Date</th>
-            </tr>
-          </thead>
-        )}
+        <thead>
+          <tr>
+            <th className="w-8">#</th>
+            <th className="text-left">Task Name</th>
+            <th className="w-24">Requester</th>
+            <th className="w-24 text-center">Target Date</th>
+          </tr>
+        </thead>
         <tbody>
-          {tickets.map(ticket => (
+          {tickets.length === 0 ? (
+            <tr><td colSpan={4} className="text-center text-base-content/40 text-sm py-3">None</td></tr>
+          ) : tickets.map(ticket => (
             <tr key={ticket.id}
               className={`hover cursor-pointer [&>td]:py-1 ${selectedId === ticket.id ? 'bg-primary/10' : ''}`}
               onClick={() => onRowClick(ticket)}
@@ -435,7 +432,7 @@ export default function TicketsPage() {
           </div>
           <div>
             <h2 className="text-lg font-bold mb-2">Tasks in the queue</h2>
-            <TicketTable tickets={inQueue} onRowClick={loadTicket} selectedId={selectedTicket?.id ?? null} showHeader={false} />
+            <TicketTable tickets={inQueue} onRowClick={loadTicket} selectedId={selectedTicket?.id ?? null} />
           </div>
         </div>
 
