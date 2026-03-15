@@ -209,6 +209,9 @@ export default function DashboardPage() {
   const [diagActionsText,  setDiagActionsText]  = useState('');
   const [diagConversation, setDiagConversation] = useState<Record<string, unknown>[]>([]);
   const [diagAnswer,       setDiagAnswer]       = useState('');
+  const [additionalHelpOpen,  setAdditionalHelpOpen]  = useState(false);
+  const [additionalHelpText,  setAdditionalHelpText]  = useState('');
+  const [additionalHelpReply, setAdditionalHelpReply] = useState<string | null>(null);
   const [attachOpen,        setAttachOpen]        = useState(false);
   const [attachedFile,      setAttachedFile]      = useState<File | null>(null);
   const [onboardingData, setOnboardingData] = useState<Record<string, string> | null>(null);
@@ -230,16 +233,22 @@ export default function DashboardPage() {
   const [listeningDate,         setListeningDate]         = useState(false);
   const [listeningInfoRequired, setListeningInfoRequired] = useState(false);
   const [listeningInfoDone,     setListeningInfoDone]     = useState(false);
-  const [listeningIssues,       setListeningIssues]       = useState(false);
-  const [listeningRequester,    setListeningRequester]    = useState(false);
+  const [listeningIssues,         setListeningIssues]         = useState(false);
+  const [listeningRequester,      setListeningRequester]      = useState(false);
+  const [listeningDiagCause,      setListeningDiagCause]      = useState(false);
+  const [listeningDiagActions,    setListeningDiagActions]    = useState(false);
+  const [listeningAdditionalHelp, setListeningAdditionalHelp] = useState(false);
 
   const numRecRef           = useRef<unknown>(null);
   const nameRecRef          = useRef<unknown>(null);
   const dateRecRef          = useRef<unknown>(null);
   const infoRequiredRecRef  = useRef<unknown>(null);
   const infoDoneRecRef      = useRef<unknown>(null);
-  const issuesRecRef        = useRef<unknown>(null);
-  const requesterRecRef     = useRef<unknown>(null);
+  const issuesRecRef          = useRef<unknown>(null);
+  const requesterRecRef       = useRef<unknown>(null);
+  const diagCauseRecRef       = useRef<unknown>(null);
+  const diagActionsRecRef     = useRef<unknown>(null);
+  const additionalHelpRecRef  = useRef<unknown>(null);
 
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
 
@@ -620,6 +629,9 @@ export default function DashboardPage() {
     setDiagSteps(null); setDiagActionsText('');
     setDiagConversation([]);
     setDiagAnswer('');
+    setAdditionalHelpOpen(false);
+    setAdditionalHelpText('');
+    setAdditionalHelpReply(null);
 
     try {
       const res = await fetch('/api/ai/diagnose', {
@@ -733,6 +745,32 @@ export default function DashboardPage() {
       await saveAiUpdate('ai_response', `Fix steps: ${steps.join(' | ')}`);
     } catch {
       toast.error('Could not get fix steps — try again.');
+    }
+    setDiagnosing(false);
+  }
+
+  async function handleAdditionalHelp() {
+    if (!additionalHelpText.trim() || !selectedType) return;
+    const question = additionalHelpText.trim();
+    setAdditionalHelpText('');
+    setDiagnosing(true);
+    const userTurn = { role: 'user' as const, content: question };
+    const updatedConv = [...diagConversation, userTurn];
+    setDiagConversation(updatedConv);
+    try {
+      const res = await fetch('/api/ai/diagnose', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ problem_type: selectedType, stage: 'followup', conversation: updatedConv }),
+      });
+      const data = await res.json();
+      const reply: string = data.cause || (data.questions as string[] | null)?.join('\n') || '';
+      if (reply) {
+        setAdditionalHelpReply(reply);
+        setDiagConversation(prev => [...prev, { role: 'ai' as const, content: reply }]);
+      }
+    } catch {
+      toast.error('Could not get AI response — try again.');
     }
     setDiagnosing(false);
   }
@@ -1280,11 +1318,28 @@ export default function DashboardPage() {
                     <div className="space-y-2">
                       <label className="label py-0"><span className="label-text text-xs font-semibold">Diagnosis</span></label>
                       <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                        <AutoTextarea
-                          className="textarea textarea-bordered textarea-sm w-full text-sm bg-white"
-                          value={diagCause}
-                          onChange={e => setDiagCause(e.target.value)}
-                        />
+                        <div className="flex gap-1 items-start">
+                          <AutoTextarea
+                            className="textarea textarea-bordered textarea-sm flex-1 text-sm bg-white"
+                            value={diagCause}
+                            onChange={e => setDiagCause(e.target.value)}
+                          />
+                          <VoiceButton
+                            listening={listeningDiagCause}
+                            onToggle={() => listeningDiagCause
+                              ? stopVoice(diagCauseRecRef as React.MutableRefObject<unknown>, setListeningDiagCause)
+                              : startVoice(
+                                  wrapVoiceResult(
+                                    text => setDiagCause(prev => prev ? `${prev} ${text}` : text),
+                                    () => setDiagCause(null)
+                                  ),
+                                  setListeningDiagCause,
+                                  diagCauseRecRef as React.MutableRefObject<unknown>,
+                                  true
+                                )
+                            }
+                          />
+                        </div>
                         <div>
                           <button
                             className="text-xs text-primary underline"
@@ -1322,15 +1377,112 @@ export default function DashboardPage() {
                     </div>
                   )}
 
-                  {/* Actions to take stage */}
+                  {/* Fix stage: Problem / Diagnosis / Actions */}
                   {diagStage === 'fix' && diagSteps && (
-                    <div className="space-y-2">
-                      <label className="label py-0"><span className="label-text text-xs font-semibold">Actions to take</span></label>
-                      <AutoTextarea
-                        className="textarea textarea-bordered textarea-sm w-full text-sm"
-                        value={diagActionsText}
-                        onChange={e => setDiagActionsText(e.target.value)}
-                      />
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="label py-0"><span className="label-text text-xs font-semibold">Problem to fix</span></label>
+                        <AutoTextarea
+                          className="textarea textarea-bordered textarea-sm w-full text-sm"
+                          value={infoDone}
+                          onChange={e => setInfoDone(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="label py-0"><span className="label-text text-xs font-semibold">Diagnosis</span></label>
+                        <div className="flex gap-1 items-start">
+                          <AutoTextarea
+                            className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                            value={diagCause ?? ''}
+                            onChange={e => setDiagCause(e.target.value)}
+                          />
+                          <VoiceButton
+                            listening={listeningDiagCause}
+                            onToggle={() => listeningDiagCause
+                              ? stopVoice(diagCauseRecRef as React.MutableRefObject<unknown>, setListeningDiagCause)
+                              : startVoice(
+                                  wrapVoiceResult(
+                                    text => setDiagCause(prev => prev ? `${prev} ${text}` : text),
+                                    () => setDiagCause(null)
+                                  ),
+                                  setListeningDiagCause,
+                                  diagCauseRecRef as React.MutableRefObject<unknown>,
+                                  true
+                                )
+                            }
+                          />
+                        </div>
+                      </div>
+                      <div className="space-y-1">
+                        <label className="label py-0"><span className="label-text text-xs font-semibold">Actions to take</span></label>
+                        <div className="flex gap-1 items-start">
+                          <AutoTextarea
+                            className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                            value={diagActionsText}
+                            onChange={e => setDiagActionsText(e.target.value)}
+                          />
+                          <VoiceButton
+                            listening={listeningDiagActions}
+                            onToggle={() => listeningDiagActions
+                              ? stopVoice(diagActionsRecRef as React.MutableRefObject<unknown>, setListeningDiagActions)
+                              : startVoice(
+                                  wrapVoiceResult(
+                                    text => setDiagActionsText(prev => prev ? `${prev} ${text}` : text),
+                                    () => setDiagActionsText('')
+                                  ),
+                                  setListeningDiagActions,
+                                  diagActionsRecRef as React.MutableRefObject<unknown>,
+                                  true
+                                )
+                            }
+                          />
+                        </div>
+                      </div>
+                      {!additionalHelpOpen && (
+                        <button
+                          className="btn btn-outline btn-sm w-full"
+                          onClick={() => setAdditionalHelpOpen(true)}
+                        >
+                          Ask the AI for additional help
+                        </button>
+                      )}
+                      {additionalHelpOpen && (
+                        <div className="space-y-2">
+                          <div className="flex gap-1 items-start">
+                            <AutoTextarea
+                              className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                              value={additionalHelpText}
+                              onChange={e => setAdditionalHelpText(e.target.value)}
+                              placeholder="What additional help do you need?"
+                            />
+                            <VoiceButton
+                              listening={listeningAdditionalHelp}
+                              onToggle={() => listeningAdditionalHelp
+                                ? stopVoice(additionalHelpRecRef as React.MutableRefObject<unknown>, setListeningAdditionalHelp)
+                                : startVoice(
+                                    wrapVoiceResult(
+                                      text => setAdditionalHelpText(prev => prev ? `${prev} ${text}` : text),
+                                      () => setAdditionalHelpText('')
+                                    ),
+                                    setListeningAdditionalHelp,
+                                    additionalHelpRecRef as React.MutableRefObject<unknown>,
+                                    true
+                                  )
+                              }
+                            />
+                          </div>
+                          {additionalHelpReply && (
+                            <div className="rounded-box p-3 bg-primary/10 text-sm whitespace-pre-wrap">{additionalHelpReply}</div>
+                          )}
+                          <button
+                            className="btn btn-primary btn-sm w-full"
+                            onClick={handleAdditionalHelp}
+                            disabled={diagnosing || !additionalHelpText.trim()}
+                          >
+                            {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
+                          </button>
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
