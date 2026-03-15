@@ -560,7 +560,7 @@ export default function DashboardPage() {
     if (!selectedType) return;
 
     // Onboarding: use AI to extract structured data, then show asset proposal
-    if (selectedType === 'onboarding' || selectedType === 'onboarding_offboarding') {
+    if (selectedType === 'onboarding' || selectedType === 'onboarding_offboarding' || selectedType === 'offboarding') {
       if (!infoDone.trim() && !infoRequired.trim()) {
         router.push('/onboarding');
         return;
@@ -1001,7 +1001,7 @@ export default function DashboardPage() {
               </div>
 
               {/* Task details — only for onboarding/offboarding */}
-              {selectedType === 'onboarding_offboarding' && <div className="form-control">
+              {(selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding') && <div className="form-control">
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Information needed</span>
                 </label>
@@ -1139,7 +1139,7 @@ export default function DashboardPage() {
                   )}
 
                   {/* Cause stage — onboarding: asset proposals */}
-                  {diagStage === 'cause' && (selectedType === 'onboarding' || selectedType === 'onboarding_offboarding') && onboardingData && (
+                  {diagStage === 'cause' && (selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding') && onboardingData && (
                     <div className="rounded-box p-3 bg-primary/10 space-y-4">
 
                       {(['Computer', 'Phone', 'iPad'] as const).map(cat => {
@@ -1276,7 +1276,7 @@ export default function DashboardPage() {
                   )}
 
                   {/* Cause stage — general: diagnosis result */}
-                  {diagStage === 'cause' && selectedType !== 'onboarding' && selectedType !== 'onboarding_offboarding' && diagCause && (
+                  {diagStage === 'cause' && selectedType !== 'onboarding' && selectedType !== 'offboarding' && selectedType !== 'onboarding_offboarding' && diagCause && (
                     <div className="space-y-2">
                       <label className="label py-0"><span className="label-text text-xs font-semibold">Diagnosis</span></label>
                       <div className="rounded-box p-3 bg-primary/10 space-y-2">
@@ -1450,10 +1450,10 @@ export default function DashboardPage() {
                 onChange={e => setNewTaskType(e.target.value)}>
                 <option value="">Select task type *</option>
                 <option value="problem_to_fix">Problem to fix</option>
-                <option value="ticket_to_fix">Ticket to fix</option>
-                <option value="onboarding_offboarding">Onboarding/Offboarding</option>
+                <option value="ticket_to_fix">Ticket to deal with</option>
                 <option value="decision_to_make">Decision to make</option>
-                <option value="project_to_manage">Project to manage</option>
+                <option value="onboarding">Onboarding</option>
+                <option value="offboarding">Offboarding</option>
               </select>
             </div>
             <div className="modal-action mt-0">

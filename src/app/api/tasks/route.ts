@@ -45,9 +45,12 @@ export async function GET() {
 
   const SCREEN_LABEL: Record<string, string> = {
     problem_to_fix:         'Problem to fix',
-    ticket_to_fix:          'Ticket to fix',
-    onboarding_offboarding: 'Onboarding/Offboarding',
+    ticket_to_fix:          'Ticket to deal with',
     decision_to_make:       'Decision to make',
+    onboarding:             'Onboarding',
+    offboarding:            'Offboarding',
+    // legacy
+    onboarding_offboarding: 'Onboarding',
     project_to_manage:      'Project to manage',
   };
 

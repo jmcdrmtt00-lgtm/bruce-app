@@ -42,12 +42,13 @@ function normalizePriority(p: string | undefined | null): 'high' | 'low' | null 
 
 function normalizeTaskType(t: string | undefined | null): string | null {
   if (!t) return null;
-  const lower = t.toLowerCase().trim().replace(/[\s/]+/g, '_');
-  if (lower.includes('problem'))      return 'problem_to_fix';
-  if (lower.includes('ticket'))       return 'ticket_to_fix';
-  if (lower.includes('onboarding') || lower.includes('offboarding')) return 'onboarding_offboarding';
-  if (lower.includes('decision'))     return 'decision_to_make';
-  if (lower.includes('project'))      return 'project_to_manage';
+  const lower = t.toLowerCase().trim();
+  if (lower.includes('problem'))     return 'problem_to_fix';
+  if (lower.includes('ticket'))      return 'ticket_to_fix';
+  if (lower.includes('offboarding')) return 'offboarding';
+  if (lower.includes('onboarding'))  return 'onboarding';
+  if (lower.includes('decision'))    return 'decision_to_make';
+  if (lower.includes('project'))     return 'project_to_manage';
   return null;
 }
 
