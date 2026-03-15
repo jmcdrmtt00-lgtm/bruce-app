@@ -1069,8 +1069,8 @@ export default function DashboardPage() {
                 </div>
               </div>}
 
-              {/* infoDone — label varies by task type */}
-              <div className="form-control">
+              {/* infoDone — label varies by task type; hidden in fix stage (shown there instead) */}
+              <div className={`form-control${diagStage === 'fix' ? ' hidden' : ''}`}>
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">
                     {selectedType === 'problem_to_fix' || selectedType === 'ticket_to_fix' ? 'Problem to fix'
@@ -1160,12 +1160,29 @@ export default function DashboardPage() {
                       <ol className="list-decimal list-inside text-sm space-y-1">
                         {diagQuestions.map((q, i) => <li key={i}>{q}</li>)}
                       </ol>
-                      <AutoTextarea
-                        className="textarea textarea-bordered textarea-sm w-full text-sm font-mono"
-                        value={diagAnswer}
-                        onChange={e => setDiagAnswer(e.target.value)}
-                        placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
-                      />
+                      <div className="flex gap-1 items-start">
+                        <AutoTextarea
+                          className="textarea textarea-bordered textarea-sm flex-1 text-sm font-mono"
+                          value={diagAnswer}
+                          onChange={e => setDiagAnswer(e.target.value)}
+                          placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
+                        />
+                        <VoiceButton
+                          listening={listeningDiagActions}
+                          onToggle={() => listeningDiagActions
+                            ? stopVoice(diagActionsRecRef as React.MutableRefObject<unknown>, setListeningDiagActions)
+                            : startVoice(
+                                wrapVoiceResult(
+                                  text => setDiagAnswer(prev => prev ? `${prev} ${text}` : text),
+                                  () => setDiagAnswer('')
+                                ),
+                                setListeningDiagActions,
+                                diagActionsRecRef as React.MutableRefObject<unknown>,
+                                true
+                              )
+                          }
+                        />
+                      </div>
                       <button
                         className="btn btn-primary btn-sm w-full"
                         onClick={handleFollowUp}
@@ -1440,7 +1457,7 @@ export default function DashboardPage() {
                       </div>
                       {!additionalHelpOpen && (
                         <button
-                          className="btn btn-outline btn-sm w-full"
+                          className="btn btn-primary btn-sm w-full"
                           onClick={() => setAdditionalHelpOpen(true)}
                         >
                           Ask the AI for additional help
