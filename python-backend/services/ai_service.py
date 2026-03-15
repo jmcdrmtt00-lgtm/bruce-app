@@ -323,6 +323,75 @@ async def diagnose(
             }
         return {"recommendation": text or None, "questions": None}
 
+    elif problem_type == "nurse_assess":
+        # Nurse self-service: questions loop → {assessment, reason} or {questions}
+        if conversation:
+            messages = [
+                {"role": "assistant" if t.get("role") == "ai" else "user",
+                 "content": t.get("content", t.get("text", ""))}
+                for t in conversation
+                if t.get("role") not in ("tool_use", "tool_result")
+            ]
+        else:
+            msg = (information or "").strip() or "No problem described."
+            messages = [{"role": "user", "content": msg}]
+
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=512,
+            system=prompt_loader.get_nurse_assess_prompt(),
+            messages=messages,
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text_block = next((b for b in message.content if hasattr(b, "text")), None)
+        text = text_block.text.strip() if text_block else ""
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+        parsed = None
+        try:
+            parsed = _json.loads(text)
+        except Exception:
+            import re as _re
+            m = _re.search(r'\{.*\}', text, _re.DOTALL)
+            if m:
+                try:
+                    parsed = _json.loads(m.group())
+                except Exception:
+                    pass
+        if parsed:
+            return {
+                "assessment": parsed.get("assessment") or None,
+                "reason":     parsed.get("reason") or None,
+                "questions":  parsed.get("questions") or None,
+            }
+        return {"assessment": None, "reason": None, "questions": [text]}
+
+    elif problem_type == "nurse_coach":
+        # Nurse coaching: given problem + context, return step-by-step fix
+        context = (information or task_details or "Unknown problem").strip()
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=512,
+            system=prompt_loader.get_nurse_coach_prompt(),
+            messages=[{"role": "user", "content": context}],
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text_block = next((b for b in message.content if hasattr(b, "text")), None)
+        text = text_block.text.strip() if text_block else ""
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+        try:
+            result = _json.loads(text)
+            return {"steps": result.get("steps", [])}
+        except Exception:
+            return {"steps": [text]}
+
     elif stage == "fix":
         # Call 3: given agreed cause, return fix steps
         cause_text = information or task_details or "Unknown cause"

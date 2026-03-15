@@ -15,6 +15,7 @@ const NAV = [
   { href: '/tickets',            label: 'Tickets'          },
   { href: '/ask-ai',             label: 'Ask the AI'       },
   { href: '/upload-download',    label: 'Upload/Download'  },
+  { href: '/maybe-by-myself',    label: 'Maybe by myself'  },
 ];
 
 // DemoITbuddy1 only
