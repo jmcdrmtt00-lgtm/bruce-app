@@ -144,6 +144,8 @@ Return ONLY a valid JSON object with exactly these fields:
 
 Plain text only, no markdown symbols."""
 
+_DEFAULT_NURSE_EXPLAIN = """You are IT Buddy, helping a healthcare staff member who is following technology troubleshooting steps. They have a question about something they don't understand. Answer in very plain, simple language — no technical jargon at all. Be brief, friendly, and encouraging. One or two sentences is usually enough. Plain text only, no markdown."""
+
 _DEFAULT_ADVISE_ANSWER = """You are IT Buddy, an IT advisor for an IT professional at Oriol Healthcare — \
 a nursing facility operator with three sites: Holden, Oakdale, and Business Office.
 
@@ -253,6 +255,11 @@ def get_nurse_assess_prompt() -> str:
 def get_nurse_coach_prompt() -> str:
     _ensure_loaded()
     return _prompts.get("p-bruce-nurse-coach") or _DEFAULT_NURSE_COACH
+
+
+def get_nurse_explain_prompt() -> str:
+    _ensure_loaded()
+    return _prompts.get("p-bruce-nurse-explain") or _DEFAULT_NURSE_EXPLAIN
 
 
 def get_advise_plan_prompt() -> str:

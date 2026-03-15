@@ -392,6 +392,22 @@ async def diagnose(
         except Exception:
             return {"steps": [text]}
 
+    elif problem_type == "nurse_explain":
+        # Nurse clarification: answer a plain-language question about the coaching steps
+        context = (information or "").strip() or "No context provided."
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=256,
+            system=prompt_loader.get_nurse_explain_prompt(),
+            messages=[{"role": "user", "content": context}],
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text_block = next((b for b in message.content if hasattr(b, "text")), None)
+        text = text_block.text.strip() if text_block else ""
+        return {"answer": text}
+
     elif stage == "fix":
         # Call 3: given agreed cause, return fix steps
         cause_text = information or task_details or "Unknown cause"
