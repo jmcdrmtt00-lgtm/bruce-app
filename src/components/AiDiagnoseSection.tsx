@@ -1,6 +1,6 @@
 'use client';
 
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
@@ -14,14 +14,15 @@ export function AutoTextarea({ value, onChange, onBlur, placeholder, className }
   className?: string;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  // Resize on every render where value changes
-  const handleChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
-    onChange(e);
+  // Resize whenever value changes, including when loaded externally from DB
+  useEffect(() => {
     const el = ref.current;
-    if (el) { el.style.height = 'auto'; el.style.height = `${el.scrollHeight}px`; }
-  };
+    if (!el) return;
+    el.style.height = 'auto';
+    el.style.height = `${el.scrollHeight}px`;
+  }, [value]);
   return (
-    <textarea ref={ref} rows={1} value={value} onChange={handleChange} onBlur={onBlur}
+    <textarea ref={ref} rows={1} value={value} onChange={onChange} onBlur={onBlur}
       placeholder={placeholder} className={className}
       style={{ resize: 'none', overflow: 'hidden', minHeight: '2.25rem' }} />
   );
