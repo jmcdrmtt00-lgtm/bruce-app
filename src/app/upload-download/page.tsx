@@ -7,7 +7,6 @@ import toast from 'react-hot-toast';
 
 // ── Shared types ───────────────────────────────────────────────────────────────
 
-type FileType = 'inventory' | 'tasks';
 
 // ── Inventory types & helpers ──────────────────────────────────────────────────
 
@@ -623,27 +622,14 @@ function TasksSection() {
 // ── Page ───────────────────────────────────────────────────────────────────────
 
 export default function UploadDownloadPage() {
-  const [fileType, setFileType] = useState<FileType>('inventory');
-
   return (
     <main className="min-h-screen bg-base-200 py-8 px-4">
-      <div className="max-w-2xl mx-auto space-y-6">
-
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">Upload / Download</h1>
-          <select
-            className="select select-bordered select-sm"
-            value={fileType}
-            onChange={e => setFileType(e.target.value as FileType)}
-          >
-            <option value="inventory">Inventory</option>
-            <option value="tasks">Tasks</option>
-          </select>
+      <div className="max-w-6xl mx-auto">
+        <h1 className="text-2xl font-bold mb-6">Upload / Download</h1>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          <InventorySection />
+          <TasksSection />
         </div>
-
-        {fileType === 'inventory' && <InventorySection />}
-        {fileType === 'tasks'     && <TasksSection />}
-
       </div>
     </main>
   );
