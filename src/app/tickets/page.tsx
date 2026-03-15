@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Incident, IncidentUpdate } from '@/types';
 import { formatDate } from '@/lib/formatDate';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
+import AiDiagnoseSection, { AutoTextarea, VoiceButton, startVoice, stopVoice, wrapVoiceResult } from '@/components/AiDiagnoseSection';
 
 // ── Shared helpers ─────────────────────────────────────────────────────────────
 
@@ -18,35 +19,6 @@ function normalizeScreenToTypeId(screen: string): string {
   const lower = screen.toLowerCase().replace(/[\s-]/g, '_');
   if (TASK_TYPES[lower]) return lower;
   return '';
-}
-
-function AutoTextarea({ value, onChange, onBlur, placeholder, className }: {
-  value: string; onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
-  onBlur?: () => void; placeholder?: string; className?: string;
-}) {
-  const ref = useRef<HTMLTextAreaElement>(null);
-  useEffect(() => {
-    const el = ref.current;
-    if (!el) return;
-    el.style.height = 'auto';
-    el.style.height = `${el.scrollHeight}px`;
-  }, [value]);
-  return (
-    <textarea ref={ref} rows={1} value={value} onChange={onChange} onBlur={onBlur}
-      placeholder={placeholder} className={className}
-      style={{ resize: 'none', overflow: 'hidden', minHeight: '2.25rem' }} />
-  );
-}
-
-function VoiceButton({ listening, onToggle }: { listening: boolean; onToggle: () => void }) {
-  return (
-    <button
-      className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${listening ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200' : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'}`}
-      onClick={onToggle}
-    >
-      {listening ? 'listening' : 'not listening'}
-    </button>
-  );
 }
 
 // ── Ticket table ───────────────────────────────────────────────────────────────
@@ -102,7 +74,7 @@ export default function TicketsPage() {
   const [allUpdates,       setAllUpdates]       = useState<IncidentUpdate[]>([]);
   const [historyOpen,      setHistoryOpen]      = useState(false);
 
-  // Panel state — mirrors Dashboard exactly
+  // Panel state
   const [taskNumber,   setTaskNumber]   = useState('');
   const [taskName,     setTaskName]     = useState('');
   const [priority,     setPriority]     = useState<'high' | 'low' | ''>('');
@@ -116,16 +88,8 @@ export default function TicketsPage() {
   const [selectedTicket, setSelectedTicket] = useState<Incident | null>(null);
   const [saveStatus,   setSaveStatus]   = useState<'idle' | 'saving' | 'saved'>('idle');
 
-  // AI state
-  const [diagnosing,       setDiagnosing]       = useState(false);
-  const [diagStage,        setDiagStage]        = useState<'idle' | 'questions' | 'cause' | 'fix'>('idle');
-  const [diagCause,        setDiagCause]        = useState<string | null>(null);
-  const [diagDetail,       setDiagDetail]       = useState<string | null>(null);
-  const [diagDetailOpen,   setDiagDetailOpen]   = useState(false);
-  const [diagQuestions,    setDiagQuestions]    = useState<string[] | null>(null);
-  const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
-  const [diagConversation, setDiagConversation] = useState<Record<string, unknown>[]>([]);
-  const [diagAnswer,       setDiagAnswer]       = useState('');
+  // AI stage (for hiding infoDone when fix/recommendation summary is shown)
+  const [aiStage, setAiStage] = useState('idle');
 
   // Autosave bookkeeping
   const panelDirtyRef    = useRef(false);
@@ -134,7 +98,7 @@ export default function TicketsPage() {
   const savedInfoDoneRef = useRef('');
   const savedIssuesRef   = useRef('');
 
-  // Voice state + refs
+  // Voice state + refs (for non-AI fields)
   const [listeningName,         setListeningName]         = useState(false);
   const [listeningDate,         setListeningDate]         = useState(false);
   const [listeningRequester,    setListeningRequester]    = useState(false);
@@ -149,6 +113,10 @@ export default function TicketsPage() {
   const infoDoneRecRef     = useRef<unknown>(null);
   const issuesRecRef       = useRef<unknown>(null);
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
+
+  function wrap(onResult: (t: string) => void, clearFn: () => void) {
+    return wrapVoiceResult(onResult, clearFn, clearLastVoiceFieldRef);
+  }
 
   const loadTickets = useCallback(() => {
     fetch('/api/issues?source=ticket')
@@ -202,10 +170,8 @@ export default function TicketsPage() {
     setTaskNumber(''); setTaskName(''); setPriority(''); setDateDue('');
     setStatus('pending'); setRequester(''); setInfoRequired(''); setInfoDone('');
     setIssues(''); setSelectedTicket(null); setSelectedType('general');
-    setDiagStage('idle'); setDiagCause(null); setDiagDetail(null);
-    setDiagDetailOpen(false); setDiagQuestions(null); setDiagSteps(null);
-    setDiagConversation([]); setDiagAnswer('');
     setAllUpdates([]); setHistoryOpen(false);
+    setAiStage('idle');
     panelDirtyRef.current = false;
     savedDetailsRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
   }
@@ -222,10 +188,8 @@ export default function TicketsPage() {
     setSelectedType(typeId);
     setInfoRequired(TASK_TYPES[typeId] ? `Information needed: ${TASK_TYPES[typeId].fields.join(', ')}` : '');
     setInfoDone(''); setIssues('');
-    setDiagStage('idle'); setDiagCause(null); setDiagDetail(null);
-    setDiagDetailOpen(false); setDiagQuestions(null); setDiagSteps(null);
-    setDiagConversation([]); setDiagAnswer('');
     setAllUpdates([]); setHistoryOpen(false);
+    setAiStage('idle');
     setSelectedTicket(ticket);
     panelDirtyRef.current = false;
     savedDetailsRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
@@ -290,44 +254,6 @@ export default function TicketsPage() {
     } catch { toast.error('Could not delete ticket'); }
   }
 
-  // Voice helpers
-  function startVoice(onResult: (text: string) => void, setActive: (v: boolean) => void, ref: React.MutableRefObject<unknown>, continuous = false) {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
-    if (!SR) { toast.error('Voice input requires Chrome.'); return; }
-    const r = new SR();
-    r.continuous = continuous; r.interimResults = false;
-    r.onresult = (e: { results: SpeechRecognitionResultList; resultIndex: number }) => {
-      onResult(e.results[e.resultIndex][0].transcript);
-    };
-    r.onerror = (e: { error: string }) => {
-      setActive(false);
-      if (e.error === 'not-allowed') toast.error('Microphone access was denied.');
-      else if (e.error !== 'no-speech') toast.error(`Voice error: ${e.error}`);
-    };
-    r.onend = () => setActive(false);
-    try { r.start(); ref.current = r; setActive(true); }
-    catch (err) { toast.error(`Could not start voice: ${err instanceof Error ? err.message : String(err)}`); }
-  }
-
-  function stopVoice(ref: React.MutableRefObject<unknown>, setActive: (v: boolean) => void) {
-    (ref.current as { stop: () => void } | null)?.stop(); setActive(false);
-  }
-
-  function wrapVoiceResult(onResult: (text: string) => void, clearFn: () => void) {
-    return (text: string) => {
-      const lower = text.toLowerCase().trim();
-      if (lower.startsWith('hey buddy')) {
-        const cmd = text.slice('hey buddy'.length).trim().toLowerCase();
-        if (cmd.includes('clear') || cmd.includes('remove') || cmd.includes('erase')) {
-          clearLastVoiceFieldRef.current(); toast('Field cleared');
-        }
-      } else {
-        onResult(text); clearLastVoiceFieldRef.current = clearFn;
-      }
-    };
-  }
-
   function parseSpokenDate(text: string): string {
     const d = new Date(text);
     if (!isNaN(d.getTime())) return d.toISOString().split('T')[0];
@@ -343,73 +269,6 @@ export default function TicketsPage() {
     markDirty();
   }
 
-  async function handleDiagnose() {
-    if (!selectedType) return;
-    setDiagnosing(true); setDiagStage('idle'); setDiagCause(null); setDiagDetail(null);
-    setDiagDetailOpen(false); setDiagQuestions(null); setDiagSteps(null);
-    setDiagConversation([]); setDiagAnswer('');
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_type: selectedType, stage: 'symptoms', task_details: infoRequired || null, information: infoDone || null }),
-      });
-      const data = await res.json();
-      const symptoms = [infoRequired, infoDone].filter(Boolean).join('\n') || 'No symptoms provided.';
-      const userTurn = { role: 'user' as const, content: `Symptoms: ${symptoms}` };
-      const toolTurns = data._tool_context ? [
-        { role: 'tool_use' as const, tool_use_id: data._tool_context.tool_call.tool_use_id, name: data._tool_context.tool_call.name, input: data._tool_context.tool_call.input },
-        { role: 'tool_result' as const, tool_use_id: data._tool_context.tool_call.tool_use_id, content: data._tool_context.tool_result },
-      ] : [];
-      if (data.cause) {
-        setDiagConversation([userTurn, ...toolTurns, { role: 'ai' as const, content: data.cause }]);
-        setDiagCause(data.cause); setDiagDetail(data.detail ?? null); setDiagStage('cause');
-      } else if (data.questions?.length) {
-        setDiagConversation([userTurn, ...toolTurns, { role: 'ai' as const, content: data.questions.join('\n') }]);
-        setDiagQuestions(data.questions); setDiagStage('questions');
-        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
-      }
-    } catch { toast.error('Could not get AI response — try again.'); }
-    setDiagnosing(false);
-  }
-
-  async function handleFollowUp() {
-    if (!diagAnswer.trim() || !selectedType) return;
-    const answer = diagAnswer.trim(); setDiagAnswer('');
-    const userTurn = { role: 'user' as const, content: answer };
-    const updatedConv = [...diagConversation, userTurn];
-    setDiagConversation(updatedConv); setDiagnosing(true);
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_type: selectedType, stage: 'followup', conversation: updatedConv }),
-      });
-      const data = await res.json();
-      if (data.cause) {
-        setDiagConversation(prev => [...prev, { role: 'ai' as const, content: data.cause }]);
-        setDiagCause(data.cause); setDiagDetail(data.detail ?? null); setDiagStage('cause');
-      } else if (data.questions?.length) {
-        setDiagConversation(prev => [...prev, { role: 'ai' as const, content: (data.questions as string[]).join('\n') }]);
-        setDiagQuestions(data.questions); setDiagStage('questions');
-        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
-      }
-    } catch { toast.error('Could not get AI response — try again.'); }
-    setDiagnosing(false);
-  }
-
-  async function handleConfirmCause() {
-    if (!diagCause || !selectedType) return;
-    setDiagnosing(true);
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_type: selectedType, stage: 'fix', information: diagCause }),
-      });
-      const data = await res.json();
-      setDiagSteps(data.steps ?? []); setDiagStage('fix');
-    } catch { toast.error('Could not get fix steps — try again.'); }
-    setDiagnosing(false);
-  }
-
   const inProgress = useMemo(() =>
     tickets.filter(t => t.status === 'in_progress')
       .sort((a, b) => (a.priority === 'high' ? 0 : 1) - (b.priority === 'high' ? 0 : 1)),
@@ -419,6 +278,8 @@ export default function TicketsPage() {
     tickets.filter(t => t.status === 'pending' || t.status === 'open')
       .sort((a, b) => a.task_number - b.task_number),
   [tickets]);
+
+  const hideInfoDone = aiStage === 'fix' || aiStage === 'recommendation';
 
   return (
     <main className="min-h-screen bg-base-200 px-8 py-4">
@@ -478,10 +339,7 @@ export default function TicketsPage() {
                     listening={listeningName}
                     onToggle={() => listeningName
                       ? stopVoice(nameRecRef as React.MutableRefObject<unknown>, setListeningName)
-                      : startVoice(
-                          wrapVoiceResult(t => setTaskName(prev => prev ? `${prev} ${t}` : t), () => setTaskName('')),
-                          setListeningName, nameRecRef as React.MutableRefObject<unknown>, true
-                        )
+                      : startVoice(wrap(t => setTaskName(prev => prev ? `${prev} ${t}` : t), () => setTaskName('')), setListeningName, nameRecRef as React.MutableRefObject<unknown>, true)
                     }
                   />
                 </div>
@@ -516,10 +374,7 @@ export default function TicketsPage() {
                       listening={listeningDate}
                       onToggle={() => listeningDate
                         ? stopVoice(dateRecRef as React.MutableRefObject<unknown>, setListeningDate)
-                        : startVoice(
-                            wrapVoiceResult(t => { const d = parseSpokenDate(t); if (d) setDateDue(d); }, () => setDateDue('')),
-                            setListeningDate, dateRecRef as React.MutableRefObject<unknown>, false
-                          )
+                        : startVoice(wrap(t => { const d = parseSpokenDate(t); if (d) setDateDue(d); }, () => setDateDue('')), setListeningDate, dateRecRef as React.MutableRefObject<unknown>, false)
                       }
                     />
                   </div>
@@ -537,10 +392,7 @@ export default function TicketsPage() {
                       listening={listeningRequester}
                       onToggle={() => listeningRequester
                         ? stopVoice(requesterRecRef as React.MutableRefObject<unknown>, setListeningRequester)
-                        : startVoice(
-                            wrapVoiceResult(t => setRequester(prev => prev ? `${prev} ${t}` : t), () => setRequester('')),
-                            setListeningRequester, requesterRecRef as React.MutableRefObject<unknown>, true
-                          )
+                        : startVoice(wrap(t => setRequester(prev => prev ? `${prev} ${t}` : t), () => setRequester('')), setListeningRequester, requesterRecRef as React.MutableRefObject<unknown>, true)
                       }
                     />
                   </div>
@@ -554,9 +406,13 @@ export default function TicketsPage() {
                 </div>
               </div>
 
-              {/* Problem to fix (infoDone — tickets are always ticket_to_fix) */}
-              <div className="form-control">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Problem to fix</span></label>
+              {/* infoDone — hidden when AI fix/recommendation summary is shown */}
+              <div className={`form-control${hideInfoDone ? ' hidden' : ''}`}>
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">
+                    {selectedType === 'ticket_to_fix' ? 'Ticket to deal with' : 'Problem to fix'}
+                  </span>
+                </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
                     className="textarea textarea-bordered textarea-sm flex-1 text-sm"
@@ -569,76 +425,30 @@ export default function TicketsPage() {
                     listening={listeningInfoDone}
                     onToggle={() => listeningInfoDone
                       ? stopVoice(infoDoneRecRef as React.MutableRefObject<unknown>, setListeningInfoDone)
-                      : startVoice(
-                          wrapVoiceResult(t => setInfoDone(prev => prev ? `${prev} ${t}` : t), () => setInfoDone('')),
-                          setListeningInfoDone, infoDoneRecRef as React.MutableRefObject<unknown>, true
-                        )
+                      : startVoice(wrap(t => setInfoDone(prev => prev ? `${prev} ${t}` : t), () => setInfoDone('')), setListeningInfoDone, infoDoneRecRef as React.MutableRefObject<unknown>, true)
                     }
                   />
                 </div>
-                <div className="mt-2">
-                  <button className="btn btn-primary btn-sm w-full" onClick={handleDiagnose} disabled={diagnosing}>
-                    {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                    {diagnosing ? 'Thinking…' : 'Ask the AI'}
-                  </button>
-                </div>
               </div>
 
-              {/* IT Buddy response panel */}
-              {diagStage !== 'idle' && (
-                <div className="form-control">
-                  <label className="label py-0"><span className="label-text text-xs font-semibold">IT Buddy</span></label>
+              {/* AI Diagnose Section */}
+              <AiDiagnoseSection
+                selectedType={selectedType}
+                infoDone={infoDone}
+                setInfoDone={setInfoDone}
+                infoRequired={infoRequired}
+                onSaveUpdate={async (type, note) => {
+                  if (!selectedTicket) return;
+                  await fetch(`/api/issues/${selectedTicket.id}/updates`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ type, note }),
+                  });
+                }}
+                onStageChange={setAiStage}
+              />
 
-                  {diagStage === 'questions' && diagQuestions && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-xs font-semibold text-base-content/50">To narrow down the cause, please answer:</p>
-                      <ol className="list-decimal list-inside text-sm space-y-1">
-                        {diagQuestions.map((q, i) => <li key={i}>{q}</li>)}
-                      </ol>
-                      <AutoTextarea
-                        className="textarea textarea-bordered textarea-sm w-full text-sm font-mono"
-                        value={diagAnswer} onChange={e => setDiagAnswer(e.target.value)}
-                        placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
-                      />
-                      <button className="btn btn-outline btn-sm w-full" onClick={handleFollowUp} disabled={diagnosing || !diagAnswer.trim()}>
-                        {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
-                      </button>
-                    </div>
-                  )}
-
-                  {diagStage === 'cause' && diagCause && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-sm font-medium">{diagCause}</p>
-                      <div>
-                        <button className="text-xs text-primary underline" onClick={() => setDiagDetailOpen(o => !o)}>
-                          {diagDetailOpen ? 'Hide detail' : 'More detail →'}
-                        </button>
-                        {diagDetailOpen && <p className="text-xs text-base-content/70 mt-1">{diagDetail ?? 'No additional detail available.'}</p>}
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <button className="btn btn-primary btn-sm flex-1" onClick={handleConfirmCause} disabled={diagnosing}>
-                          {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Steps to fix'}
-                        </button>
-                        <button className="btn btn-outline btn-sm flex-1" disabled={diagnosing}
-                          onClick={() => { setDiagStage('questions'); setDiagQuestions(["What else can you tell me about the problem?"]); setDiagAnswer('1. '); setDiagCause(null); setDiagDetail(null); }}>
-                          Not quite right
-                        </button>
-                      </div>
-                    </div>
-                  )}
-
-                  {diagStage === 'fix' && diagSteps && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-xs font-semibold text-base-content/50">Try these steps in order:</p>
-                      <ol className="list-decimal list-inside text-sm space-y-1">
-                        {diagSteps.map((s, i) => <li key={i}>{s}</li>)}
-                      </ol>
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {/* Issues / Comments — always at the bottom */}
+              {/* Issues / Comments */}
               <div className="form-control">
                 <label className="label py-0"><span className="label-text text-xs font-semibold">Issues / Comments</span></label>
                 <div className="flex gap-1 items-start">
@@ -652,10 +462,7 @@ export default function TicketsPage() {
                     listening={listeningIssues}
                     onToggle={() => listeningIssues
                       ? stopVoice(issuesRecRef as React.MutableRefObject<unknown>, setListeningIssues)
-                      : startVoice(
-                          wrapVoiceResult(t => setIssues(prev => prev ? `${prev} ${t}` : t), () => setIssues('')),
-                          setListeningIssues, issuesRecRef as React.MutableRefObject<unknown>, true
-                        )
+                      : startVoice(wrap(t => setIssues(prev => prev ? `${prev} ${t}` : t), () => setIssues('')), setListeningIssues, issuesRecRef as React.MutableRefObject<unknown>, true)
                     }
                   />
                 </div>
