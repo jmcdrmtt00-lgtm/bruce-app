@@ -236,6 +236,7 @@ export default function DashboardPage() {
   const [listeningIssues,         setListeningIssues]         = useState(false);
   const [listeningRequester,      setListeningRequester]      = useState(false);
   const [listeningDiagCause,      setListeningDiagCause]      = useState(false);
+  const [listeningDiagAnswer,     setListeningDiagAnswer]     = useState(false);
   const [listeningDiagActions,    setListeningDiagActions]    = useState(false);
   const [listeningAdditionalHelp, setListeningAdditionalHelp] = useState(false);
 
@@ -247,6 +248,7 @@ export default function DashboardPage() {
   const issuesRecRef          = useRef<unknown>(null);
   const requesterRecRef       = useRef<unknown>(null);
   const diagCauseRecRef       = useRef<unknown>(null);
+  const diagAnswerRecRef      = useRef<unknown>(null);
   const diagActionsRecRef     = useRef<unknown>(null);
   const additionalHelpRecRef  = useRef<unknown>(null);
 
@@ -1168,16 +1170,16 @@ export default function DashboardPage() {
                           placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
                         />
                         <VoiceButton
-                          listening={listeningDiagActions}
-                          onToggle={() => listeningDiagActions
-                            ? stopVoice(diagActionsRecRef as React.MutableRefObject<unknown>, setListeningDiagActions)
+                          listening={listeningDiagAnswer}
+                          onToggle={() => listeningDiagAnswer
+                            ? stopVoice(diagAnswerRecRef as React.MutableRefObject<unknown>, setListeningDiagAnswer)
                             : startVoice(
                                 wrapVoiceResult(
                                   text => setDiagAnswer(prev => prev ? `${prev} ${text}` : text),
                                   () => setDiagAnswer('')
                                 ),
-                                setListeningDiagActions,
-                                diagActionsRecRef as React.MutableRefObject<unknown>,
+                                setListeningDiagAnswer,
+                                diagAnswerRecRef as React.MutableRefObject<unknown>,
                                 true
                               )
                           }
@@ -1188,7 +1190,7 @@ export default function DashboardPage() {
                         onClick={handleFollowUp}
                         disabled={diagnosing || !diagAnswer.trim()}
                       >
-                        {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Ask the AI to diagnose'}
+                        {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
                       </button>
                     </div>
                   )}
