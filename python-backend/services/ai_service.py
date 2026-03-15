@@ -359,14 +359,16 @@ async def diagnose(
             headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
             # If Claude wants to call a tool, return the tool call for Next.js to execute
             if message.stop_reason == "tool_use":
-                tool_use_block = next(b for b in message.content if b.type == "tool_use")
-                return {
-                    "tool_call": {
-                        "name": tool_use_block.name,
-                        "input": tool_use_block.input,
-                        "tool_use_id": tool_use_block.id,
+                tool_use_block = next((b for b in message.content if b.type == "tool_use"), None)
+                if tool_use_block is not None:
+                    return {
+                        "tool_call": {
+                            "name": tool_use_block.name,
+                            "input": tool_use_block.input,
+                            "tool_use_id": tool_use_block.id,
+                        }
                     }
-                }
+                # No tool_use block found despite stop_reason — fall through to text response
         else:
             message = client.messages.create(
                 model="claude-sonnet-4-6",
@@ -378,7 +380,8 @@ async def diagnose(
         headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
         headlights_tracker.track_activity(user_email, sessions=1)
 
-        text = message.content[0].text.strip()
+        text_block = next((b for b in message.content if hasattr(b, 'text')), None)
+        text = text_block.text.strip() if text_block else ''
         if text.startswith("```"):
             lines = text.splitlines()
             text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
