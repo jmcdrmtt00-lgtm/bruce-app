@@ -206,6 +206,7 @@ export default function DashboardPage() {
   const [diagDetailOpen,   setDiagDetailOpen]   = useState(false);
   const [diagQuestions,    setDiagQuestions]    = useState<string[] | null>(null);
   const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
+  const [diagActionsText,  setDiagActionsText]  = useState('');
   const [diagConversation, setDiagConversation] = useState<Record<string, unknown>[]>([]);
   const [diagAnswer,       setDiagAnswer]       = useState('');
   const [attachOpen,        setAttachOpen]        = useState(false);
@@ -339,7 +340,7 @@ export default function DashboardPage() {
     setDiagDetail(null);
     setDiagDetailOpen(false);
     setDiagQuestions(null);
-    setDiagSteps(null);
+    setDiagSteps(null); setDiagActionsText('');
     setDiagConversation([]);
     setDiagAnswer('');
     setAttachOpen(false);
@@ -372,7 +373,7 @@ export default function DashboardPage() {
     setDiagDetail(null);
     setDiagDetailOpen(false);
     setDiagQuestions(null);
-    setDiagSteps(null);
+    setDiagSteps(null); setDiagActionsText('');
     setDiagConversation([]);
     setDiagAnswer('');
     setOnboardingData(null);
@@ -616,7 +617,7 @@ export default function DashboardPage() {
     setDiagDetail(null);
     setDiagDetailOpen(false);
     setDiagQuestions(null);
-    setDiagSteps(null);
+    setDiagSteps(null); setDiagActionsText('');
     setDiagConversation([]);
     setDiagAnswer('');
 
@@ -727,6 +728,7 @@ export default function DashboardPage() {
       const data = await res.json();
       const steps: string[] = data.steps ?? [];
       setDiagSteps(steps);
+      setDiagActionsText(steps.map((s, i) => `${i + 1}. ${s}`).join('\n'));
       setDiagStage('fix');
       await saveAiUpdate('ai_response', `Fix steps: ${steps.join(' | ')}`);
     } catch {
@@ -1063,7 +1065,8 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
-                {/* Ask the AI + attach file */}
+                {/* Ask the AI to diagnose + attach file — hidden once AI has responded */}
+                {diagStage === 'idle' && (
                 <div className="mt-2 space-y-2">
                   {attachOpen && (
                     <div className="rounded-box border border-base-300 p-2 space-y-1">
@@ -1093,7 +1096,7 @@ export default function DashboardPage() {
                       disabled={diagnosing}
                     >
                       {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                      {diagnosing ? 'Thinking…' : 'Ask the AI'}
+                      {diagnosing ? 'Thinking…' : 'Ask the AI to diagnose'}
                     </button>
                     <button
                       className="btn btn-ghost btn-sm text-base-content/40 hover:text-base-content"
@@ -1105,14 +1108,12 @@ export default function DashboardPage() {
                     </button>
                   </div>
                 </div>
+                )}
               </div>
 
-              {/* IT Buddy response panel */}
+              {/* AI response panel */}
               {diagStage !== 'idle' && (
                 <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">IT Buddy</span>
-                  </label>
 
                   {/* Questions stage */}
                   {diagStage === 'questions' && diagQuestions && (
@@ -1128,11 +1129,11 @@ export default function DashboardPage() {
                         placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
                       />
                       <button
-                        className="btn btn-outline btn-sm w-full"
+                        className="btn btn-primary btn-sm w-full"
                         onClick={handleFollowUp}
                         disabled={diagnosing || !diagAnswer.trim()}
                       >
-                        {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
+                        {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Ask the AI to diagnose'}
                       </button>
                     </div>
                   )}
@@ -1275,52 +1276,61 @@ export default function DashboardPage() {
                   )}
 
                   {/* Cause stage — general: diagnosis result */}
-                  {diagStage === 'cause' && selectedType !== 'onboarding' && diagCause && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-sm font-medium">{diagCause}</p>
-                      <div>
-                        <button
-                          className="text-xs text-primary underline"
-                          onClick={() => setDiagDetailOpen(o => !o)}
-                        >
-                          {diagDetailOpen ? 'Hide detail' : 'More detail →'}
-                        </button>
-                        {diagDetailOpen && (
-                          <p className="text-xs text-base-content/70 mt-1">{diagDetail ?? 'No additional detail available.'}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          className="btn btn-primary btn-sm flex-1"
-                          onClick={handleConfirmCause}
-                          disabled={diagnosing}
-                        >
-                          {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Steps to fix'}
-                        </button>
-                        <button
-                          className="btn btn-outline btn-sm flex-1"
-                          onClick={() => {
-                            setDiagStage('questions');
-                            setDiagQuestions(["What else can you tell me about the problem?"]);
-                            setDiagAnswer('1. ');
-                            setDiagCause(null);
-                            setDiagDetail(null);
-                          }}
-                          disabled={diagnosing}
-                        >
-                          Not quite right
-                        </button>
+                  {diagStage === 'cause' && selectedType !== 'onboarding' && selectedType !== 'onboarding_offboarding' && diagCause && (
+                    <div className="space-y-2">
+                      <label className="label py-0"><span className="label-text text-xs font-semibold">Diagnosis</span></label>
+                      <div className="rounded-box p-3 bg-primary/10 space-y-2">
+                        <AutoTextarea
+                          className="textarea textarea-bordered textarea-sm w-full text-sm bg-white"
+                          value={diagCause}
+                          onChange={e => setDiagCause(e.target.value)}
+                        />
+                        <div>
+                          <button
+                            className="text-xs text-primary underline"
+                            onClick={() => setDiagDetailOpen(o => !o)}
+                          >
+                            {diagDetailOpen ? 'Hide detail' : 'More detail →'}
+                          </button>
+                          {diagDetailOpen && (
+                            <p className="text-xs text-base-content/70 mt-1">{diagDetail ?? 'No additional detail available.'}</p>
+                          )}
+                        </div>
+                        <div className="flex gap-2 pt-1">
+                          <button
+                            className="btn btn-primary btn-sm flex-1"
+                            onClick={handleConfirmCause}
+                            disabled={diagnosing}
+                          >
+                            {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Actions to take'}
+                          </button>
+                          <button
+                            className="btn btn-outline btn-sm flex-1"
+                            onClick={() => {
+                              setDiagStage('questions');
+                              setDiagQuestions(["What else can you tell me about the problem?"]);
+                              setDiagAnswer('1. ');
+                              setDiagCause(null);
+                              setDiagDetail(null);
+                            }}
+                            disabled={diagnosing}
+                          >
+                            Not quite right
+                          </button>
+                        </div>
                       </div>
                     </div>
                   )}
 
-                  {/* Fix stage */}
+                  {/* Actions to take stage */}
                   {diagStage === 'fix' && diagSteps && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-xs font-semibold text-base-content/50">Try these steps in order:</p>
-                      <ol className="list-decimal list-inside text-sm space-y-1">
-                        {diagSteps.map((s, i) => <li key={i}>{s}</li>)}
-                      </ol>
+                    <div className="space-y-2">
+                      <label className="label py-0"><span className="label-text text-xs font-semibold">Actions to take</span></label>
+                      <AutoTextarea
+                        className="textarea textarea-bordered textarea-sm w-full text-sm"
+                        value={diagActionsText}
+                        onChange={e => setDiagActionsText(e.target.value)}
+                      />
                     </div>
                   )}
                 </div>
