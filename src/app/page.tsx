@@ -200,8 +200,9 @@ export default function DashboardPage() {
   // Problem type state
   const [selectedType,     setSelectedType]     = useState<string>('general');
   const [diagnosing,       setDiagnosing]       = useState(false);
-  const [diagStage,        setDiagStage]        = useState<'idle' | 'questions' | 'cause' | 'fix'>('idle');
+  const [diagStage,        setDiagStage]        = useState<'idle' | 'questions' | 'cause' | 'fix' | 'recommendation'>('idle');
   const [diagCause,        setDiagCause]        = useState<string | null>(null);
+  const [diagRecommendation, setDiagRecommendation] = useState<string | null>(null);
   const [diagDetail,       setDiagDetail]       = useState<string | null>(null);
   const [diagDetailOpen,   setDiagDetailOpen]   = useState(false);
   const [diagQuestions,    setDiagQuestions]    = useState<string[] | null>(null);
@@ -235,8 +236,9 @@ export default function DashboardPage() {
   const [listeningInfoDone,     setListeningInfoDone]     = useState(false);
   const [listeningIssues,         setListeningIssues]         = useState(false);
   const [listeningRequester,      setListeningRequester]      = useState(false);
-  const [listeningDiagCause,      setListeningDiagCause]      = useState(false);
-  const [listeningDiagAnswer,     setListeningDiagAnswer]     = useState(false);
+  const [listeningDiagCause,          setListeningDiagCause]          = useState(false);
+  const [listeningDiagRecommendation, setListeningDiagRecommendation] = useState(false);
+  const [listeningDiagAnswer,         setListeningDiagAnswer]         = useState(false);
   const [listeningDiagActions,    setListeningDiagActions]    = useState(false);
   const [listeningAdditionalHelp, setListeningAdditionalHelp] = useState(false);
 
@@ -247,8 +249,9 @@ export default function DashboardPage() {
   const infoDoneRecRef      = useRef<unknown>(null);
   const issuesRecRef          = useRef<unknown>(null);
   const requesterRecRef       = useRef<unknown>(null);
-  const diagCauseRecRef       = useRef<unknown>(null);
-  const diagAnswerRecRef      = useRef<unknown>(null);
+  const diagCauseRecRef           = useRef<unknown>(null);
+  const diagRecommendationRecRef  = useRef<unknown>(null);
+  const diagAnswerRecRef          = useRef<unknown>(null);
   const diagActionsRecRef     = useRef<unknown>(null);
   const additionalHelpRecRef  = useRef<unknown>(null);
 
@@ -629,6 +632,7 @@ export default function DashboardPage() {
     setDiagDetailOpen(false);
     setDiagQuestions(null);
     setDiagSteps(null); setDiagActionsText('');
+    setDiagRecommendation(null);
     setDiagConversation([]);
     setDiagAnswer('');
     setAdditionalHelpOpen(false);
@@ -658,6 +662,12 @@ export default function DashboardPage() {
 
       if (!res.ok || data.error) {
         toast.error(data.error || `AI error (${res.status}) — try again.`);
+      } else if (data.recommendation) {
+        const aiTurn = { role: 'ai' as const, content: data.recommendation };
+        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
+        setDiagRecommendation(data.recommendation);
+        setDiagStage('recommendation');
+        await saveAiUpdate('ai_response', `Recommendation: ${data.recommendation}`);
       } else if (data.cause) {
         const aiTurn = { role: 'ai' as const, content: data.cause };
         setDiagConversation([userTurn, ...toolTurns, aiTurn]);
@@ -704,7 +714,13 @@ export default function DashboardPage() {
       });
       const data = await res.json();
 
-      if (data.cause) {
+      if (data.recommendation) {
+        const aiTurn = { role: 'ai' as const, content: data.recommendation };
+        setDiagConversation(prev => [...prev, aiTurn]);
+        setDiagRecommendation(data.recommendation);
+        setDiagStage('recommendation');
+        await saveAiUpdate('ai_response', `Recommendation: ${data.recommendation}`);
+      } else if (data.cause) {
         const aiTurn = { role: 'ai' as const, content: data.cause };
         setDiagConversation(prev => [...prev, aiTurn]);
         setDiagCause(data.cause);
@@ -766,7 +782,7 @@ export default function DashboardPage() {
         body: JSON.stringify({ problem_type: selectedType, stage: 'followup', conversation: updatedConv }),
       });
       const data = await res.json();
-      const reply: string = data.cause || (data.questions as string[] | null)?.join('\n') || '';
+      const reply: string = data.recommendation || data.cause || (data.questions as string[] | null)?.join('\n') || '';
       if (reply) {
         setAdditionalHelpReply(reply);
         setDiagConversation(prev => [...prev, { role: 'ai' as const, content: reply }]);
@@ -1071,8 +1087,8 @@ export default function DashboardPage() {
                 </div>
               </div>}
 
-              {/* infoDone — label varies by task type; hidden in fix stage (shown there instead) */}
-              <div className={`form-control${diagStage === 'fix' ? ' hidden' : ''}`}>
+              {/* infoDone — label varies by task type; hidden in fix/recommendation stages (shown there instead) */}
+              <div className={`form-control${diagStage === 'fix' || diagStage === 'recommendation' ? ' hidden' : ''}`}>
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">
                     {selectedType === 'problem_to_fix' || selectedType === 'ticket_to_fix' ? 'Problem to fix'
@@ -1400,7 +1416,7 @@ export default function DashboardPage() {
                   {diagStage === 'fix' && diagSteps && (
                     <div className="space-y-3">
                       <div className="space-y-1">
-                        <label className="label py-0"><span className="label-text text-xs font-semibold">Problem to fix</span></label>
+                        <label className="label py-0"><span className="label-text text-xs font-semibold">{selectedType === 'ticket_to_fix' ? 'Ticket to deal with' : 'Problem to fix'}</span></label>
                         <AutoTextarea
                           className="textarea textarea-bordered textarea-sm w-full text-sm"
                           value={infoDone}
@@ -1473,6 +1489,90 @@ export default function DashboardPage() {
                               value={additionalHelpText}
                               onChange={e => setAdditionalHelpText(e.target.value)}
                               placeholder="What additional help do you need?"
+                            />
+                            <VoiceButton
+                              listening={listeningAdditionalHelp}
+                              onToggle={() => listeningAdditionalHelp
+                                ? stopVoice(additionalHelpRecRef as React.MutableRefObject<unknown>, setListeningAdditionalHelp)
+                                : startVoice(
+                                    wrapVoiceResult(
+                                      text => setAdditionalHelpText(prev => prev ? `${prev} ${text}` : text),
+                                      () => setAdditionalHelpText('')
+                                    ),
+                                    setListeningAdditionalHelp,
+                                    additionalHelpRecRef as React.MutableRefObject<unknown>,
+                                    true
+                                  )
+                              }
+                            />
+                          </div>
+                          {additionalHelpReply && (
+                            <div className="rounded-box p-3 bg-primary/10 text-sm whitespace-pre-wrap">{additionalHelpReply}</div>
+                          )}
+                          <button
+                            className="btn btn-primary btn-sm w-full"
+                            onClick={handleAdditionalHelp}
+                            disabled={diagnosing || !additionalHelpText.trim()}
+                          >
+                            {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Recommendation stage — decision_to_make */}
+                  {diagStage === 'recommendation' && diagRecommendation !== null && (
+                    <div className="space-y-3">
+                      <div className="space-y-1">
+                        <label className="label py-0"><span className="label-text text-xs font-semibold">Decision to make</span></label>
+                        <AutoTextarea
+                          className="textarea textarea-bordered textarea-sm w-full text-sm"
+                          value={infoDone}
+                          onChange={e => setInfoDone(e.target.value)}
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="label py-0"><span className="label-text text-xs font-semibold">Options &amp; Recommendation</span></label>
+                        <div className="flex gap-1 items-start">
+                          <AutoTextarea
+                            className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                            value={diagRecommendation}
+                            onChange={e => setDiagRecommendation(e.target.value)}
+                          />
+                          <VoiceButton
+                            listening={listeningDiagRecommendation}
+                            onToggle={() => listeningDiagRecommendation
+                              ? stopVoice(diagRecommendationRecRef as React.MutableRefObject<unknown>, setListeningDiagRecommendation)
+                              : startVoice(
+                                  wrapVoiceResult(
+                                    text => setDiagRecommendation(prev => prev ? `${prev} ${text}` : text),
+                                    () => setDiagRecommendation(null)
+                                  ),
+                                  setListeningDiagRecommendation,
+                                  diagRecommendationRecRef as React.MutableRefObject<unknown>,
+                                  true
+                                )
+                            }
+                          />
+                        </div>
+                      </div>
+                      {!additionalHelpOpen && (
+                        <button
+                          className="btn btn-primary btn-sm w-full"
+                          onClick={() => setAdditionalHelpOpen(true)}
+                        >
+                          Discuss further with the AI
+                        </button>
+                      )}
+                      {additionalHelpOpen && (
+                        <div className="space-y-2">
+                          <div className="flex gap-1 items-start">
+                            <AutoTextarea
+                              className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                              value={additionalHelpText}
+                              onChange={e => setAdditionalHelpText(e.target.value)}
+                              placeholder="What would you like to discuss?"
                             />
                             <VoiceButton
                               listening={listeningAdditionalHelp}

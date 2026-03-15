@@ -278,6 +278,51 @@ async def diagnose(
         except Exception:
             return {"structured_data": {}}
 
+    elif problem_type == "decision_to_make":
+        # Decision path — return {recommendation} or {questions}
+        if conversation:
+            messages = [
+                {"role": "assistant" if t.get("role") == "ai" else "user",
+                 "content": t.get("content", t.get("text", ""))}
+                for t in conversation
+                if t.get("role") not in ("tool_use", "tool_result")
+            ]
+        else:
+            decision_text = (information or "").strip() or "No decision described."
+            messages = [{"role": "user", "content": f"Decision to make: {decision_text}"}]
+
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            system=prompt_loader.get_diagnose_decision_prompt(),
+            messages=messages,
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text_block = next((b for b in message.content if hasattr(b, "text")), None)
+        text = text_block.text.strip() if text_block else ""
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+        parsed = None
+        try:
+            parsed = _json.loads(text)
+        except Exception:
+            import re as _re
+            m = _re.search(r'\{.*\}', text, _re.DOTALL)
+            if m:
+                try:
+                    parsed = _json.loads(m.group())
+                except Exception:
+                    pass
+        if parsed:
+            return {
+                "recommendation": parsed.get("recommendation") or None,
+                "questions":      parsed.get("questions") or None,
+            }
+        return {"recommendation": text or None, "questions": None}
+
     elif stage == "fix":
         # Call 3: given agreed cause, return fix steps
         cause_text = information or task_details or "Unknown cause"
