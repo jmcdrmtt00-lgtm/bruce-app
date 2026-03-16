@@ -339,6 +339,7 @@ async def diagnose(
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=512,
+            temperature=0,
             system=prompt_loader.get_nurse_assess_prompt(),
             messages=messages,
         )
@@ -375,6 +376,7 @@ async def diagnose(
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=512,
+            temperature=0,
             system=prompt_loader.get_nurse_coach_prompt(),
             messages=[{"role": "user", "content": context}],
         )
@@ -398,6 +400,7 @@ async def diagnose(
         message = client.messages.create(
             model="claude-sonnet-4-6",
             max_tokens=256,
+            temperature=0,
             system=prompt_loader.get_nurse_explain_prompt(),
             messages=[{"role": "user", "content": context}],
         )
