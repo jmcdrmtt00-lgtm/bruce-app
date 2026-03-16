@@ -4,9 +4,10 @@ import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
-import { Incident } from '@/types';
+import { Incident, IncidentUpdate } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
+import AiDiagnoseSection from '@/components/AiDiagnoseSection';
 
 interface UnassignedAsset {
   id: string;
@@ -69,26 +70,22 @@ function TaskTable({
   onRowClick: (task: Incident) => void;
   variant: 'inProgress' | 'queue';
 }) {
-  if (tasks.length === 0) {
-    return (
-      <div className="bg-base-100 rounded-box shadow p-4 text-center text-base-content/40 text-sm">
-        No tasks
-      </div>
-    );
-  }
   return (
     <div className="overflow-x-auto rounded-box shadow">
       <table className="table table-xs table-fixed bg-base-100 w-full">
         <thead>
           <tr>
             <th className="w-8">#</th>
-            <th>Task Name</th>
-            <th className="w-24 text-center">{variant === 'inProgress' ? 'Priority' : 'Source'}</th>
-            <th className="w-28 text-center">Date Due</th>
+            <th className="text-left">Task Name</th>
+            <th className="w-14 text-center">Urgency</th>
+            <th className="w-24">Requester</th>
+            <th className="w-24 text-center">Target Date</th>
           </tr>
         </thead>
         <tbody>
-          {tasks.map(task => (
+          {tasks.length === 0 ? (
+            <tr><td colSpan={5} className="text-center text-base-content/40 text-sm py-3">No tasks</td></tr>
+          ) : tasks.map(task => (
             <tr
               key={task.id}
               className="hover cursor-pointer [&>td]:py-0.5"
@@ -101,17 +98,14 @@ function TaskTable({
                 </p>
               </td>
               <td className="text-center">
-                {variant === 'inProgress' ? (
-                  task.priority && (
-                    <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
-                      {PRIORITY_LABEL[task.priority]}
-                    </span>
-                  )
-                ) : (
-                  task.auto_suggested && (
-                    <span className="text-xs text-base-content/60 whitespace-nowrap">IT Buddy</span>
-                  )
+                {task.priority && (
+                  <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
+                    {PRIORITY_LABEL[task.priority]}
+                  </span>
                 )}
+              </td>
+              <td className="text-xs text-base-content/70 truncate max-w-0">
+                {task.reported_by || ''}
               </td>
               <td className="text-center text-xs text-base-content/70">
                 {formatDate(task.date_due)}
@@ -187,12 +181,19 @@ export default function DashboardPage() {
   const [priority, setPriority]   = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]     = useState('');
   const [status, setStatus]       = useState<'pending' | 'in_progress' | 'resolved'>('pending');
+  const [requester, setRequester] = useState('');
 
   // Add task modal state
-  const [showAddModal,   setShowAddModal]   = useState(false);
-  const [newTaskName,    setNewTaskName]    = useState('');
-  const [newTaskStatus,  setNewTaskStatus]  = useState<'pending' | 'in_progress'>('pending');
-  const [newTaskDetails, setNewTaskDetails] = useState('');
+  const [showAddModal,     setShowAddModal]     = useState(false);
+  const [newTaskName,      setNewTaskName]      = useState('');
+  const [newTaskDetails,   setNewTaskDetails]   = useState('');
+  const [newTaskRequester, setNewTaskRequester] = useState('');
+  const [newTaskPriority,  setNewTaskPriority]  = useState<'high' | 'low' | ''>('');
+  const [newTaskType,      setNewTaskType]      = useState('');
+  const [listeningNewName,    setListeningNewName]    = useState(false);
+  const [listeningNewDetails, setListeningNewDetails] = useState(false);
+  const [allUpdates,       setAllUpdates]       = useState<IncidentUpdate[]>([]);
+  const [historyOpen,      setHistoryOpen]      = useState(false);
   const [infoRequired, setInfoRequired] = useState('');
   const [infoDone, setInfoDone]         = useState('');
   const [issues, setIssues]             = useState('');
@@ -201,17 +202,14 @@ export default function DashboardPage() {
 
   // Problem type state
   const [selectedType,     setSelectedType]     = useState<string>('general');
-  const [diagnosing,       setDiagnosing]       = useState(false);
-  const [diagStage,        setDiagStage]        = useState<'idle' | 'questions' | 'cause' | 'fix'>('idle');
-  const [diagCause,        setDiagCause]        = useState<string | null>(null);
-  const [diagDetail,       setDiagDetail]       = useState<string | null>(null);
-  const [diagDetailOpen,   setDiagDetailOpen]   = useState(false);
-  const [diagQuestions,    setDiagQuestions]    = useState<string[] | null>(null);
-  const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
-  const [diagConversation, setDiagConversation] = useState<Record<string, unknown>[]>([]);
-  const [diagAnswer,       setDiagAnswer]       = useState('');
-  const [attachOpen,        setAttachOpen]        = useState(false);
-  const [attachedFile,      setAttachedFile]      = useState<File | null>(null);
+  const [diagnosing,       setDiagnosing]       = useState(false); // onboarding AI call only
+  const [diagStage,        setDiagStage]        = useState<'idle' | 'cause'>('idle'); // onboarding only
+
+  // AI section state — non-onboarding types, driven by AiDiagnoseSection
+  const [aiStage,                   setAiStage]                   = useState('idle');
+  const [initialDiagCause,          setInitialDiagCause]          = useState<string | null>(null);
+  const [initialDiagActionsText,    setInitialDiagActionsText]    = useState<string | null>(null);
+  const [initialDiagRecommendation, setInitialDiagRecommendation] = useState<string | null>(null);
   const [onboardingData, setOnboardingData] = useState<Record<string, string> | null>(null);
   const [computer, setComputer] = useState<CategoryState>(emptyCat());
   const [phone,    setPhone]    = useState<CategoryState>(emptyCat());
@@ -231,21 +229,24 @@ export default function DashboardPage() {
   const [listeningDate,         setListeningDate]         = useState(false);
   const [listeningInfoRequired, setListeningInfoRequired] = useState(false);
   const [listeningInfoDone,     setListeningInfoDone]     = useState(false);
-  const [listeningIssues,       setListeningIssues]       = useState(false);
-
+  const [listeningIssues,         setListeningIssues]         = useState(false);
+  const [listeningRequester,      setListeningRequester]      = useState(false);
   const numRecRef           = useRef<unknown>(null);
   const nameRecRef          = useRef<unknown>(null);
   const dateRecRef          = useRef<unknown>(null);
   const infoRequiredRecRef  = useRef<unknown>(null);
   const infoDoneRecRef      = useRef<unknown>(null);
   const issuesRecRef        = useRef<unknown>(null);
+  const requesterRecRef     = useRef<unknown>(null);
 
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
+  const newNameRecRef    = useRef<unknown>(null);
+  const newDetailsRecRef = useRef<unknown>(null);
 
   const loadTasks = useCallback(() => {
     fetch('/api/issues')
       .then(r => r.json())
-      .then(data => { setTasks(data.incidents ?? []); setLoading(false); })
+      .then(data => { setTasks((data.incidents ?? []).filter((i: Incident) => i.task_number != null)); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
@@ -266,7 +267,7 @@ export default function DashboardPage() {
           await fetch(`/api/issues/${selectedTask.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null }),
+            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null, reported_by: requester.trim() || null }),
           });
           loadTasks();
         }
@@ -276,7 +277,7 @@ export default function DashboardPage() {
     }, 1500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskName, priority, dateDue, status, selectedType]);
+  }, [taskName, priority, dateDue, status, selectedType, requester]);
 
   // Save a textarea as an incident_update on blur (only if changed since last save)
   async function saveUpdate(type: string, note: string, lastRef: React.MutableRefObject<string>) {
@@ -293,17 +294,6 @@ export default function DashboardPage() {
       setSaveStatus('saved');
       setTimeout(() => setSaveStatus('idle'), 2000);
     } catch { setSaveStatus('idle'); }
-  }
-
-  async function saveAiUpdate(type: 'ai_response' | 'user_reply', note: string) {
-    if (!selectedTask || !note.trim()) return;
-    try {
-      await fetch(`/api/issues/${selectedTask.id}/updates`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, note: note.trim() }),
-      });
-    } catch { /* ignore */ }
   }
 
   function markDirty() { panelDirtyRef.current = true; }
@@ -328,23 +318,18 @@ export default function DashboardPage() {
     setPriority('');
     setDateDue('');
     setStatus('pending');
+    setRequester('');
     setInfoRequired('');
     setInfoDone('');
     setIssues('');
     setSelectedTask(null);
     setSelectedType('general');
     setDiagStage('idle');
-    setDiagCause(null);
-    setDiagDetail(null);
-    setDiagDetailOpen(false);
-    setDiagQuestions(null);
-    setDiagSteps(null);
-    setDiagConversation([]);
-    setDiagAnswer('');
-    setAttachOpen(false);
-    setAttachedFile(null);
+    setAiStage('idle');
+    setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     setOnboardingData(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
+    setAllUpdates([]); setHistoryOpen(false);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
@@ -356,24 +341,21 @@ export default function DashboardPage() {
     setDateDue(task.date_due || '');
     const s = task.status === 'open' ? 'pending' : task.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
+    setRequester(task.reported_by || '');
 
     // Normalize screen → problem type ID, default to 'general'
     const rawScreen = task.screen || '';
-    const typeId = normalizeScreenToTypeId(rawScreen) || 'general';
+    const typeId = normalizeScreenToTypeId(rawScreen) || 'problem_to_fix';
     setSelectedType(typeId);
 
     setInfoDone('');
     setIssues('');
     setDiagStage('idle');
-    setDiagCause(null);
-    setDiagDetail(null);
-    setDiagDetailOpen(false);
-    setDiagQuestions(null);
-    setDiagSteps(null);
-    setDiagConversation([]);
-    setDiagAnswer('');
+    setAiStage('idle');
+    setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     setOnboardingData(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
+    setAllUpdates([]); setHistoryOpen(false);
     setSelectedTask(task);
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
@@ -386,8 +368,9 @@ export default function DashboardPage() {
     // Load updates
     fetch(`/api/issues/${task.id}/updates`)
       .then(r => r.json())
-      .then(({ updates }: { updates: { type: string; note: string; created_at?: string }[] }) => {
-        const latest = (t: string) => updates.find(u => u.type === t)?.note ?? '';
+      .then(({ updates }: { updates: IncidentUpdate[] }) => {
+        setAllUpdates(updates);
+        const latest = (t: string) => updates.filter(u => u.type === t).at(-1)?.note ?? '';
 
         const progress = latest('progress');
         setInfoDone(progress);
@@ -399,6 +382,21 @@ export default function DashboardPage() {
           savedDetailsRef.current = details;
         }
 
+        // Restore AI-generated content from saved ai_response updates
+        const aiUpdates = updates.filter(u => u.type === 'ai_response');
+        let restoredCause: string | null = null;
+        let restoredActions: string | null = null;
+        let restoredRecommendation: string | null = null;
+        for (const u of aiUpdates) {
+          if (u.note.startsWith('Cause: '))          restoredCause = u.note.slice('Cause: '.length);
+          if (u.note.startsWith('Fix steps: '))      restoredActions = u.note.slice('Fix steps: '.length);
+          if (u.note.startsWith('Recommendation: ')) restoredRecommendation = u.note.slice('Recommendation: '.length);
+        }
+        setInitialDiagCause(restoredCause);
+        setInitialDiagActionsText(restoredActions
+          ? restoredActions.split(' | ').map((s, i) => `${i + 1}. ${s}`).join('\n')
+          : null);
+        setInitialDiagRecommendation(restoredRecommendation);
       })
       .catch(() => {});
   }
@@ -551,179 +549,50 @@ export default function DashboardPage() {
     }
   }
 
+  // Onboarding-only: AI extracts structured data then shows asset proposals inline
   async function handleDiagnose() {
-    if (!selectedType) return;
-
-    // Onboarding: use AI to extract structured data, then show asset proposal
-    if (selectedType === 'onboarding') {
-      if (!infoDone.trim() && !infoRequired.trim()) {
-        router.push('/onboarding');
-        return;
-      }
-      setDiagnosing(true);
-      try {
-        const res = await fetch('/api/ai/diagnose', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            problem_type: 'onboarding',
-            stage: 'symptoms',
-            task_details: infoRequired || null,
-            information: infoDone || null,
-          }),
-        });
-        const data = await res.json();
-        if (data.structured_data !== undefined) {
-          localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
-          setOnboardingData(data.structured_data);
-          setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
-
-          // Fetch ALL (assigned + unassigned) assets at the new hire's site in parallel
-          const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
-          if (siteLabel) {
-            const [compRes, phoneRes, ipadRes] = await Promise.all([
-              fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
-              fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
-              fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
-            ]);
-            const [compData, phoneData, ipadData] = await Promise.all([
-              compRes.json(), phoneRes.json(), ipadRes.json(),
-            ]);
-            const compGroups  = buildAssetGroups(compData.assets ?? []);
-            const phoneGroups = buildAssetGroups(phoneData.assets ?? []);
-            const ipadGroups  = buildAssetGroups(ipadData.assets ?? []);
-            setComputer(prev => ({ ...prev, groups: compGroups,  proposed: pickProposed(compGroups)  }));
-            setPhone   (prev => ({ ...prev, groups: phoneGroups, proposed: pickProposed(phoneGroups) }));
-            setIpad    (prev => ({ ...prev, groups: ipadGroups,  proposed: pickProposed(ipadGroups)  }));
-          }
-          setDiagStage('cause');
-        }
-      } catch {
-        toast.error('Could not get AI response — try again.');
-      }
-      setDiagnosing(false);
+    if (!infoDone.trim() && !infoRequired.trim()) {
+      router.push('/onboarding');
       return;
     }
-
-    // Stage 1: symptoms → cause or questions
     setDiagnosing(true);
-    setDiagStage('idle');
-    setDiagCause(null);
-    setDiagDetail(null);
-    setDiagDetailOpen(false);
-    setDiagQuestions(null);
-    setDiagSteps(null);
-    setDiagConversation([]);
-    setDiagAnswer('');
-
     try {
       const res = await fetch('/api/ai/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          problem_type: selectedType,
+          problem_type: 'onboarding',
           stage: 'symptoms',
           task_details: infoRequired || null,
           information: infoDone || null,
         }),
       });
       const data = await res.json();
-      const symptoms = [infoRequired, infoDone].filter(Boolean).join('\n') || 'No symptoms provided.';
-      const userTurn = { role: 'user' as const, content: `Symptoms: ${symptoms}` };
-
-      // If tool use happened, prepend those turns so follow-up passes have full context
-      const toolTurns = data._tool_context ? [
-        { role: 'tool_use'    as const, tool_use_id: data._tool_context.tool_call.tool_use_id, name: data._tool_context.tool_call.name, input: data._tool_context.tool_call.input },
-        { role: 'tool_result' as const, tool_use_id: data._tool_context.tool_call.tool_use_id, content: data._tool_context.tool_result },
-      ] : [];
-
-      if (data.cause) {
-        const aiTurn = { role: 'ai' as const, content: data.cause };
-        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
-        setDiagCause(data.cause);
-        setDiagDetail(data.detail ?? null);
-        setDiagDetailOpen(false);
+      if (data.structured_data !== undefined) {
+        localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
+        setOnboardingData(data.structured_data);
+        setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
+        const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
+        if (siteLabel) {
+          const [compRes, phoneRes, ipadRes] = await Promise.all([
+            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
+            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
+            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
+          ]);
+          const [compData, phoneData, ipadData] = await Promise.all([
+            compRes.json(), phoneRes.json(), ipadRes.json(),
+          ]);
+          const compGroups  = buildAssetGroups(compData.assets ?? []);
+          const phoneGroups = buildAssetGroups(phoneData.assets ?? []);
+          const ipadGroups  = buildAssetGroups(ipadData.assets ?? []);
+          setComputer(prev => ({ ...prev, groups: compGroups,  proposed: pickProposed(compGroups)  }));
+          setPhone   (prev => ({ ...prev, groups: phoneGroups, proposed: pickProposed(phoneGroups) }));
+          setIpad    (prev => ({ ...prev, groups: ipadGroups,  proposed: pickProposed(ipadGroups)  }));
+        }
         setDiagStage('cause');
-        await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
-      } else if (data.questions?.length) {
-        const aiTurn = { role: 'ai' as const, content: data.questions.join('\n') };
-        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
-        setDiagQuestions(data.questions);
-        setDiagStage('questions');
-        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
-        await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
       }
     } catch {
       toast.error('Could not get AI response — try again.');
-    }
-    setDiagnosing(false);
-  }
-
-  async function handleFollowUp() {
-    if (!diagAnswer.trim() || !selectedType) return;
-    const answer = diagAnswer.trim();
-    setDiagAnswer('');
-    await saveAiUpdate('user_reply', answer);
-
-    const userTurn = { role: 'user' as const, content: answer };
-    const updatedConv = [...diagConversation, userTurn];
-    setDiagConversation(updatedConv);
-
-    setDiagnosing(true);
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problem_type: selectedType,
-          stage: 'followup',
-          conversation: updatedConv,
-        }),
-      });
-      const data = await res.json();
-
-      if (data.cause) {
-        const aiTurn = { role: 'ai' as const, content: data.cause };
-        setDiagConversation(prev => [...prev, aiTurn]);
-        setDiagCause(data.cause);
-        setDiagDetail(data.detail ?? null);
-        setDiagDetailOpen(false);
-        setDiagStage('cause');
-        await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
-      } else if (data.questions?.length) {
-        const aiTurn = { role: 'ai' as const, content: (data.questions as string[]).join('\n') };
-        setDiagConversation(prev => [...prev, aiTurn]);
-        setDiagQuestions(data.questions);
-        setDiagStage('questions');
-        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
-        await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
-      }
-    } catch {
-      toast.error('Could not get AI response — try again.');
-    }
-    setDiagnosing(false);
-  }
-
-  async function handleConfirmCause() {
-    if (!diagCause || !selectedType) return;
-    setDiagnosing(true);
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problem_type: selectedType,
-          stage: 'fix',
-          information: diagCause,
-        }),
-      });
-      const data = await res.json();
-      const steps: string[] = data.steps ?? [];
-      setDiagSteps(steps);
-      setDiagStage('fix');
-      await saveAiUpdate('ai_response', `Fix steps: ${steps.join(' | ')}`);
-    } catch {
-      toast.error('Could not get fix steps — try again.');
     }
     setDiagnosing(false);
   }
@@ -734,7 +603,7 @@ export default function DashboardPage() {
       const res = await fetch('/api/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTaskName.trim(), status: newTaskStatus }),
+        body: JSON.stringify({ title: newTaskName.trim(), status: 'pending', reported_by: newTaskRequester.trim() || null, priority: newTaskPriority || null, description: newTaskDetails.trim() || newTaskName.trim(), screen: newTaskType || null }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -746,9 +615,8 @@ export default function DashboardPage() {
           });
         }
         setShowAddModal(false);
-        setNewTaskName('');
-        setNewTaskStatus('pending');
-        setNewTaskDetails('');
+        setNewTaskName(''); setNewTaskDetails('');
+        setNewTaskRequester(''); setNewTaskPriority(''); setNewTaskType('');
         loadTasks();
         loadTask(data.incident);
       }
@@ -784,6 +652,9 @@ export default function DashboardPage() {
 
   // Suppress unused variable warnings for voice refs not used in current render
   void numRecRef; void parseSpokenNumber; void listeningNum; void setListeningNum;
+
+  const isOnboarding = selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding';
+  const hideInfoDone = !isOnboarding && (aiStage === 'fix' || aiStage === 'recommendation');
 
   if (loading) {
     return (
@@ -830,7 +701,7 @@ export default function DashboardPage() {
               <div className="flex justify-between items-center">
                 <button
                   className="btn btn-primary btn-sm"
-                  onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskStatus('pending'); setNewTaskDetails(''); }}
+                  onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskDetails(''); }}
                 >
                   + Add task
                 </button>
@@ -888,7 +759,7 @@ export default function DashboardPage() {
               <div className="grid grid-cols-3 gap-3">
                 <div className="form-control">
                   <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Priority</span>
+                    <span className="label-text text-xs font-semibold">Urgency</span>
                   </label>
                   <select
                     className="select select-bordered select-sm text-sm w-full"
@@ -918,7 +789,7 @@ export default function DashboardPage() {
 
                 <div className="form-control">
                   <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Date Due</span>
+                    <span className="label-text text-xs font-semibold">Target Date</span>
                   </label>
                   <div className="flex gap-1">
                     <input
@@ -946,27 +817,56 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Task type */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Task type</span>
-                </label>
-                <select
-                  className="select select-bordered select-sm text-sm w-full"
-                  value={selectedType}
-                  onChange={e => selectProblemType(e.target.value)}
-                >
-                  {QUICK_TASK_TYPES.map(t => (
-                    <option key={t.id} value={t.id}>{t.label}</option>
-                  ))}
-                </select>
-
+              {/* Requester + Task type */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Requester</span>
+                  </label>
+                  <div className="flex gap-1">
+                    <input
+                      className="input input-bordered input-sm flex-1 min-w-0"
+                      value={requester}
+                      onChange={e => { setRequester(e.target.value); markDirty(); }}
+                      placeholder=""
+                    />
+                    <VoiceButton
+                      listening={listeningRequester}
+                      onToggle={() => listeningRequester
+                        ? stopVoice(requesterRecRef as React.MutableRefObject<unknown>, setListeningRequester)
+                        : startVoice(
+                            wrapVoiceResult(
+                              text => setRequester(prev => prev ? `${prev} ${text}` : text),
+                              () => setRequester('')
+                            ),
+                            setListeningRequester,
+                            requesterRecRef as React.MutableRefObject<unknown>,
+                            true
+                          )
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Task type</span>
+                  </label>
+                  <select
+                    className="select select-bordered select-sm text-sm w-full"
+                    value={selectedType}
+                    onChange={e => selectProblemType(e.target.value)}
+                  >
+                    {QUICK_TASK_TYPES.map(t => (
+                      <option key={t.id} value={t.id}>{t.label}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
 
-              {/* Task details */}
-              <div className="form-control">
+              {/* Task details — only for onboarding/offboarding */}
+              {(selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding') && <div className="form-control">
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Task details</span>
+                  <span className="label-text text-xs font-semibold">Information needed</span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
@@ -992,12 +892,17 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
-              </div>
+              </div>}
 
-              {/* Information to send to the AI */}
-              <div className="form-control">
+              {/* infoDone — label varies by task type; hidden when AiDiagnoseSection shows fix/recommendation */}
+              <div className={`form-control${hideInfoDone ? ' hidden' : ''}`}>
                 <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Information to send to the AI</span>
+                  <span className="label-text text-xs font-semibold">
+                    {selectedType === 'problem_to_fix' || selectedType === 'ticket_to_fix' ? 'Problem to fix'
+                      : selectedType === 'decision_to_make' ? 'Decision to make'
+                      : selectedType === 'project_to_manage' ? 'Project to manage'
+                      : 'Information to send to the AI'}
+                  </span>
                 </label>
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
@@ -1023,114 +928,25 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
-                {/* Ask the AI + attach file */}
-                <div className="mt-2 space-y-2">
-                  {attachOpen && (
-                    <div className="rounded-box border border-base-300 p-2 space-y-1">
-                      <p className="text-xs text-base-content/50">Attach a file (image, text, PDF)</p>
-                      <input
-                        type="file"
-                        accept="image/*,.txt,.pdf,.csv,.log"
-                        className="file-input file-input-bordered file-input-xs w-full"
-                        onChange={e => setAttachedFile(e.target.files?.[0] ?? null)}
-                      />
-                      {attachedFile && (
-                        <p className="text-xs text-base-content/60">
-                          {attachedFile.name}
-                          <button
-                            className="ml-2 text-error"
-                            onClick={() => { setAttachedFile(null); }}
-                            type="button"
-                          >✕</button>
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex gap-2 items-center">
+                {/* Onboarding: Ask the AI button (non-onboarding types get their button from AiDiagnoseSection) */}
+                {isOnboarding && diagStage === 'idle' && (
+                  <div className="mt-2">
                     <button
-                      className="btn btn-primary btn-sm flex-1"
+                      className="btn btn-primary btn-sm w-full"
                       onClick={handleDiagnose}
                       disabled={diagnosing}
                     >
                       {diagnosing && <span className="loading loading-spinner loading-xs" />}
                       {diagnosing ? 'Thinking…' : 'Ask the AI'}
                     </button>
-                    <button
-                      className="btn btn-ghost btn-sm text-base-content/40 hover:text-base-content"
-                      title="Attach a file"
-                      onClick={() => setAttachOpen(o => !o)}
-                      type="button"
-                    >
-                      📎
-                    </button>
                   </div>
-                </div>
+                )}
               </div>
 
-              {/* Issues / Comments */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Issues / Comments</span>
-                </label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    value={issues}
-                    onChange={e => setIssues(e.target.value)}
-                    onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
-                    placeholder="Any issues or comments..."
-                  />
-                  <VoiceButton
-                    listening={listeningIssues}
-                    onToggle={() => listeningIssues
-                      ? stopVoice(issuesRecRef as React.MutableRefObject<unknown>, setListeningIssues)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setIssues(prev => prev ? `${prev} ${text}` : text),
-                            () => setIssues('')
-                          ),
-                          setListeningIssues,
-                          issuesRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
-                </div>
-              </div>
-
-              {/* IT Buddy response panel */}
-              {diagStage !== 'idle' && (
+              {/* Onboarding asset proposals — shown after AI extracts structured data */}
+              {diagStage === 'cause' && isOnboarding && onboardingData && (
                 <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">IT Buddy</span>
-                  </label>
-
-                  {/* Questions stage */}
-                  {diagStage === 'questions' && diagQuestions && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-xs font-semibold text-base-content/50">To narrow down the cause, please answer:</p>
-                      <ol className="list-decimal list-inside text-sm space-y-1">
-                        {diagQuestions.map((q, i) => <li key={i}>{q}</li>)}
-                      </ol>
-                      <AutoTextarea
-                        className="textarea textarea-bordered textarea-sm w-full text-sm font-mono"
-                        value={diagAnswer}
-                        onChange={e => setDiagAnswer(e.target.value)}
-                        placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
-                      />
-                      <button
-                        className="btn btn-outline btn-sm w-full"
-                        onClick={handleFollowUp}
-                        disabled={diagnosing || !diagAnswer.trim()}
-                      >
-                        {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Cause stage — onboarding: asset proposals */}
-                  {diagStage === 'cause' && selectedType === 'onboarding' && onboardingData && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-4">
+                  <div className="rounded-box p-3 bg-primary/10 space-y-4">
 
                       {(['Computer', 'Phone', 'iPad'] as const).map(cat => {
                         const catState = cat === 'Computer' ? computer : cat === 'Phone' ? phone : ipad;
@@ -1263,61 +1079,86 @@ export default function DashboardPage() {
                         Open checklist →
                       </button>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* Cause stage — general: diagnosis result */}
-                  {diagStage === 'cause' && selectedType !== 'onboarding' && diagCause && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-sm font-medium">{diagCause}</p>
-                      <div>
-                        <button
-                          className="text-xs text-primary underline"
-                          onClick={() => setDiagDetailOpen(o => !o)}
-                        >
-                          {diagDetailOpen ? 'Hide detail' : 'More detail →'}
-                        </button>
-                        {diagDetailOpen && (
-                          <p className="text-xs text-base-content/70 mt-1">{diagDetail ?? 'No additional detail available.'}</p>
-                        )}
-                      </div>
-                      <div className="flex gap-2 pt-1">
-                        <button
-                          className="btn btn-primary btn-sm flex-1"
-                          onClick={handleConfirmCause}
-                          disabled={diagnosing}
-                        >
-                          {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Steps to fix'}
-                        </button>
-                        <button
-                          className="btn btn-outline btn-sm flex-1"
-                          onClick={() => {
-                            setDiagStage('questions');
-                            setDiagQuestions(["What else can you tell me about the problem?"]);
-                            setDiagAnswer('1. ');
-                            setDiagCause(null);
-                            setDiagDetail(null);
-                          }}
-                          disabled={diagnosing}
-                        >
-                          Not quite right
-                        </button>
-                      </div>
-                    </div>
-                  )}
+              {/* AI Diagnose Section — all non-onboarding task types */}
+              {!isOnboarding && (
+                <AiDiagnoseSection
+                  key={selectedTask?.id}
+                  selectedType={selectedType}
+                  infoDone={infoDone}
+                  setInfoDone={setInfoDone}
+                  infoRequired={infoRequired}
+                  onSaveUpdate={async (type, note) => {
+                    if (!selectedTask) return;
+                    await fetch(`/api/issues/${selectedTask.id}/updates`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ type, note }),
+                    });
+                  }}
+                  onStageChange={setAiStage}
+                  initialCause={initialDiagCause}
+                  initialActionsText={initialDiagActionsText}
+                  initialRecommendation={initialDiagRecommendation}
+                />
+              )}
 
-                  {/* Fix stage */}
-                  {diagStage === 'fix' && diagSteps && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-xs font-semibold text-base-content/50">Try these steps in order:</p>
-                      <ol className="list-decimal list-inside text-sm space-y-1">
-                        {diagSteps.map((s, i) => <li key={i}>{s}</li>)}
-                      </ol>
+              {/* Issues / Comments */}
+              <div className="form-control">
+                <label className="label py-0">
+                  <span className="label-text text-xs font-semibold">Issues / Comments</span>
+                </label>
+                <div className="flex gap-1 items-start">
+                  <AutoTextarea
+                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                    value={issues}
+                    onChange={e => setIssues(e.target.value)}
+                    onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
+                    placeholder="Any issues or comments..."
+                  />
+                  <VoiceButton
+                    listening={listeningIssues}
+                    onToggle={() => listeningIssues
+                      ? stopVoice(issuesRecRef as React.MutableRefObject<unknown>, setListeningIssues)
+                      : startVoice(
+                          wrapVoiceResult(
+                            text => setIssues(prev => prev ? `${prev} ${text}` : text),
+                            () => setIssues('')
+                          ),
+                          setListeningIssues,
+                          issuesRecRef as React.MutableRefObject<unknown>,
+                          true
+                        )
+                    }
+                  />
+                </div>
+              </div>
+
+              {/* Delete */}
+              {/* Update history */}
+              {allUpdates.length > 0 && (
+                <div>
+                  <button className="text-xs text-primary underline" onClick={() => setHistoryOpen(o => !o)}>
+                    {historyOpen ? 'Hide history' : `View history (${allUpdates.length} entries)`}
+                  </button>
+                  {historyOpen && (
+                    <div className="mt-2 space-y-1 max-h-48 overflow-y-auto border border-base-200 rounded-box p-2">
+                      {allUpdates.map((u, i) => (
+                        <div key={i} className="text-xs border-b border-base-200 last:border-0 pb-1 last:pb-0">
+                          <span className="font-semibold text-base-content/50 mr-1">
+                            {u.type === 'details' ? 'Task details' : u.type === 'progress' ? 'Info sent to AI' : u.type === 'ai_response' ? 'IT Buddy' : u.type === 'user_reply' ? 'Reply' : u.type}
+                          </span>
+                          <span className="text-base-content/30">{u.created_at ? new Date(u.created_at).toLocaleString() : ''}</span>
+                          <p className="text-base-content/70 whitespace-pre-wrap mt-0.5">{u.note}</p>
+                        </div>
+                      ))}
                     </div>
                   )}
                 </div>
               )}
 
-              {/* Delete */}
               <div className="flex justify-end">
                 <button
                   className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
@@ -1346,37 +1187,65 @@ export default function DashboardPage() {
         <dialog className="modal modal-open">
           <div className="modal-box max-w-sm">
             <h3 className="font-semibold mb-3">Add task</h3>
-            <input
-              className="input input-bordered input-sm w-full mb-2"
-              placeholder="Task name..."
-              value={newTaskName}
-              onChange={e => setNewTaskName(e.target.value)}
-              autoFocus
-              onKeyDown={e => e.key === 'Enter' && handleAddTask()}
-            />
-            <AutoTextarea
-              className="textarea textarea-bordered textarea-sm w-full mb-3 text-sm"
-              value={newTaskDetails}
-              onChange={e => setNewTaskDetails(e.target.value)}
-              placeholder="Task details..."
-            />
-            <div className="flex gap-1 mb-4">
-              <button
-                className={`btn btn-xs flex-1 ${newTaskStatus === 'pending' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setNewTaskStatus('pending')}
-              >
-                Queue
-              </button>
-              <button
-                className={`btn btn-xs flex-1 ${newTaskStatus === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setNewTaskStatus('in_progress')}
-              >
-                In Progress
-              </button>
+            <div className="space-y-2 mb-3">
+              <div className="flex gap-1 items-center">
+                <input
+                  className="input input-bordered input-sm flex-1"
+                  placeholder="Task name *"
+                  value={newTaskName}
+                  onChange={e => setNewTaskName(e.target.value)}
+                  autoFocus
+                />
+                <VoiceButton
+                  listening={listeningNewName}
+                  onToggle={() => listeningNewName
+                    ? stopVoice(newNameRecRef, setListeningNewName)
+                    : startVoice(t => setNewTaskName(prev => prev ? `${prev} ${t}` : t), setListeningNewName, newNameRecRef, false)
+                  }
+                />
+              </div>
+              <div className="flex gap-1 items-start">
+                <AutoTextarea
+                  className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                  value={newTaskDetails}
+                  onChange={e => setNewTaskDetails(e.target.value)}
+                  placeholder="Task details *"
+                />
+                <VoiceButton
+                  listening={listeningNewDetails}
+                  onToggle={() => listeningNewDetails
+                    ? stopVoice(newDetailsRecRef, setListeningNewDetails)
+                    : startVoice(t => setNewTaskDetails(prev => prev ? `${prev} ${t}` : t), setListeningNewDetails, newDetailsRecRef, true)
+                  }
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <input
+                  className="input input-bordered input-sm w-full"
+                  placeholder="Requester"
+                  value={newTaskRequester}
+                  onChange={e => setNewTaskRequester(e.target.value)}
+                />
+                <select className="select select-bordered select-sm w-full" value={newTaskPriority}
+                  onChange={e => setNewTaskPriority(e.target.value as 'high' | 'low' | '')}>
+                  <option value="">Urgency —</option>
+                  <option value="high">High</option>
+                  <option value="low">Low</option>
+                </select>
+              </div>
+              <select className="select select-bordered select-sm w-full" value={newTaskType}
+                onChange={e => setNewTaskType(e.target.value)}>
+                <option value="">Select task type *</option>
+                <option value="problem_to_fix">Problem to fix</option>
+                <option value="ticket_to_fix">Ticket to deal with</option>
+                <option value="decision_to_make">Decision to make</option>
+                <option value="onboarding">Onboarding</option>
+                <option value="offboarding">Offboarding</option>
+              </select>
             </div>
             <div className="modal-action mt-0">
-              <button className="btn btn-ghost btn-sm" onClick={() => setShowAddModal(false)}>Cancel</button>
-              <button className="btn btn-primary btn-sm" onClick={handleAddTask} disabled={!newTaskName.trim()}>Save</button>
+              <button className="btn btn-ghost btn-sm" onClick={() => { setShowAddModal(false); setNewTaskName(''); setNewTaskDetails(''); setNewTaskRequester(''); setNewTaskPriority(''); setNewTaskType(''); }}>Cancel</button>
+              <button className="btn btn-primary btn-sm" onClick={handleAddTask} disabled={!newTaskName.trim() || !newTaskDetails.trim() || !newTaskType}>Save</button>
             </div>
           </div>
           <div className="modal-backdrop" onClick={() => setShowAddModal(false)} />

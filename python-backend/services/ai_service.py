@@ -278,6 +278,139 @@ async def diagnose(
         except Exception:
             return {"structured_data": {}}
 
+    elif problem_type == "decision_to_make":
+        # Decision path — return {recommendation} or {questions}
+        if conversation:
+            messages = [
+                {"role": "assistant" if t.get("role") == "ai" else "user",
+                 "content": t.get("content", t.get("text", ""))}
+                for t in conversation
+                if t.get("role") not in ("tool_use", "tool_result")
+            ]
+        else:
+            decision_text = (information or "").strip() or "No decision described."
+            messages = [{"role": "user", "content": f"Decision to make: {decision_text}"}]
+
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=1024,
+            system=prompt_loader.get_diagnose_decision_prompt(),
+            messages=messages,
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text_block = next((b for b in message.content if hasattr(b, "text")), None)
+        text = text_block.text.strip() if text_block else ""
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+        parsed = None
+        try:
+            parsed = _json.loads(text)
+        except Exception:
+            import re as _re
+            m = _re.search(r'\{.*\}', text, _re.DOTALL)
+            if m:
+                try:
+                    parsed = _json.loads(m.group())
+                except Exception:
+                    pass
+        if parsed:
+            return {
+                "recommendation": parsed.get("recommendation") or None,
+                "questions":      parsed.get("questions") or None,
+            }
+        return {"recommendation": text or None, "questions": None}
+
+    elif problem_type == "nurse_assess":
+        # Nurse self-service: questions loop → {assessment, reason} or {questions}
+        if conversation:
+            messages = [
+                {"role": "assistant" if t.get("role") == "ai" else "user",
+                 "content": t.get("content", t.get("text", ""))}
+                for t in conversation
+                if t.get("role") not in ("tool_use", "tool_result")
+            ]
+        else:
+            msg = (information or "").strip() or "No problem described."
+            messages = [{"role": "user", "content": msg}]
+
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=512,
+            temperature=0,
+            system=prompt_loader.get_nurse_assess_prompt(),
+            messages=messages,
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text_block = next((b for b in message.content if hasattr(b, "text")), None)
+        text = text_block.text.strip() if text_block else ""
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+        parsed = None
+        try:
+            parsed = _json.loads(text)
+        except Exception:
+            import re as _re
+            m = _re.search(r'\{.*\}', text, _re.DOTALL)
+            if m:
+                try:
+                    parsed = _json.loads(m.group())
+                except Exception:
+                    pass
+        if parsed:
+            return {
+                "assessment": parsed.get("assessment") or None,
+                "reason":     parsed.get("reason") or None,
+                "questions":  parsed.get("questions") or None,
+            }
+        return {"assessment": None, "reason": None, "questions": [text]}
+
+    elif problem_type == "nurse_coach":
+        # Nurse coaching: given problem + context, return step-by-step fix
+        context = (information or task_details or "Unknown problem").strip()
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=512,
+            temperature=0,
+            system=prompt_loader.get_nurse_coach_prompt(),
+            messages=[{"role": "user", "content": context}],
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text_block = next((b for b in message.content if hasattr(b, "text")), None)
+        text = text_block.text.strip() if text_block else ""
+        if text.startswith("```"):
+            lines = text.splitlines()
+            text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()
+        try:
+            result = _json.loads(text)
+            return {"steps": result.get("steps", [])}
+        except Exception:
+            return {"steps": [text]}
+
+    elif problem_type == "nurse_explain":
+        # Nurse clarification: answer a plain-language question about the coaching steps
+        context = (information or "").strip() or "No context provided."
+        message = client.messages.create(
+            model="claude-sonnet-4-6",
+            max_tokens=256,
+            temperature=0,
+            system=prompt_loader.get_nurse_explain_prompt(),
+            messages=[{"role": "user", "content": context}],
+        )
+        headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
+        headlights_tracker.track_activity(user_email, sessions=1)
+
+        text_block = next((b for b in message.content if hasattr(b, "text")), None)
+        text = text_block.text.strip() if text_block else ""
+        return {"answer": text}
+
     elif stage == "fix":
         # Call 3: given agreed cause, return fix steps
         cause_text = information or task_details or "Unknown cause"
@@ -325,8 +458,8 @@ async def diagnose(
             symptoms = (information or "").strip() or "No symptoms provided."
             messages = [{"role": "user", "content": f"Symptoms: {symptoms}"}]
 
-        # Tool use: general tasks (all passes, so Claude retains access across follow-ups)
-        use_tools = (problem_type == "general" and tool_result is None)
+        # Tool use: all problem types (prompt always references lookup_asset for device mentions)
+        use_tools = tool_result is None
 
         if tool_call and tool_result is not None:
             # Second pass: append tool use + result to message history, then get final diagnosis
@@ -359,14 +492,16 @@ async def diagnose(
             headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
             # If Claude wants to call a tool, return the tool call for Next.js to execute
             if message.stop_reason == "tool_use":
-                tool_use_block = next(b for b in message.content if b.type == "tool_use")
-                return {
-                    "tool_call": {
-                        "name": tool_use_block.name,
-                        "input": tool_use_block.input,
-                        "tool_use_id": tool_use_block.id,
+                tool_use_block = next((b for b in message.content if b.type == "tool_use"), None)
+                if tool_use_block is not None:
+                    return {
+                        "tool_call": {
+                            "name": tool_use_block.name,
+                            "input": tool_use_block.input,
+                            "tool_use_id": tool_use_block.id,
+                        }
                     }
-                }
+                # No tool_use block found despite stop_reason — fall through to text response
         else:
             message = client.messages.create(
                 model="claude-sonnet-4-6",
@@ -378,7 +513,8 @@ async def diagnose(
         headlights_tracker.track_tokens(user_email, message.usage.input_tokens, message.usage.output_tokens)
         headlights_tracker.track_activity(user_email, sessions=1)
 
-        text = message.content[0].text.strip()
+        text_block = next((b for b in message.content if hasattr(b, 'text')), None)
+        text = text_block.text.strip() if text_block else ''
         if text.startswith("```"):
             lines = text.splitlines()
             text = "\n".join(lines[1:-1] if lines[-1].strip() == "```" else lines[1:]).strip()

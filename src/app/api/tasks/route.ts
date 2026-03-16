@@ -18,9 +18,10 @@ export async function GET() {
 
   const { data: incidents, error: incErr } = await supabase
     .from('incidents')
-    .select('id, task_number, title, description, priority, date_due, status')
+    .select('id, task_number, title, description, priority, date_due, status, reported_by, screen, source')
     .eq('user_id', user.id)
-    .order('task_number');
+    .order('source')
+    .order('task_number', { nullsFirst: false });
 
   if (incErr) return NextResponse.json({ error: incErr.message }, { status: 500 });
   if (!incidents || incidents.length === 0) return NextResponse.json({ tasks: [] });
@@ -42,28 +43,37 @@ export async function GET() {
     updatesByIncident.get(upd.incident_id)!.push(upd);
   }
 
+  const SCREEN_LABEL: Record<string, string> = {
+    problem_to_fix:         'Problem to fix',
+    ticket_to_fix:          'Ticket to deal with',
+    decision_to_make:       'Decision to make',
+    onboarding:             'Onboarding',
+    offboarding:            'Offboarding',
+    // legacy
+    onboarding_offboarding: 'Onboarding',
+    project_to_manage:      'Project to manage',
+  };
+
   const tasks = incidents.map(inc => {
     const updates = updatesByIncident.get(inc.id) ?? [];
-    // Already sorted desc by created_at — get latest results and issues entries
-    const resultsUpdate = updates.find(u => u.type === 'progress' && !u.note.startsWith('Issues/Comments:'));
-    const issueUpdates  = updates.filter(u => u.type === 'progress' && u.note.startsWith('Issues/Comments:'));
+    const detailsUpdate  = updates.find(u => u.type === 'details');
+    const progressUpdate = updates.find(u => u.type === 'progress' && !u.note.startsWith('Issues/Comments:'));
 
-    const issues_comments = issueUpdates
-      .map(u => ({
-        timestamp: u.created_at,
-        text: u.note.replace(/^Issues\/Comments:\s*/, '').trim(),
-      }))
-      .filter(u => u.text);
+    const screen = inc.screen ?? '';
+    const isOnboarding = screen === 'onboarding_offboarding' || screen === 'onboarding';
 
     return {
-      task_number:        inc.task_number,
-      task_name:          inc.title || inc.description,
-      priority:           inc.priority,
-      date_due:           inc.date_due,
-      status:             inc.status,
-      information_needed: null,
-      results:            resultsUpdate?.note ?? null,
-      issues_comments,
+      task_number:      inc.task_number,
+      task_name:        inc.title || inc.description,
+      requester:        inc.reported_by ?? null,
+      priority:         inc.priority,
+      date_due:         inc.date_due,
+      status:           inc.status,
+      task_type:        SCREEN_LABEL[screen] ?? null,
+      information_needed: isOnboarding ? (detailsUpdate?.note ?? null) : null,
+      problem_to_fix:   (screen === 'problem_to_fix' || screen === 'ticket_to_fix') ? (progressUpdate?.note ?? null) : null,
+      decision_to_make: screen === 'decision_to_make'  ? (progressUpdate?.note ?? null) : null,
+      project_to_manage: screen === 'project_to_manage' ? (progressUpdate?.note ?? null) : null,
     };
   });
 

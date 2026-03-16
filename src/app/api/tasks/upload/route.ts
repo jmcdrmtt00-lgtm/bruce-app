@@ -40,6 +40,18 @@ function normalizePriority(p: string | undefined | null): 'high' | 'low' | null 
   return null;
 }
 
+function normalizeTaskType(t: string | undefined | null): string | null {
+  if (!t) return null;
+  const lower = t.toLowerCase().trim();
+  if (lower.includes('problem'))     return 'problem_to_fix';
+  if (lower.includes('ticket'))      return 'ticket_to_fix';
+  if (lower.includes('offboarding')) return 'offboarding';
+  if (lower.includes('onboarding'))  return 'onboarding';
+  if (lower.includes('decision'))    return 'decision_to_make';
+  if (lower.includes('project'))     return 'project_to_manage';
+  return null;
+}
+
 function normalizeStatus(s: string | undefined | null): string {
   if (!s) return 'pending';
   const lower = s.toLowerCase().trim();
@@ -51,10 +63,15 @@ function normalizeStatus(s: string | undefined | null): string {
 interface TaskRow {
   task_number?: number | string;
   task_name?: string;
+  requester?: string;
   priority?: string;
   date_due?: string;
   status?: string;
+  task_type?: string;
   information_needed?: string;
+  problem_to_fix?: string;
+  decision_to_make?: string;
+  project_to_manage?: string;
   results?: string;
   issues_comments?: string;
 }
@@ -94,21 +111,29 @@ export async function POST(request: NextRequest) {
     .eq('user_id', user.id);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
-  // Insert new incidents
-  const incidentRows = tasks.map((t, idx) => ({
-    user_id:        user.id,
-    task_number:    t.task_number ? Number(t.task_number) : idx + 1,
-    title:          t.task_name ?? null,
-    description:    t.task_name ?? '',
-    priority:       normalizePriority(t.priority),
-    date_due:       t.date_due || null,
-    status:         normalizeStatus(t.status),
-    source:         'issue',
-    auto_suggested: false,
-    date_completed: normalizeStatus(t.status) === 'resolved'
-      ? (t.date_due || new Date().toISOString().split('T')[0])
-      : null,
-  }));
+  // Insert new incidents — ticket_to_fix task type → source='ticket' (Tickets tab + Dashboard),
+  // all other types → source='issue' (Dashboard only)
+  const incidentRows = tasks.map(t => {
+    const screen = normalizeTaskType(t.task_type);
+    const isTicket = screen === 'ticket_to_fix';
+    const hasTaskNumber = t.task_number !== null && t.task_number !== undefined && String(t.task_number).trim() !== '';
+    return {
+      user_id:        user.id,
+      task_number:    hasTaskNumber ? Number(t.task_number) : null,
+      title:          t.task_name ?? null,
+      description:    t.task_name ?? '',
+      reported_by:    t.requester?.trim() || null,
+      priority:       normalizePriority(t.priority),
+      date_due:       t.date_due || null,
+      status:         normalizeStatus(t.status),
+      screen,
+      source:         isTicket ? 'ticket' : 'issue',
+      auto_suggested: false,
+      date_completed: normalizeStatus(t.status) === 'resolved'
+        ? (t.date_due || new Date().toISOString().split('T')[0])
+        : null,
+    };
+  });
 
   const { data: inserted, error: insErr } = await supabase
     .from('incidents')
@@ -124,14 +149,24 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  // Insert incident_updates for results and issues_comments
+  // Insert incident_updates for content fields, results, and issues_comments
   const updates: { incident_id: string; user_id: string; type: string; note: string }[] = [];
   for (let i = 0; i < tasks.length; i++) {
     const t = tasks[i];
-    const taskNum = t.task_number ? Number(t.task_number) : i + 1;
-    const incidentId = idByTaskNumber.get(taskNum) ?? inserted?.[i]?.id;
+    const taskNum = (t.task_number !== null && t.task_number !== undefined && String(t.task_number).trim() !== '')
+      ? Number(t.task_number) : null;
+    const incidentId = (taskNum !== null ? idByTaskNumber.get(taskNum) : null) ?? inserted?.[i]?.id;
     if (!incidentId) continue;
 
+    // Information needed (onboarding) → 'details' update
+    if (t.information_needed?.trim()) {
+      updates.push({ incident_id: incidentId, user_id: user.id, type: 'details', note: t.information_needed.trim() });
+    }
+    // Main content field → 'progress' update (what gets sent to the AI)
+    const mainContent = t.problem_to_fix?.trim() || t.decision_to_make?.trim() || t.project_to_manage?.trim() || '';
+    if (mainContent) {
+      updates.push({ incident_id: incidentId, user_id: user.id, type: 'progress', note: mainContent });
+    }
     if (t.results?.trim()) {
       updates.push({ incident_id: incidentId, user_id: user.id, type: 'progress', note: t.results.trim() });
     }
@@ -147,5 +182,7 @@ export async function POST(request: NextRequest) {
     if (updInsErr) return NextResponse.json({ error: updInsErr.message }, { status: 500 });
   }
 
-  return NextResponse.json({ inserted: incidentRows.length });
+  const ticketCount = incidentRows.filter(r => r.source === 'ticket').length;
+  const issueCount  = incidentRows.filter(r => r.source === 'issue').length;
+  return NextResponse.json({ inserted: incidentRows.length, issues: issueCount, tickets: ticketCount });
 }

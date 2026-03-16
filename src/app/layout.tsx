@@ -20,7 +20,7 @@ export default function RootLayout({
       <body>
         <DemoProvider>
           <Header />
-          <Toaster position="top-center" />
+          <Toaster position="top-center" toastOptions={{ duration: 8000 }} />
           {children}
           <DemoController />
         </DemoProvider>

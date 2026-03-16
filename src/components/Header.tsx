@@ -11,12 +11,11 @@ import { useAdminUser } from '@/libs/useAdminUser';
 import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 
 const NAV = [
-  { href: '/',                     label: 'Dashboard'             },
-  { href: '/ask-ai',               label: 'Ask the AI'            },
-  { href: '/task-management',      label: 'Task List'             },
-  { href: '/query-tasks',          label: 'Query Completed Tasks' },
-  { href: '/query-inventory',      label: 'Query Inventory'       },
-  { href: '/inventory-management', label: 'Inventory Mgmt'        },
+  { href: '/',                   label: 'Dashboard'        },
+  { href: '/tickets',            label: 'Tickets'          },
+  { href: '/ask-ai',             label: 'Ask the AI'       },
+  { href: '/upload-download',    label: 'Upload/Download'  },
+  { href: '/maybe-by-myself',    label: 'Maybe by myself'  },
 ];
 
 // DemoITbuddy1 only
@@ -25,9 +24,7 @@ const DEMO_NAV = [
 ];
 
 // jmcdrmtt00 only
-const ADMIN_NAV = [
-  { href: '/demo-scenarios', label: 'Demo Scenarios' },
-];
+const ADMIN_NAV: { href: string; label: string }[] = [];
 
 // Auth pages are public — hide the nav on these routes
 const AUTH_PATHS = ['/auth/'];
