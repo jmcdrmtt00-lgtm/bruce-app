@@ -103,11 +103,16 @@ interface Props {
   onSaveUpdate?: (type: string, note: string) => Promise<void>;
   /** Called whenever diagStage changes so the parent can hide its infoDone field */
   onStageChange?: (stage: 'idle' | 'questions' | 'cause' | 'fix' | 'recommendation') => void;
+  /** Restored from saved ai_response updates when reopening a task */
+  initialCause?: string | null;
+  initialActionsText?: string | null;
+  initialRecommendation?: string | null;
 }
 
 export default function AiDiagnoseSection({
   selectedType, infoDone, setInfoDone, infoRequired = '',
   onSaveUpdate, onStageChange,
+  initialCause = null, initialActionsText = null, initialRecommendation = null,
 }: Props) {
   const router = useRouter();
 
@@ -138,6 +143,30 @@ export default function AiDiagnoseSection({
   const diagRecommendationRecRef = useRef<unknown>(null);
   const additionalHelpRecRef     = useRef<unknown>(null);
   const clearLastVoiceFieldRef   = useRef<() => void>(() => {});
+  const aiRestoredRef            = useRef(false);
+
+  // Restore AI-generated content when a saved task is reopened
+  useEffect(() => {
+    if (aiRestoredRef.current) return;
+    if (!initialRecommendation && !initialActionsText && !initialCause) return;
+    if (initialRecommendation) {
+      setDiagRecommendation(initialRecommendation);
+      setDiagStageRaw('recommendation');
+      onStageChange?.('recommendation');
+    } else if (initialActionsText) {
+      if (initialCause) setDiagCause(initialCause);
+      setDiagActionsText(initialActionsText);
+      setDiagSteps(initialActionsText.split('\n').map(s => s.replace(/^\d+\.\s*/, '')));
+      setDiagStageRaw('fix');
+      onStageChange?.('fix');
+    } else if (initialCause) {
+      setDiagCause(initialCause);
+      setDiagStageRaw('cause');
+      onStageChange?.('cause');
+    }
+    aiRestoredRef.current = true;
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialCause, initialActionsText, initialRecommendation]);
 
   function setDiagStage(s: 'idle' | 'questions' | 'cause' | 'fix' | 'recommendation') {
     setDiagStageRaw(s);

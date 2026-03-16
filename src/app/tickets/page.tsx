@@ -93,6 +93,11 @@ export default function TicketsPage() {
   // AI stage (for hiding infoDone when fix/recommendation summary is shown)
   const [aiStage, setAiStage] = useState('idle');
 
+  // AI content restored from saved ai_response updates
+  const [initialDiagCause,          setInitialDiagCause]          = useState<string | null>(null);
+  const [initialDiagActionsText,    setInitialDiagActionsText]    = useState<string | null>(null);
+  const [initialDiagRecommendation, setInitialDiagRecommendation] = useState<string | null>(null);
+
   // Autosave bookkeeping
   const panelDirtyRef    = useRef(false);
   const saveTimerRef     = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -176,6 +181,7 @@ export default function TicketsPage() {
     setIssues(''); setSelectedTicket(null); setSelectedType('general');
     setAllUpdates([]); setHistoryOpen(false);
     setAiStage('idle');
+    setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     panelDirtyRef.current = false;
     savedDetailsRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
   }
@@ -194,6 +200,7 @@ export default function TicketsPage() {
     setInfoDone(''); setIssues('');
     setAllUpdates([]); setHistoryOpen(false);
     setAiStage('idle');
+    setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     setSelectedTicket(ticket);
     panelDirtyRef.current = false;
     savedDetailsRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = '';
@@ -210,6 +217,20 @@ export default function TicketsPage() {
         if (details) { setInfoRequired(details); savedDetailsRef.current = details; }
         const issuesNote = latest('issues');
         if (issuesNote) { setIssues(issuesNote); savedIssuesRef.current = issuesNote; }
+
+        // Restore AI-generated content from saved ai_response updates
+        const aiUpdates = updates.filter(u => u.type === 'ai_response');
+        let restoredCause: string | null = null;
+        let restoredActions: string | null = null;
+        let restoredRecommendation: string | null = null;
+        for (const u of aiUpdates) {
+          if (u.note.startsWith('Cause: '))          restoredCause = u.note.slice('Cause: '.length);
+          if (u.note.startsWith('Fix steps: '))      restoredActions = u.note.slice('Fix steps: '.length).split(' | ').map((s, i) => `${i + 1}. ${s}`).join('\n');
+          if (u.note.startsWith('Recommendation: ')) restoredRecommendation = u.note.slice('Recommendation: '.length);
+        }
+        setInitialDiagCause(restoredCause);
+        setInitialDiagActionsText(restoredActions);
+        setInitialDiagRecommendation(restoredRecommendation);
       })
       .catch(() => {
         setInfoDone(ticket.description);
@@ -445,6 +466,7 @@ export default function TicketsPage() {
 
               {/* AI Diagnose Section */}
               <AiDiagnoseSection
+                key={selectedTicket.id}
                 selectedType={selectedType}
                 infoDone={infoDone}
                 setInfoDone={setInfoDone}
@@ -458,6 +480,9 @@ export default function TicketsPage() {
                   });
                 }}
                 onStageChange={setAiStage}
+                initialCause={initialDiagCause}
+                initialActionsText={initialDiagActionsText}
+                initialRecommendation={initialDiagRecommendation}
               />
 
               {/* Issues / Comments */}

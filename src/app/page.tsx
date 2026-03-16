@@ -422,6 +422,30 @@ export default function DashboardPage() {
           setInfoRequired(details);
           savedDetailsRef.current = details;
         }
+
+        // Restore AI-generated content from saved ai_response updates
+        const aiUpdates = updates.filter(u => u.type === 'ai_response');
+        let restoredCause: string | null = null;
+        let restoredActions: string | null = null;
+        let restoredRecommendation: string | null = null;
+        for (const u of aiUpdates) {
+          if (u.note.startsWith('Cause: '))          restoredCause = u.note.slice('Cause: '.length);
+          if (u.note.startsWith('Fix steps: '))      restoredActions = u.note.slice('Fix steps: '.length);
+          if (u.note.startsWith('Recommendation: ')) restoredRecommendation = u.note.slice('Recommendation: '.length);
+        }
+        if (restoredRecommendation) {
+          setDiagRecommendation(restoredRecommendation);
+          setDiagStage('recommendation');
+        } else if (restoredActions) {
+          if (restoredCause) setDiagCause(restoredCause);
+          const steps = restoredActions.split(' | ');
+          setDiagSteps(steps);
+          setDiagActionsText(steps.map((s, i) => `${i + 1}. ${s}`).join('\n'));
+          setDiagStage('fix');
+        } else if (restoredCause) {
+          setDiagCause(restoredCause);
+          setDiagStage('cause');
+        }
       })
       .catch(() => {});
   }
