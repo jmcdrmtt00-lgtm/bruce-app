@@ -71,6 +71,8 @@ export default function TicketsPage() {
   const [newTaskPriority,  setNewTaskPriority]  = useState<'high' | 'low' | ''>('');
   const [newTaskType,      setNewTaskType]      = useState('');
   const [addingTicket,     setAddingTicket]     = useState(false);
+  const [listeningNewName,    setListeningNewName]    = useState(false);
+  const [listeningNewDetails, setListeningNewDetails] = useState(false);
   const [allUpdates,       setAllUpdates]       = useState<IncidentUpdate[]>([]);
   const [historyOpen,      setHistoryOpen]      = useState(false);
 
@@ -113,6 +115,8 @@ export default function TicketsPage() {
   const infoDoneRecRef     = useRef<unknown>(null);
   const issuesRecRef       = useRef<unknown>(null);
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
+  const newNameRecRef    = useRef<unknown>(null);
+  const newDetailsRecRef = useRef<unknown>(null);
 
   function wrap(onResult: (t: string) => void, clearFn: () => void) {
     return wrapVoiceResult(onResult, clearFn, clearLastVoiceFieldRef);
@@ -517,11 +521,29 @@ export default function TicketsPage() {
           <div className="modal-box max-w-sm">
             <h3 className="font-semibold mb-3">Add ticket</h3>
             <div className="space-y-2 mb-3">
-              <input className="input input-bordered input-sm w-full" placeholder="Task name *"
-                value={newTaskName} onChange={e => setNewTaskName(e.target.value)} autoFocus />
-              <AutoTextarea className="textarea textarea-bordered textarea-sm w-full text-sm"
-                value={newTaskDetails} onChange={e => setNewTaskDetails(e.target.value)}
-                placeholder="Task details (or paste email body) *" />
+              <div className="flex gap-1 items-center">
+                <input className="input input-bordered input-sm flex-1" placeholder="Task name *"
+                  value={newTaskName} onChange={e => setNewTaskName(e.target.value)} autoFocus />
+                <VoiceButton
+                  listening={listeningNewName}
+                  onToggle={() => listeningNewName
+                    ? stopVoice(newNameRecRef, setListeningNewName)
+                    : startVoice(t => setNewTaskName(prev => prev ? `${prev} ${t}` : t), setListeningNewName, newNameRecRef, false)
+                  }
+                />
+              </div>
+              <div className="flex gap-1 items-start">
+                <AutoTextarea className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                  value={newTaskDetails} onChange={e => setNewTaskDetails(e.target.value)}
+                  placeholder="Task details (or paste email body) *" />
+                <VoiceButton
+                  listening={listeningNewDetails}
+                  onToggle={() => listeningNewDetails
+                    ? stopVoice(newDetailsRecRef, setListeningNewDetails)
+                    : startVoice(t => setNewTaskDetails(prev => prev ? `${prev} ${t}` : t), setListeningNewDetails, newDetailsRecRef, true)
+                  }
+                />
+              </div>
               <div className="grid grid-cols-2 gap-2">
                 <input className="input input-bordered input-sm w-full" placeholder="Requester"
                   value={newTaskRequester} onChange={e => setNewTaskRequester(e.target.value)} />
