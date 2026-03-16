@@ -7,6 +7,7 @@ import toast from 'react-hot-toast';
 import { Incident, IncidentUpdate } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
+import AiDiagnoseSection from '@/components/AiDiagnoseSection';
 
 interface UnassignedAsset {
   id: string;
@@ -201,22 +202,14 @@ export default function DashboardPage() {
 
   // Problem type state
   const [selectedType,     setSelectedType]     = useState<string>('general');
-  const [diagnosing,       setDiagnosing]       = useState(false);
-  const [diagStage,        setDiagStage]        = useState<'idle' | 'questions' | 'cause' | 'fix' | 'recommendation'>('idle');
-  const [diagCause,        setDiagCause]        = useState<string | null>(null);
-  const [diagRecommendation, setDiagRecommendation] = useState<string | null>(null);
-  const [diagDetail,       setDiagDetail]       = useState<string | null>(null);
-  const [diagDetailOpen,   setDiagDetailOpen]   = useState(false);
-  const [diagQuestions,    setDiagQuestions]    = useState<string[] | null>(null);
-  const [diagSteps,        setDiagSteps]        = useState<string[] | null>(null);
-  const [diagActionsText,  setDiagActionsText]  = useState('');
-  const [diagConversation, setDiagConversation] = useState<Record<string, unknown>[]>([]);
-  const [diagAnswer,       setDiagAnswer]       = useState('');
-  const [additionalHelpOpen,  setAdditionalHelpOpen]  = useState(false);
-  const [additionalHelpText,  setAdditionalHelpText]  = useState('');
-  const [additionalHelpReply, setAdditionalHelpReply] = useState<string | null>(null);
-  const [attachOpen,        setAttachOpen]        = useState(false);
-  const [attachedFile,      setAttachedFile]      = useState<File | null>(null);
+  const [diagnosing,       setDiagnosing]       = useState(false); // onboarding AI call only
+  const [diagStage,        setDiagStage]        = useState<'idle' | 'cause'>('idle'); // onboarding only
+
+  // AI section state — non-onboarding types, driven by AiDiagnoseSection
+  const [aiStage,                   setAiStage]                   = useState('idle');
+  const [initialDiagCause,          setInitialDiagCause]          = useState<string | null>(null);
+  const [initialDiagActionsText,    setInitialDiagActionsText]    = useState<string | null>(null);
+  const [initialDiagRecommendation, setInitialDiagRecommendation] = useState<string | null>(null);
   const [onboardingData, setOnboardingData] = useState<Record<string, string> | null>(null);
   const [computer, setComputer] = useState<CategoryState>(emptyCat());
   const [phone,    setPhone]    = useState<CategoryState>(emptyCat());
@@ -238,24 +231,13 @@ export default function DashboardPage() {
   const [listeningInfoDone,     setListeningInfoDone]     = useState(false);
   const [listeningIssues,         setListeningIssues]         = useState(false);
   const [listeningRequester,      setListeningRequester]      = useState(false);
-  const [listeningDiagCause,          setListeningDiagCause]          = useState(false);
-  const [listeningDiagRecommendation, setListeningDiagRecommendation] = useState(false);
-  const [listeningDiagAnswer,         setListeningDiagAnswer]         = useState(false);
-  const [listeningDiagActions,    setListeningDiagActions]    = useState(false);
-  const [listeningAdditionalHelp, setListeningAdditionalHelp] = useState(false);
-
   const numRecRef           = useRef<unknown>(null);
   const nameRecRef          = useRef<unknown>(null);
   const dateRecRef          = useRef<unknown>(null);
   const infoRequiredRecRef  = useRef<unknown>(null);
   const infoDoneRecRef      = useRef<unknown>(null);
-  const issuesRecRef          = useRef<unknown>(null);
-  const requesterRecRef       = useRef<unknown>(null);
-  const diagCauseRecRef           = useRef<unknown>(null);
-  const diagRecommendationRecRef  = useRef<unknown>(null);
-  const diagAnswerRecRef          = useRef<unknown>(null);
-  const diagActionsRecRef     = useRef<unknown>(null);
-  const additionalHelpRecRef  = useRef<unknown>(null);
+  const issuesRecRef        = useRef<unknown>(null);
+  const requesterRecRef     = useRef<unknown>(null);
 
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
   const newNameRecRef    = useRef<unknown>(null);
@@ -314,17 +296,6 @@ export default function DashboardPage() {
     } catch { setSaveStatus('idle'); }
   }
 
-  async function saveAiUpdate(type: 'ai_response' | 'user_reply', note: string) {
-    if (!selectedTask || !note.trim()) return;
-    try {
-      await fetch(`/api/issues/${selectedTask.id}/updates`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, note: note.trim() }),
-      });
-    } catch { /* ignore */ }
-  }
-
   function markDirty() { panelDirtyRef.current = true; }
 
   const inProgress = useMemo(() => {
@@ -354,15 +325,8 @@ export default function DashboardPage() {
     setSelectedTask(null);
     setSelectedType('general');
     setDiagStage('idle');
-    setDiagCause(null);
-    setDiagDetail(null);
-    setDiagDetailOpen(false);
-    setDiagQuestions(null);
-    setDiagSteps(null); setDiagActionsText('');
-    setDiagConversation([]);
-    setDiagAnswer('');
-    setAttachOpen(false);
-    setAttachedFile(null);
+    setAiStage('idle');
+    setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     setOnboardingData(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
     setAllUpdates([]); setHistoryOpen(false);
@@ -387,13 +351,8 @@ export default function DashboardPage() {
     setInfoDone('');
     setIssues('');
     setDiagStage('idle');
-    setDiagCause(null);
-    setDiagDetail(null);
-    setDiagDetailOpen(false);
-    setDiagQuestions(null);
-    setDiagSteps(null); setDiagActionsText('');
-    setDiagConversation([]);
-    setDiagAnswer('');
+    setAiStage('idle');
+    setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     setOnboardingData(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
     setAllUpdates([]); setHistoryOpen(false);
@@ -433,19 +392,11 @@ export default function DashboardPage() {
           if (u.note.startsWith('Fix steps: '))      restoredActions = u.note.slice('Fix steps: '.length);
           if (u.note.startsWith('Recommendation: ')) restoredRecommendation = u.note.slice('Recommendation: '.length);
         }
-        if (restoredRecommendation) {
-          setDiagRecommendation(restoredRecommendation);
-          setDiagStage('recommendation');
-        } else if (restoredActions) {
-          if (restoredCause) setDiagCause(restoredCause);
-          const steps = restoredActions.split(' | ');
-          setDiagSteps(steps);
-          setDiagActionsText(steps.map((s, i) => `${i + 1}. ${s}`).join('\n'));
-          setDiagStage('fix');
-        } else if (restoredCause) {
-          setDiagCause(restoredCause);
-          setDiagStage('cause');
-        }
+        setInitialDiagCause(restoredCause);
+        setInitialDiagActionsText(restoredActions
+          ? restoredActions.split(' | ').map((s, i) => `${i + 1}. ${s}`).join('\n')
+          : null);
+        setInitialDiagRecommendation(restoredRecommendation);
       })
       .catch(() => {});
   }
@@ -598,222 +549,47 @@ export default function DashboardPage() {
     }
   }
 
+  // Onboarding-only: AI extracts structured data then shows asset proposals inline
   async function handleDiagnose() {
-    if (!selectedType) return;
-
-    // Onboarding: use AI to extract structured data, then show asset proposal
-    if (selectedType === 'onboarding' || selectedType === 'onboarding_offboarding' || selectedType === 'offboarding') {
-      if (!infoDone.trim() && !infoRequired.trim()) {
-        router.push('/onboarding');
-        return;
-      }
-      setDiagnosing(true);
-      try {
-        const res = await fetch('/api/ai/diagnose', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            problem_type: 'onboarding',
-            stage: 'symptoms',
-            task_details: infoRequired || null,
-            information: infoDone || null,
-          }),
-        });
-        const data = await res.json();
-        if (data.structured_data !== undefined) {
-          localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
-          setOnboardingData(data.structured_data);
-          setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
-
-          // Fetch ALL (assigned + unassigned) assets at the new hire's site in parallel
-          const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
-          if (siteLabel) {
-            const [compRes, phoneRes, ipadRes] = await Promise.all([
-              fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
-              fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
-              fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
-            ]);
-            const [compData, phoneData, ipadData] = await Promise.all([
-              compRes.json(), phoneRes.json(), ipadRes.json(),
-            ]);
-            const compGroups  = buildAssetGroups(compData.assets ?? []);
-            const phoneGroups = buildAssetGroups(phoneData.assets ?? []);
-            const ipadGroups  = buildAssetGroups(ipadData.assets ?? []);
-            setComputer(prev => ({ ...prev, groups: compGroups,  proposed: pickProposed(compGroups)  }));
-            setPhone   (prev => ({ ...prev, groups: phoneGroups, proposed: pickProposed(phoneGroups) }));
-            setIpad    (prev => ({ ...prev, groups: ipadGroups,  proposed: pickProposed(ipadGroups)  }));
-          }
-          setDiagStage('cause');
-        }
-      } catch {
-        toast.error('Could not get AI response — try again.');
-      }
-      setDiagnosing(false);
+    if (!infoDone.trim() && !infoRequired.trim()) {
+      router.push('/onboarding');
       return;
     }
-
-    // Stage 1: symptoms → cause or questions
     setDiagnosing(true);
-    setDiagStage('idle');
-    setDiagCause(null);
-    setDiagDetail(null);
-    setDiagDetailOpen(false);
-    setDiagQuestions(null);
-    setDiagSteps(null); setDiagActionsText('');
-    setDiagRecommendation(null);
-    setDiagConversation([]);
-    setDiagAnswer('');
-    setAdditionalHelpOpen(false);
-    setAdditionalHelpText('');
-    setAdditionalHelpReply(null);
-
     try {
       const res = await fetch('/api/ai/diagnose', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          problem_type: selectedType,
+          problem_type: 'onboarding',
           stage: 'symptoms',
           task_details: infoRequired || null,
           information: infoDone || null,
         }),
       });
       const data = await res.json();
-      const symptoms = [infoRequired, infoDone].filter(Boolean).join('\n') || 'No symptoms provided.';
-      const userTurn = { role: 'user' as const, content: `Symptoms: ${symptoms}` };
-
-      // If tool use happened, prepend those turns so follow-up passes have full context
-      const toolTurns = data._tool_context ? [
-        { role: 'tool_use'    as const, tool_use_id: data._tool_context.tool_call.tool_use_id, name: data._tool_context.tool_call.name, input: data._tool_context.tool_call.input },
-        { role: 'tool_result' as const, tool_use_id: data._tool_context.tool_call.tool_use_id, content: data._tool_context.tool_result },
-      ] : [];
-
-      if (!res.ok || data.error) {
-        toast.error(data.error || `AI error (${res.status}) — try again.`);
-      } else if (data.recommendation) {
-        const aiTurn = { role: 'ai' as const, content: data.recommendation };
-        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
-        setDiagRecommendation(data.recommendation);
-        setDiagStage('recommendation');
-        await saveAiUpdate('ai_response', `Recommendation: ${data.recommendation}`);
-      } else if (data.cause) {
-        const aiTurn = { role: 'ai' as const, content: data.cause };
-        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
-        setDiagCause(data.cause);
-        setDiagDetail(data.detail ?? null);
-        setDiagDetailOpen(false);
+      if (data.structured_data !== undefined) {
+        localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
+        setOnboardingData(data.structured_data);
+        setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
+        const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
+        if (siteLabel) {
+          const [compRes, phoneRes, ipadRes] = await Promise.all([
+            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
+            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
+            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
+          ]);
+          const [compData, phoneData, ipadData] = await Promise.all([
+            compRes.json(), phoneRes.json(), ipadRes.json(),
+          ]);
+          const compGroups  = buildAssetGroups(compData.assets ?? []);
+          const phoneGroups = buildAssetGroups(phoneData.assets ?? []);
+          const ipadGroups  = buildAssetGroups(ipadData.assets ?? []);
+          setComputer(prev => ({ ...prev, groups: compGroups,  proposed: pickProposed(compGroups)  }));
+          setPhone   (prev => ({ ...prev, groups: phoneGroups, proposed: pickProposed(phoneGroups) }));
+          setIpad    (prev => ({ ...prev, groups: ipadGroups,  proposed: pickProposed(ipadGroups)  }));
+        }
         setDiagStage('cause');
-        await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
-      } else if (data.questions?.length) {
-        const aiTurn = { role: 'ai' as const, content: data.questions.join('\n') };
-        setDiagConversation([userTurn, ...toolTurns, aiTurn]);
-        setDiagQuestions(data.questions);
-        setDiagStage('questions');
-        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
-        await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
-      }
-    } catch (err) {
-      console.error('[diagnose]', err);
-      toast.error('Could not reach the AI — try again.');
-    }
-    setDiagnosing(false);
-  }
-
-  async function handleFollowUp() {
-    if (!diagAnswer.trim() || !selectedType) return;
-    const answer = diagAnswer.trim();
-    setDiagAnswer('');
-    await saveAiUpdate('user_reply', answer);
-
-    const userTurn = { role: 'user' as const, content: answer };
-    const updatedConv = [...diagConversation, userTurn];
-    setDiagConversation(updatedConv);
-
-    setDiagnosing(true);
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problem_type: selectedType,
-          stage: 'followup',
-          conversation: updatedConv,
-        }),
-      });
-      const data = await res.json();
-
-      if (data.recommendation) {
-        const aiTurn = { role: 'ai' as const, content: data.recommendation };
-        setDiagConversation(prev => [...prev, aiTurn]);
-        setDiagRecommendation(data.recommendation);
-        setDiagStage('recommendation');
-        await saveAiUpdate('ai_response', `Recommendation: ${data.recommendation}`);
-      } else if (data.cause) {
-        const aiTurn = { role: 'ai' as const, content: data.cause };
-        setDiagConversation(prev => [...prev, aiTurn]);
-        setDiagCause(data.cause);
-        setDiagDetail(data.detail ?? null);
-        setDiagDetailOpen(false);
-        setDiagStage('cause');
-        await saveAiUpdate('ai_response', `Cause: ${data.cause}`);
-      } else if (data.questions?.length) {
-        const aiTurn = { role: 'ai' as const, content: (data.questions as string[]).join('\n') };
-        setDiagConversation(prev => [...prev, aiTurn]);
-        setDiagQuestions(data.questions);
-        setDiagStage('questions');
-        setDiagAnswer((data.questions as string[]).map((_: string, i: number) => `${i + 1}. `).join('\n'));
-        await saveAiUpdate('ai_response', `Questions: ${(data.questions as string[]).join(' | ')}`);
-      }
-    } catch {
-      toast.error('Could not get AI response — try again.');
-    }
-    setDiagnosing(false);
-  }
-
-  async function handleConfirmCause() {
-    if (!diagCause || !selectedType) return;
-    setDiagnosing(true);
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          problem_type: selectedType,
-          stage: 'fix',
-          information: diagCause,
-        }),
-      });
-      const data = await res.json();
-      const steps: string[] = data.steps ?? [];
-      setDiagSteps(steps);
-      setDiagActionsText(steps.map((s, i) => `${i + 1}. ${s}`).join('\n'));
-      setDiagStage('fix');
-      await saveAiUpdate('ai_response', `Fix steps: ${steps.join(' | ')}`);
-    } catch {
-      toast.error('Could not get fix steps — try again.');
-    }
-    setDiagnosing(false);
-  }
-
-  async function handleAdditionalHelp() {
-    if (!additionalHelpText.trim() || !selectedType) return;
-    const question = additionalHelpText.trim();
-    setAdditionalHelpText('');
-    setDiagnosing(true);
-    const userTurn = { role: 'user' as const, content: question };
-    const updatedConv = [...diagConversation, userTurn];
-    setDiagConversation(updatedConv);
-    try {
-      const res = await fetch('/api/ai/diagnose', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ problem_type: selectedType, stage: 'followup', conversation: updatedConv }),
-      });
-      const data = await res.json();
-      const reply: string = data.recommendation || data.cause || (data.questions as string[] | null)?.join('\n') || '';
-      if (reply) {
-        setAdditionalHelpReply(reply);
-        setDiagConversation(prev => [...prev, { role: 'ai' as const, content: reply }]);
       }
     } catch {
       toast.error('Could not get AI response — try again.');
@@ -876,6 +652,9 @@ export default function DashboardPage() {
 
   // Suppress unused variable warnings for voice refs not used in current render
   void numRecRef; void parseSpokenNumber; void listeningNum; void setListeningNum;
+
+  const isOnboarding = selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding';
+  const hideInfoDone = !isOnboarding && (aiStage === 'fix' || aiStage === 'recommendation');
 
   if (loading) {
     return (
@@ -1115,8 +894,8 @@ export default function DashboardPage() {
                 </div>
               </div>}
 
-              {/* infoDone — label varies by task type; hidden in fix/recommendation stages (shown there instead) */}
-              <div className={`form-control${diagStage === 'fix' || diagStage === 'recommendation' ? ' hidden' : ''}`}>
+              {/* infoDone — label varies by task type; hidden when AiDiagnoseSection shows fix/recommendation */}
+              <div className={`form-control${hideInfoDone ? ' hidden' : ''}`}>
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">
                     {selectedType === 'problem_to_fix' || selectedType === 'ticket_to_fix' ? 'Problem to fix'
@@ -1149,99 +928,25 @@ export default function DashboardPage() {
                     }
                   />
                 </div>
-                {/* Ask the AI to diagnose + attach file — hidden once AI has responded */}
-                {diagStage === 'idle' && (
-                <div className="mt-2 space-y-2">
-                  {attachOpen && (
-                    <div className="rounded-box border border-base-300 p-2 space-y-1">
-                      <p className="text-xs text-base-content/50">Attach a file (image, text, PDF)</p>
-                      <input
-                        type="file"
-                        accept="image/*,.txt,.pdf,.csv,.log"
-                        className="file-input file-input-bordered file-input-xs w-full"
-                        onChange={e => setAttachedFile(e.target.files?.[0] ?? null)}
-                      />
-                      {attachedFile && (
-                        <p className="text-xs text-base-content/60">
-                          {attachedFile.name}
-                          <button
-                            className="ml-2 text-error"
-                            onClick={() => { setAttachedFile(null); }}
-                            type="button"
-                          >✕</button>
-                        </p>
-                      )}
-                    </div>
-                  )}
-                  <div className="flex gap-2 items-center">
+                {/* Onboarding: Ask the AI button (non-onboarding types get their button from AiDiagnoseSection) */}
+                {isOnboarding && diagStage === 'idle' && (
+                  <div className="mt-2">
                     <button
-                      className="btn btn-primary btn-sm flex-1"
+                      className="btn btn-primary btn-sm w-full"
                       onClick={handleDiagnose}
                       disabled={diagnosing}
                     >
                       {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                      {diagnosing ? 'Thinking…' : 'Ask the AI to diagnose'}
-                    </button>
-                    <button
-                      className="btn btn-ghost btn-sm text-base-content/40 hover:text-base-content"
-                      title="Attach a file"
-                      onClick={() => setAttachOpen(o => !o)}
-                      type="button"
-                    >
-                      📎
+                      {diagnosing ? 'Thinking…' : 'Ask the AI'}
                     </button>
                   </div>
-                </div>
                 )}
               </div>
 
-              {/* AI response panel */}
-              {diagStage !== 'idle' && (
+              {/* Onboarding asset proposals — shown after AI extracts structured data */}
+              {diagStage === 'cause' && isOnboarding && onboardingData && (
                 <div className="form-control">
-
-                  {/* Questions stage */}
-                  {diagStage === 'questions' && diagQuestions && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                      <p className="text-xs font-semibold text-base-content/50">To narrow down the cause, please answer:</p>
-                      <ol className="list-decimal list-inside text-sm space-y-1">
-                        {diagQuestions.map((q, i) => <li key={i}>{q}</li>)}
-                      </ol>
-                      <div className="flex gap-1 items-start">
-                        <AutoTextarea
-                          className="textarea textarea-bordered textarea-sm flex-1 text-sm font-mono"
-                          value={diagAnswer}
-                          onChange={e => setDiagAnswer(e.target.value)}
-                          placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
-                        />
-                        <VoiceButton
-                          listening={listeningDiagAnswer}
-                          onToggle={() => listeningDiagAnswer
-                            ? stopVoice(diagAnswerRecRef as React.MutableRefObject<unknown>, setListeningDiagAnswer)
-                            : startVoice(
-                                wrapVoiceResult(
-                                  text => setDiagAnswer(prev => prev ? `${prev} ${text}` : text),
-                                  () => setDiagAnswer('')
-                                ),
-                                setListeningDiagAnswer,
-                                diagAnswerRecRef as React.MutableRefObject<unknown>,
-                                true
-                              )
-                          }
-                        />
-                      </div>
-                      <button
-                        className="btn btn-primary btn-sm w-full"
-                        onClick={handleFollowUp}
-                        disabled={diagnosing || !diagAnswer.trim()}
-                      >
-                        {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
-                      </button>
-                    </div>
-                  )}
-
-                  {/* Cause stage — onboarding: asset proposals */}
-                  {diagStage === 'cause' && (selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding') && onboardingData && (
-                    <div className="rounded-box p-3 bg-primary/10 space-y-4">
+                  <div className="rounded-box p-3 bg-primary/10 space-y-4">
 
                       {(['Computer', 'Phone', 'iPad'] as const).map(cat => {
                         const catState = cat === 'Computer' ? computer : cat === 'Phone' ? phone : ipad;
@@ -1374,265 +1079,30 @@ export default function DashboardPage() {
                         Open checklist →
                       </button>
                     </div>
-                  )}
+                  </div>
+                )}
 
-                  {/* Cause stage — general: diagnosis result */}
-                  {diagStage === 'cause' && selectedType !== 'onboarding' && selectedType !== 'offboarding' && selectedType !== 'onboarding_offboarding' && diagCause && (
-                    <div className="space-y-2">
-                      <label className="label py-0"><span className="label-text text-xs font-semibold">Diagnosis</span></label>
-                      <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                        <div className="flex gap-1 items-start">
-                          <AutoTextarea
-                            className="textarea textarea-bordered textarea-sm flex-1 text-sm bg-white"
-                            value={diagCause}
-                            onChange={e => setDiagCause(e.target.value)}
-                          />
-                          <VoiceButton
-                            listening={listeningDiagCause}
-                            onToggle={() => listeningDiagCause
-                              ? stopVoice(diagCauseRecRef as React.MutableRefObject<unknown>, setListeningDiagCause)
-                              : startVoice(
-                                  wrapVoiceResult(
-                                    text => setDiagCause(prev => prev ? `${prev} ${text}` : text),
-                                    () => setDiagCause(null)
-                                  ),
-                                  setListeningDiagCause,
-                                  diagCauseRecRef as React.MutableRefObject<unknown>,
-                                  true
-                                )
-                            }
-                          />
-                        </div>
-                        <div>
-                          <button
-                            className="text-xs text-primary underline"
-                            onClick={() => setDiagDetailOpen(o => !o)}
-                          >
-                            {diagDetailOpen ? 'Hide detail' : 'More detail →'}
-                          </button>
-                          {diagDetailOpen && (
-                            <p className="text-xs text-base-content/70 mt-1">{diagDetail ?? 'No additional detail available.'}</p>
-                          )}
-                        </div>
-                        <div className="flex gap-2 pt-1">
-                          <button
-                            className="btn btn-primary btn-sm flex-1"
-                            onClick={handleConfirmCause}
-                            disabled={diagnosing}
-                          >
-                            {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Actions to take'}
-                          </button>
-                          <button
-                            className="btn btn-outline btn-sm flex-1"
-                            onClick={() => {
-                              setDiagStage('questions');
-                              setDiagQuestions(["What else can you tell me about the problem?"]);
-                              setDiagAnswer('1. ');
-                              setDiagCause(null);
-                              setDiagDetail(null);
-                            }}
-                            disabled={diagnosing}
-                          >
-                            Not quite right
-                          </button>
-                        </div>
-                      </div>
-                    </div>
-                  )}
-
-                  {/* Fix stage: Problem / Diagnosis / Actions */}
-                  {diagStage === 'fix' && diagSteps && (
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <label className="label py-0"><span className="label-text text-xs font-semibold">{selectedType === 'ticket_to_fix' ? 'Ticket to deal with' : 'Problem to fix'}</span></label>
-                        <AutoTextarea
-                          className="textarea textarea-bordered textarea-sm w-full text-sm"
-                          value={infoDone}
-                          onChange={e => setInfoDone(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="label py-0"><span className="label-text text-xs font-semibold">Diagnosis</span></label>
-                        <div className="flex gap-1 items-start">
-                          <AutoTextarea
-                            className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                            value={diagCause ?? ''}
-                            onChange={e => setDiagCause(e.target.value)}
-                          />
-                          <VoiceButton
-                            listening={listeningDiagCause}
-                            onToggle={() => listeningDiagCause
-                              ? stopVoice(diagCauseRecRef as React.MutableRefObject<unknown>, setListeningDiagCause)
-                              : startVoice(
-                                  wrapVoiceResult(
-                                    text => setDiagCause(prev => prev ? `${prev} ${text}` : text),
-                                    () => setDiagCause(null)
-                                  ),
-                                  setListeningDiagCause,
-                                  diagCauseRecRef as React.MutableRefObject<unknown>,
-                                  true
-                                )
-                            }
-                          />
-                        </div>
-                      </div>
-                      <div className="space-y-1">
-                        <label className="label py-0"><span className="label-text text-xs font-semibold">Actions to take</span></label>
-                        <div className="flex gap-1 items-start">
-                          <AutoTextarea
-                            className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                            value={diagActionsText}
-                            onChange={e => setDiagActionsText(e.target.value)}
-                          />
-                          <VoiceButton
-                            listening={listeningDiagActions}
-                            onToggle={() => listeningDiagActions
-                              ? stopVoice(diagActionsRecRef as React.MutableRefObject<unknown>, setListeningDiagActions)
-                              : startVoice(
-                                  wrapVoiceResult(
-                                    text => setDiagActionsText(prev => prev ? `${prev} ${text}` : text),
-                                    () => setDiagActionsText('')
-                                  ),
-                                  setListeningDiagActions,
-                                  diagActionsRecRef as React.MutableRefObject<unknown>,
-                                  true
-                                )
-                            }
-                          />
-                        </div>
-                      </div>
-                      {!additionalHelpOpen && (
-                        <button
-                          className="btn btn-primary btn-sm w-full"
-                          onClick={() => setAdditionalHelpOpen(true)}
-                        >
-                          Ask the AI for additional help
-                        </button>
-                      )}
-                      {additionalHelpOpen && (
-                        <div className="space-y-2">
-                          <div className="flex gap-1 items-start">
-                            <AutoTextarea
-                              className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                              value={additionalHelpText}
-                              onChange={e => setAdditionalHelpText(e.target.value)}
-                              placeholder="What additional help do you need?"
-                            />
-                            <VoiceButton
-                              listening={listeningAdditionalHelp}
-                              onToggle={() => listeningAdditionalHelp
-                                ? stopVoice(additionalHelpRecRef as React.MutableRefObject<unknown>, setListeningAdditionalHelp)
-                                : startVoice(
-                                    wrapVoiceResult(
-                                      text => setAdditionalHelpText(prev => prev ? `${prev} ${text}` : text),
-                                      () => setAdditionalHelpText('')
-                                    ),
-                                    setListeningAdditionalHelp,
-                                    additionalHelpRecRef as React.MutableRefObject<unknown>,
-                                    true
-                                  )
-                              }
-                            />
-                          </div>
-                          {additionalHelpReply && (
-                            <div className="rounded-box p-3 bg-primary/10 text-sm whitespace-pre-wrap">{additionalHelpReply}</div>
-                          )}
-                          <button
-                            className="btn btn-primary btn-sm w-full"
-                            onClick={handleAdditionalHelp}
-                            disabled={diagnosing || !additionalHelpText.trim()}
-                          >
-                            {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-
-                  {/* Recommendation stage — decision_to_make */}
-                  {diagStage === 'recommendation' && diagRecommendation !== null && (
-                    <div className="space-y-3">
-                      <div className="space-y-1">
-                        <label className="label py-0"><span className="label-text text-xs font-semibold">Decision to make</span></label>
-                        <AutoTextarea
-                          className="textarea textarea-bordered textarea-sm w-full text-sm"
-                          value={infoDone}
-                          onChange={e => setInfoDone(e.target.value)}
-                        />
-                      </div>
-                      <div className="space-y-1">
-                        <label className="label py-0"><span className="label-text text-xs font-semibold">Options &amp; Recommendation</span></label>
-                        <div className="flex gap-1 items-start">
-                          <AutoTextarea
-                            className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                            value={diagRecommendation}
-                            onChange={e => setDiagRecommendation(e.target.value)}
-                          />
-                          <VoiceButton
-                            listening={listeningDiagRecommendation}
-                            onToggle={() => listeningDiagRecommendation
-                              ? stopVoice(diagRecommendationRecRef as React.MutableRefObject<unknown>, setListeningDiagRecommendation)
-                              : startVoice(
-                                  wrapVoiceResult(
-                                    text => setDiagRecommendation(prev => prev ? `${prev} ${text}` : text),
-                                    () => setDiagRecommendation(null)
-                                  ),
-                                  setListeningDiagRecommendation,
-                                  diagRecommendationRecRef as React.MutableRefObject<unknown>,
-                                  true
-                                )
-                            }
-                          />
-                        </div>
-                      </div>
-                      {!additionalHelpOpen && (
-                        <button
-                          className="btn btn-primary btn-sm w-full"
-                          onClick={() => setAdditionalHelpOpen(true)}
-                        >
-                          Discuss further with the AI
-                        </button>
-                      )}
-                      {additionalHelpOpen && (
-                        <div className="space-y-2">
-                          <div className="flex gap-1 items-start">
-                            <AutoTextarea
-                              className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                              value={additionalHelpText}
-                              onChange={e => setAdditionalHelpText(e.target.value)}
-                              placeholder="What would you like to discuss?"
-                            />
-                            <VoiceButton
-                              listening={listeningAdditionalHelp}
-                              onToggle={() => listeningAdditionalHelp
-                                ? stopVoice(additionalHelpRecRef as React.MutableRefObject<unknown>, setListeningAdditionalHelp)
-                                : startVoice(
-                                    wrapVoiceResult(
-                                      text => setAdditionalHelpText(prev => prev ? `${prev} ${text}` : text),
-                                      () => setAdditionalHelpText('')
-                                    ),
-                                    setListeningAdditionalHelp,
-                                    additionalHelpRecRef as React.MutableRefObject<unknown>,
-                                    true
-                                  )
-                              }
-                            />
-                          </div>
-                          {additionalHelpReply && (
-                            <div className="rounded-box p-3 bg-primary/10 text-sm whitespace-pre-wrap">{additionalHelpReply}</div>
-                          )}
-                          <button
-                            className="btn btn-primary btn-sm w-full"
-                            onClick={handleAdditionalHelp}
-                            disabled={diagnosing || !additionalHelpText.trim()}
-                          >
-                            {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
-                          </button>
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
+              {/* AI Diagnose Section — all non-onboarding task types */}
+              {!isOnboarding && (
+                <AiDiagnoseSection
+                  key={selectedTask?.id}
+                  selectedType={selectedType}
+                  infoDone={infoDone}
+                  setInfoDone={setInfoDone}
+                  infoRequired={infoRequired}
+                  onSaveUpdate={async (type, note) => {
+                    if (!selectedTask) return;
+                    await fetch(`/api/issues/${selectedTask.id}/updates`, {
+                      method: 'POST',
+                      headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ type, note }),
+                    });
+                  }}
+                  onStageChange={setAiStage}
+                  initialCause={initialDiagCause}
+                  initialActionsText={initialDiagActionsText}
+                  initialRecommendation={initialDiagRecommendation}
+                />
               )}
 
               {/* Issues / Comments */}
