@@ -235,6 +235,14 @@ export default function TicketsPage() {
         }),
       });
       if (res.ok) {
+        const data = await res.json();
+        if (newTaskDetails.trim()) {
+          await fetch(`/api/issues/${data.incident.id}/updates`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ type: 'details', note: newTaskDetails.trim() }),
+          });
+        }
         loadTickets();
         setShowAddModal(false);
         setNewTaskName(''); setNewTaskDetails('');
