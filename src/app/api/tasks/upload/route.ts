@@ -44,7 +44,7 @@ function normalizeTaskType(t: string | undefined | null): string | null {
   if (!t) return null;
   const lower = t.toLowerCase().trim();
   if (lower.includes('problem'))     return 'problem_to_fix';
-  if (lower.includes('ticket'))      return 'ticket_to_fix';
+  if (lower.includes('ticket'))      return 'problem_to_fix';
   if (lower.includes('offboarding')) return 'offboarding';
   if (lower.includes('onboarding'))  return 'onboarding';
   if (lower.includes('decision'))    return 'decision_to_make';
@@ -67,6 +67,7 @@ interface TaskRow {
   priority?: string;
   date_due?: string;
   status?: string;
+  source?: string;
   task_type?: string;
   information_needed?: string;
   problem_to_fix?: string;
@@ -111,12 +112,13 @@ export async function POST(request: NextRequest) {
     .eq('user_id', user.id);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
-  // Insert new incidents — ticket_to_fix task type → source='ticket' (Tickets tab + Dashboard),
-  // all other types → source='issue' (Dashboard only)
+  // Insert new incidents — source is preserved from the uploaded data;
+  // defaults to 'issue' if not provided.
+  const VALID_SOURCES = new Set(['ticket', 'issue', 'nurse', 'nurse_self_fix']);
   const incidentRows = tasks.map(t => {
     const screen = normalizeTaskType(t.task_type);
-    const isTicket = screen === 'ticket_to_fix';
     const hasTaskNumber = t.task_number !== null && t.task_number !== undefined && String(t.task_number).trim() !== '';
+    const source = t.source && VALID_SOURCES.has(t.source) ? t.source : 'issue';
     return {
       user_id:        user.id,
       task_number:    hasTaskNumber ? Number(t.task_number) : null,
@@ -127,7 +129,7 @@ export async function POST(request: NextRequest) {
       date_due:       t.date_due || null,
       status:         normalizeStatus(t.status),
       screen,
-      source:         isTicket ? 'ticket' : 'issue',
+      source,
       auto_suggested: false,
       date_completed: normalizeStatus(t.status) === 'resolved'
         ? (t.date_due || new Date().toISOString().split('T')[0])
@@ -182,7 +184,9 @@ export async function POST(request: NextRequest) {
     if (updInsErr) return NextResponse.json({ error: updInsErr.message }, { status: 500 });
   }
 
-  const ticketCount = incidentRows.filter(r => r.source === 'ticket').length;
-  const issueCount  = incidentRows.filter(r => r.source === 'issue').length;
-  return NextResponse.json({ inserted: incidentRows.length, issues: issueCount, tickets: ticketCount });
+  const bySource = incidentRows.reduce<Record<string, number>>((acc, r) => {
+    acc[r.source] = (acc[r.source] ?? 0) + 1;
+    return acc;
+  }, {});
+  return NextResponse.json({ inserted: incidentRows.length, by_source: bySource });
 }

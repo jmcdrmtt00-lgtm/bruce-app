@@ -182,6 +182,7 @@ export default function DashboardPage() {
   const [dateDue, setDateDue]     = useState('');
   const [status, setStatus]       = useState<'pending' | 'in_progress' | 'resolved'>('pending');
   const [requester, setRequester] = useState('');
+  const [assignedTo, setAssignedTo] = useState('');
 
   // Add task modal state
   const [showAddModal,     setShowAddModal]     = useState(false);
@@ -267,7 +268,7 @@ export default function DashboardPage() {
           await fetch(`/api/issues/${selectedTask.id}`, {
             method: 'PATCH',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null, reported_by: requester.trim() || null }),
+            body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null, reported_by: requester.trim() || null, assigned_to: assignedTo || null }),
           });
           loadTasks();
         }
@@ -277,7 +278,7 @@ export default function DashboardPage() {
     }, 1500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskName, priority, dateDue, status, selectedType, requester]);
+  }, [taskName, priority, dateDue, status, selectedType, requester, assignedTo]);
 
   // Save a textarea as an incident_update on blur (only if changed since last save)
   async function saveUpdate(type: string, note: string, lastRef: React.MutableRefObject<string>) {
@@ -319,6 +320,7 @@ export default function DashboardPage() {
     setDateDue('');
     setStatus('pending');
     setRequester('');
+    setAssignedTo('');
     setInfoRequired('');
     setInfoDone('');
     setIssues('');
@@ -342,6 +344,7 @@ export default function DashboardPage() {
     const s = task.status === 'open' ? 'pending' : task.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
     setRequester(task.reported_by || '');
+    setAssignedTo(task.assigned_to || '');
 
     // Normalize screen → problem type ID, default to 'general'
     const rawScreen = task.screen || '';
@@ -817,8 +820,8 @@ export default function DashboardPage() {
                 </div>
               </div>
 
-              {/* Requester + Task type */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Requester + Assigned to + Task type */}
+              <div className="grid grid-cols-3 gap-2">
                 <div className="form-control">
                   <label className="label py-0">
                     <span className="label-text text-xs font-semibold">Requester</span>
@@ -846,6 +849,17 @@ export default function DashboardPage() {
                       }
                     />
                   </div>
+                </div>
+                <div className="form-control">
+                  <label className="label py-0">
+                    <span className="label-text text-xs font-semibold">Assigned to</span>
+                  </label>
+                  <select className="select select-bordered select-sm text-sm w-full" value={assignedTo}
+                    onChange={e => { setAssignedTo(e.target.value); markDirty(); }}>
+                    <option value="">Unassigned</option>
+                    <option value="Bruce">Bruce</option>
+                    <option value="John">John</option>
+                  </select>
                 </div>
                 <div className="form-control">
                   <label className="label py-0">
@@ -898,7 +912,7 @@ export default function DashboardPage() {
               <div className={`form-control${hideInfoDone ? ' hidden' : ''}`}>
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">
-                    {selectedType === 'problem_to_fix' || selectedType === 'ticket_to_fix' ? 'Problem to fix'
+                    {selectedType === 'problem_to_fix' ? 'Problem to fix'
                       : selectedType === 'decision_to_make' ? 'Decision to make'
                       : selectedType === 'project_to_manage' ? 'Project to manage'
                       : 'Information to send to the AI'}
@@ -1237,7 +1251,6 @@ export default function DashboardPage() {
                 onChange={e => setNewTaskType(e.target.value)}>
                 <option value="">Select task type *</option>
                 <option value="problem_to_fix">Problem to fix</option>
-                <option value="ticket_to_fix">Ticket to deal with</option>
                 <option value="decision_to_make">Decision to make</option>
                 <option value="onboarding">Onboarding</option>
                 <option value="offboarding">Offboarding</option>

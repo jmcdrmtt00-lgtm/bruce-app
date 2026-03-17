@@ -462,7 +462,7 @@ export default function AiDiagnoseSection({
               <div className="space-y-1">
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">
-                    {selectedType === 'ticket_to_fix' ? 'Ticket to deal with' : 'Problem to fix'}
+                    Problem to fix
                   </span>
                 </label>
                 <AutoTextarea className="textarea textarea-bordered textarea-sm w-full text-sm" value={infoDone} onChange={e => setInfoDone(e.target.value)} />

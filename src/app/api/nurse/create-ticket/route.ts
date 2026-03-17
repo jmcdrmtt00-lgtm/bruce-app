@@ -49,7 +49,7 @@ export async function POST(request: NextRequest) {
       reported_by: user.email ?? null,
       status:      'pending',
       screen:      'problem_to_fix',
-      source:      'nurse',
+      source:      'ticket',
     })
     .select('id, task_number')
     .single();

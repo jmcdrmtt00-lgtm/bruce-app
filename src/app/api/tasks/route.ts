@@ -45,11 +45,11 @@ export async function GET() {
 
   const SCREEN_LABEL: Record<string, string> = {
     problem_to_fix:         'Problem to fix',
-    ticket_to_fix:          'Ticket to deal with',
     decision_to_make:       'Decision to make',
     onboarding:             'Onboarding',
     offboarding:            'Offboarding',
     // legacy
+    ticket_to_fix:          'Problem to fix',
     onboarding_offboarding: 'Onboarding',
     project_to_manage:      'Project to manage',
   };
@@ -69,6 +69,7 @@ export async function GET() {
       priority:         inc.priority,
       date_due:         inc.date_due,
       status:           inc.status,
+      source:           inc.source ?? null,
       task_type:        SCREEN_LABEL[screen] ?? null,
       information_needed: isOnboarding ? (detailsUpdate?.note ?? null) : null,
       problem_to_fix:   (screen === 'problem_to_fix' || screen === 'ticket_to_fix') ? (progressUpdate?.note ?? null) : null,

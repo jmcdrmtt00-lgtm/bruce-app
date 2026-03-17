@@ -35,7 +35,7 @@ function TicketTable({ tickets, onRowClick, selectedId }: {
             <th className="w-8">#</th>
             <th className="text-left">Task Name</th>
             <th className="w-24">Requester</th>
-            <th className="w-24 text-center">Target Date</th>
+            <th className="w-24 text-center">Date of Request</th>
           </tr>
         </thead>
         <tbody>
@@ -83,6 +83,7 @@ export default function TicketsPage() {
   const [dateDue,      setDateDue]      = useState('');
   const [status,       setStatus]       = useState<'pending' | 'in_progress' | 'resolved'>('pending');
   const [requester,    setRequester]    = useState('');
+  const [assignedTo,   setAssignedTo]   = useState('');
   const [selectedType, setSelectedType] = useState('general');
   const [infoRequired, setInfoRequired] = useState('');
   const [infoDone,     setInfoDone]     = useState('');
@@ -146,7 +147,7 @@ export default function TicketsPage() {
         await fetch(`/api/issues/${selectedTicket.id}`, {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null, reported_by: requester.trim() || null }),
+          body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null, reported_by: requester.trim() || null, assigned_to: assignedTo || null }),
         });
         loadTickets();
         setSaveStatus('saved');
@@ -155,7 +156,7 @@ export default function TicketsPage() {
     }, 1500);
     return () => { if (saveTimerRef.current) clearTimeout(saveTimerRef.current); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [taskName, priority, dateDue, status, selectedType, requester]);
+  }, [taskName, priority, dateDue, status, selectedType, requester, assignedTo]);
 
   function markDirty() { panelDirtyRef.current = true; setSaveStatus('saving'); }
 
@@ -177,7 +178,7 @@ export default function TicketsPage() {
 
   function resetPanel() {
     setTaskNumber(''); setTaskName(''); setPriority(''); setDateDue('');
-    setStatus('pending'); setRequester(''); setInfoRequired(''); setInfoDone('');
+    setStatus('pending'); setRequester(''); setAssignedTo(''); setInfoRequired(''); setInfoDone('');
     setIssues(''); setSelectedTicket(null); setSelectedType('general');
     setAllUpdates([]); setHistoryOpen(false);
     setAiStage('idle');
@@ -194,6 +195,7 @@ export default function TicketsPage() {
     const s = ticket.status === 'open' ? 'pending' : ticket.status;
     setStatus(s as 'pending' | 'in_progress' | 'resolved');
     setRequester(ticket.reported_by || '');
+    setAssignedTo(ticket.assigned_to || '');
     const typeId = normalizeScreenToTypeId(ticket.screen || '') || 'general';
     setSelectedType(typeId);
     setInfoRequired(TASK_TYPES[typeId] ? `Information needed: ${TASK_TYPES[typeId].fields.join(', ')}` : '');
@@ -252,7 +254,7 @@ export default function TicketsPage() {
           priority: newTaskPriority || null,
           status: 'pending',
           source: 'ticket',
-          screen: 'ticket_to_fix',
+          screen: 'problem_to_fix',
         }),
       });
       if (res.ok) {
@@ -414,8 +416,8 @@ export default function TicketsPage() {
                 </div>
               </div>
 
-              {/* Requester + Task type */}
-              <div className="grid grid-cols-2 gap-2">
+              {/* Requester + Assigned to + Task type */}
+              <div className="grid grid-cols-3 gap-2">
                 <div className="form-control">
                   <label className="label py-0"><span className="label-text text-xs font-semibold">Requester</span></label>
                   <div className="flex gap-1">
@@ -431,6 +433,15 @@ export default function TicketsPage() {
                   </div>
                 </div>
                 <div className="form-control">
+                  <label className="label py-0"><span className="label-text text-xs font-semibold">Assigned to</span></label>
+                  <select className="select select-bordered select-sm text-sm w-full" value={assignedTo}
+                    onChange={e => { setAssignedTo(e.target.value); markDirty(); }}>
+                    <option value="">Unassigned</option>
+                    <option value="Bruce">Bruce</option>
+                    <option value="John">John</option>
+                  </select>
+                </div>
+                <div className="form-control">
                   <label className="label py-0"><span className="label-text text-xs font-semibold">Task type</span></label>
                   <select className="select select-bordered select-sm text-sm w-full" value={selectedType}
                     onChange={e => selectProblemType(e.target.value)}>
@@ -443,7 +454,7 @@ export default function TicketsPage() {
               <div className={`form-control${hideInfoDone ? ' hidden' : ''}`}>
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">
-                    {selectedType === 'ticket_to_fix' ? 'Ticket to deal with' : 'Problem to fix'}
+                    Problem to fix
                   </span>
                 </label>
                 <div className="flex gap-1 items-start">
