@@ -35,7 +35,7 @@ function TicketTable({ tickets, onRowClick, selectedId }: {
             <th className="w-8">#</th>
             <th className="text-left">Task Name</th>
             <th className="w-24">Requester</th>
-            <th className="w-24 text-center">Date of Request</th>
+            <th className="w-36 text-center">Date of Request</th>
           </tr>
         </thead>
         <tbody>
@@ -346,11 +346,7 @@ export default function TicketsPage() {
                 )}
               </div>
 
-              {!selectedTicket && (
-                <p className="text-center text-base-content/40 text-sm py-4">Select a ticket to edit it</p>
-              )}
-
-              {selectedTicket && (<>
+              <>
 
               {/* Task Name */}
               <div className="form-control">
@@ -477,7 +473,7 @@ export default function TicketsPage() {
 
               {/* AI Diagnose Section */}
               <AiDiagnoseSection
-                key={selectedTicket.id}
+                key={selectedTicket?.id}
                 selectedType={selectedType}
                 infoDone={infoDone}
                 setInfoDone={setInfoDone}
@@ -539,13 +535,15 @@ export default function TicketsPage() {
               )}
 
               {/* Delete */}
-              <div className="flex justify-end">
-                <button className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent" title="Delete ticket" onClick={handleDelete}>
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
+              {selectedTicket && (
+                <div className="flex justify-end">
+                  <button className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent" title="Delete ticket" onClick={handleDelete}>
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
 
-              </>)}
+              </>
 
               {/* Autosave status */}
               <div className="h-4 text-right">

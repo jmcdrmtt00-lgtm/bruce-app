@@ -76,9 +76,9 @@ function TaskTable({
         <thead>
           <tr>
             <th className="w-8">#</th>
-            <th className="text-left">Task Name</th>
             <th className="w-14 text-center">Urgency</th>
-            <th className="w-24">Requester</th>
+            <th className="text-left">Task Name</th>
+            <th className="w-28">Requester</th>
             <th className="w-24 text-center">Target Date</th>
           </tr>
         </thead>
@@ -92,17 +92,17 @@ function TaskTable({
               onClick={() => onRowClick(task)}
             >
               <td className="text-base-content/40 text-xs">{task.task_number}</td>
-              <td>
-                <p className="truncate font-medium text-sm">
-                  {task.title || task.description.slice(0, 60)}
-                </p>
-              </td>
               <td className="text-center">
                 {task.priority && (
                   <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
                     {PRIORITY_LABEL[task.priority]}
                   </span>
                 )}
+              </td>
+              <td>
+                <p className="truncate font-medium text-sm">
+                  {task.title || task.description.slice(0, 60)}
+                </p>
               </td>
               <td className="text-xs text-base-content/70 truncate max-w-0">
                 {task.reported_by || ''}
@@ -684,13 +684,6 @@ export default function DashboardPage() {
           <div>
             <h2 className="text-lg font-bold mb-2">Tasks in the queue</h2>
             <TaskTable tasks={queue} onRowClick={loadTask} variant="queue" />
-            <button
-              className="btn btn-outline btn-sm w-full mt-2"
-              onClick={handleSeedData}
-              disabled={seeding}
-            >
-              {seeding ? <span className="loading loading-spinner loading-sm" /> : 'Load Demo Data'}
-            </button>
           </div>
 
         </div>
@@ -715,13 +708,8 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Empty state hint */}
-              {!selectedTask && (
-                <p className="text-center text-base-content/40 text-sm py-4">Select a task to edit it</p>
-              )}
-
-              {/* Task fields — only shown when a task is selected */}
-              {selectedTask && (<>
+              {/* Task fields */}
+              <>
               <div className="form-control">
                 <label className="label py-0">
                   <span className="label-text text-xs font-semibold">Task Name</span>
@@ -1173,16 +1161,18 @@ export default function DashboardPage() {
                 </div>
               )}
 
-              <div className="flex justify-end">
-                <button
-                  className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
-                  onClick={handleDelete}
-                  title="Delete task"
-                >
-                  <Trash2 className="w-3.5 h-3.5" />
-                </button>
-              </div>
-              </>)}
+              {selectedTask && (
+                <div className="flex justify-end">
+                  <button
+                    className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
+                    onClick={handleDelete}
+                    title="Delete task"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                </div>
+              )}
+              </>
 
               {/* Autosave status */}
               <div className="h-4 text-right">
