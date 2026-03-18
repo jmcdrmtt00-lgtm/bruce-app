@@ -318,10 +318,11 @@ async def diagnose(
                     pass
         if parsed:
             return {
+                "alternatives":   parsed.get("alternatives") or None,
                 "recommendation": parsed.get("recommendation") or None,
                 "questions":      parsed.get("questions") or None,
             }
-        return {"recommendation": text or None, "questions": None}
+        return {"alternatives": None, "recommendation": text or None, "questions": None}
 
     elif problem_type == "nurse_assess":
         # Nurse self-service: questions loop → {assessment, reason} or {questions}

@@ -177,6 +177,13 @@ export default function AiDiagnoseSection({
     return wrapVoiceResult(onResult, clearFn, clearLastVoiceFieldRef);
   }
 
+  function formatDecisionResponse(alternatives: string[] | null, recommendation: string | null): string {
+    const parts: string[] = [];
+    if (alternatives?.length) parts.push(alternatives.join('\n'));
+    if (recommendation) parts.push(recommendation);
+    return parts.join('\n\n');
+  }
+
   function resetDiag() {
     setDiagStage('idle');
     setDiagCause(null); setDiagDetail(null); setDiagDetailOpen(false);
@@ -233,10 +240,11 @@ export default function AiDiagnoseSection({
 
       if (!res.ok || data.error) {
         toast.error(data.error || `AI error (${res.status}) — try again.`);
-      } else if (data.recommendation) {
-        setDiagConversation([userTurn, ...toolTurns, { role: 'ai' as const, content: data.recommendation }]);
-        setDiagRecommendation(data.recommendation); setDiagStage('recommendation');
-        await saveAi('ai_response', `Recommendation: ${data.recommendation}`);
+      } else if (data.recommendation || data.alternatives?.length) {
+        const formatted = formatDecisionResponse(data.alternatives ?? null, data.recommendation ?? null);
+        setDiagConversation([userTurn, ...toolTurns, { role: 'ai' as const, content: formatted }]);
+        setDiagRecommendation(formatted); setDiagStage('recommendation');
+        await saveAi('ai_response', `Recommendation: ${formatted}`);
       } else if (data.cause) {
         setDiagConversation([userTurn, ...toolTurns, { role: 'ai' as const, content: data.cause }]);
         setDiagCause(data.cause); setDiagDetail(data.detail ?? null); setDiagStage('cause');
@@ -267,10 +275,11 @@ export default function AiDiagnoseSection({
         body: JSON.stringify({ problem_type: selectedType, stage: 'followup', conversation: updatedConv }),
       });
       const data = await res.json();
-      if (data.recommendation) {
-        setDiagConversation(prev => [...prev, { role: 'ai' as const, content: data.recommendation }]);
-        setDiagRecommendation(data.recommendation); setDiagStage('recommendation');
-        await saveAi('ai_response', `Recommendation: ${data.recommendation}`);
+      if (data.recommendation || data.alternatives?.length) {
+        const formatted = formatDecisionResponse(data.alternatives ?? null, data.recommendation ?? null);
+        setDiagConversation(prev => [...prev, { role: 'ai' as const, content: formatted }]);
+        setDiagRecommendation(formatted); setDiagStage('recommendation');
+        await saveAi('ai_response', `Recommendation: ${formatted}`);
       } else if (data.cause) {
         setDiagConversation(prev => [...prev, { role: 'ai' as const, content: data.cause }]);
         setDiagCause(data.cause); setDiagDetail(data.detail ?? null); setDiagStage('cause');
@@ -316,7 +325,8 @@ export default function AiDiagnoseSection({
         body: JSON.stringify({ problem_type: selectedType, stage: 'followup', conversation: updatedConv }),
       });
       const data = await res.json();
-      const reply: string = data.recommendation || data.cause || (data.questions as string[] | null)?.join('\n') || '';
+      const decisionFormatted = (data.recommendation || data.alternatives?.length) ? formatDecisionResponse(data.alternatives ?? null, data.recommendation ?? null) : null;
+      const reply: string = decisionFormatted || data.cause || (data.questions as string[] | null)?.join('\n') || '';
       if (reply) {
         setAdditionalHelpReply(reply);
         setDiagConversation(prev => [...prev, { role: 'ai' as const, content: reply }]);
