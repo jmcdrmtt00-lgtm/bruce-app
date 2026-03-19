@@ -619,7 +619,7 @@ export default function DashboardPage() {
   void infoRequiredRecRef; void listeningInfoRequired; void setListeningInfoRequired;
   void infoDoneRecRef; void listeningInfoDone; void setListeningInfoDone;
   void issuesRecRef; void listeningIssues; void setListeningIssues;
-  void wrapVoiceResult; void clearLastVoiceFieldRef; void handleVoiceCommand;
+  void clearLastVoiceFieldRef; void handleVoiceCommand;
 
   const isOnboarding = selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding';
   const hideInfoDone = !isOnboarding && (aiStage === 'fix' || aiStage === 'recommendation');
@@ -694,7 +694,7 @@ export default function DashboardPage() {
 
   return (
     <main className="min-h-screen bg-base-200 p-6">
-      <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 items-start">
+      <div className="grid grid-cols-1 lg:grid-cols-[600px_1fr] gap-6 items-start">
 
         {/* Left panel — dark navy tabbed task list */}
         <div
@@ -876,70 +876,79 @@ export default function DashboardPage() {
 
             {/* ── Header strip ─────────────────────────────────────────── */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 20px 10px', borderBottom: '1px solid rgba(168,184,200,0.15)', flexShrink: 0, minHeight: '46px' }}>
-              {selectedTask ? (
-                <>
-                  {/* Task number */}
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#3a4a5c', flexShrink: 0 }}>
-                    #{taskNumber}
-                  </span>
-                  {/* Task name — inline editable */}
-                  <input
-                    value={taskName}
-                    onChange={e => { setTaskName(e.target.value); markDirty(); }}
-                    style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
-                  />
-                  {/* Urgency badge-select */}
-                  <select
-                    value={priority}
-                    onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }}
-                    style={{
-                      padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
-                      cursor: 'pointer', flexShrink: 0, appearance: 'none',
-                      fontFamily: "'DM Sans', sans-serif",
-                      border: priority === 'high' ? '1px solid rgba(255,68,68,0.5)' : priority === 'low' ? '1px solid rgba(34,204,110,0.35)' : '1px solid rgba(168,184,200,0.28)',
-                      background: priority === 'high' ? 'rgba(255,68,68,0.18)' : priority === 'low' ? 'rgba(34,204,110,0.12)' : 'rgba(255,255,255,0.03)',
-                      color: priority === 'high' ? '#ff6060' : priority === 'low' ? '#22cc6e' : '#6b7d8f',
-                    }}
-                  >
-                    <option value="" style={{ background: '#141f2d', color: '#eef2f7' }}>— urgency</option>
-                    <option value="high" style={{ background: '#141f2d', color: '#eef2f7' }}>High</option>
-                    <option value="low" style={{ background: '#141f2d', color: '#eef2f7' }}>Low</option>
-                  </select>
-                  {/* Status badge-select */}
-                  <select
-                    value={status}
-                    onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }}
-                    style={{
-                      padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
-                      cursor: 'pointer', flexShrink: 0, appearance: 'none',
-                      fontFamily: "'DM Sans', sans-serif",
-                      border: status === 'resolved' ? '1px solid rgba(77,184,140,0.22)' : status === 'needs_info' ? '1px solid rgba(240,160,64,0.2)' : '1px solid rgba(168,184,200,0.28)',
-                      background: status === 'resolved' ? 'rgba(77,184,140,0.1)' : status === 'needs_info' ? 'rgba(240,160,64,0.1)' : 'rgba(255,255,255,0.03)',
-                      color: status === 'resolved' ? '#4db88c' : status === 'needs_info' ? '#f0a040' : '#a8b8c8',
-                    }}
-                  >
-                    <option value="open" style={{ background: '#141f2d', color: '#eef2f7' }}>Open</option>
-                    <option value="needs_info" style={{ background: '#141f2d', color: '#eef2f7' }}>Needs info</option>
-                    <option value="resolved" style={{ background: '#141f2d', color: '#eef2f7' }}>Completed</option>
-                  </select>
-                  {/* Right-side actions */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
-                    {saveStatus === 'saving' && <span style={{ fontSize: '10px', color: '#6b7d8f' }}>Saving…</span>}
-                    {saveStatus === 'saved'  && <span style={{ fontSize: '10px', color: '#4db88c' }}>Saved ✓</span>}
-                    {allUpdates.length > 0 && (
-                      <button
-                        onClick={() => setHistoryOpen(o => !o)}
-                        style={{ padding: '4px 8px', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", border: '1px solid rgba(168,184,200,0.28)', background: historyOpen ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)', color: historyOpen ? '#eef2f7' : '#a8b8c8' }}
-                      >
-                        History
-                      </button>
-                    )}
-                    <button onClick={resetPanel} title="Deselect" style={{ padding: '4px 6px', borderRadius: '5px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.15)', background: 'transparent', color: '#3a4a5c', fontSize: '13px', lineHeight: 1 }}>×</button>
-                  </div>
-                </>
-              ) : (
-                <span style={{ fontSize: '12px', color: '#3a4a5c' }}>Select a task from the list</span>
+              {/* Task number — only shown when a task is loaded */}
+              {taskNumber && (
+                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#7a8fa3', flexShrink: 0 }}>
+                  #{taskNumber}
+                </span>
               )}
+              {/* Task name — always visible; placeholder when nothing selected */}
+              <input
+                value={taskName}
+                onChange={e => { setTaskName(e.target.value); markDirty(); }}
+                readOnly={!selectedTask}
+                placeholder={selectedTask ? '' : 'Select a task from the list →'}
+                style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: selectedTask ? '#ffffff' : '#3a4a5c', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
+              />
+              {/* Mic for task name */}
+              <VoiceButton
+                listening={listeningName}
+                onToggle={() => listeningName
+                  ? stopVoice(nameRecRef, setListeningName)
+                  : startVoice(wrapVoiceResult(t => { setTaskName(t); markDirty(); }, () => setTaskName('')), setListeningName, nameRecRef, false)
+                }
+              />
+              {/* Urgency, status, actions — faded when no task selected */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, opacity: selectedTask ? 1 : 0.25, pointerEvents: selectedTask ? 'auto' : 'none', transition: 'opacity 0.15s' }}>
+                {/* Urgency badge-select */}
+                <select
+                  value={priority}
+                  onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }}
+                  style={{
+                    padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
+                    cursor: 'pointer', flexShrink: 0, appearance: 'none',
+                    fontFamily: "'DM Sans', sans-serif",
+                    border: priority === 'high' ? '1px solid rgba(255,68,68,0.5)' : priority === 'low' ? '1px solid rgba(34,204,110,0.35)' : '1px solid rgba(168,184,200,0.28)',
+                    background: priority === 'high' ? 'rgba(255,68,68,0.18)' : priority === 'low' ? 'rgba(34,204,110,0.12)' : 'rgba(255,255,255,0.03)',
+                    color: priority === 'high' ? '#ff6060' : priority === 'low' ? '#22cc6e' : '#6b7d8f',
+                  }}
+                >
+                  <option value="" style={{ background: '#141f2d', color: '#eef2f7' }}>— urgency</option>
+                  <option value="high" style={{ background: '#141f2d', color: '#eef2f7' }}>High</option>
+                  <option value="low" style={{ background: '#141f2d', color: '#eef2f7' }}>Low</option>
+                </select>
+                {/* Status badge-select */}
+                <select
+                  value={status}
+                  onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }}
+                  style={{
+                    padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
+                    cursor: 'pointer', flexShrink: 0, appearance: 'none',
+                    fontFamily: "'DM Sans', sans-serif",
+                    border: status === 'resolved' ? '1px solid rgba(77,184,140,0.22)' : status === 'needs_info' ? '1px solid rgba(240,160,64,0.2)' : '1px solid rgba(168,184,200,0.28)',
+                    background: status === 'resolved' ? 'rgba(77,184,140,0.1)' : status === 'needs_info' ? 'rgba(240,160,64,0.1)' : 'rgba(255,255,255,0.03)',
+                    color: status === 'resolved' ? '#4db88c' : status === 'needs_info' ? '#f0a040' : '#a8b8c8',
+                  }}
+                >
+                  <option value="open" style={{ background: '#141f2d', color: '#eef2f7' }}>Open</option>
+                  <option value="needs_info" style={{ background: '#141f2d', color: '#eef2f7' }}>Needs info</option>
+                  <option value="resolved" style={{ background: '#141f2d', color: '#eef2f7' }}>Completed</option>
+                </select>
+                {/* Right-side actions */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  {saveStatus === 'saving' && <span style={{ fontSize: '10px', color: '#6b7d8f' }}>Saving…</span>}
+                  {saveStatus === 'saved'  && <span style={{ fontSize: '10px', color: '#4db88c' }}>Saved ✓</span>}
+                  {allUpdates.length > 0 && (
+                    <button
+                      onClick={() => setHistoryOpen(o => !o)}
+                      style={{ padding: '4px 8px', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", border: '1px solid rgba(168,184,200,0.28)', background: historyOpen ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)', color: historyOpen ? '#eef2f7' : '#a8b8c8' }}
+                    >
+                      History
+                    </button>
+                  )}
+                  <button onClick={resetPanel} title="Deselect" style={{ padding: '4px 6px', borderRadius: '5px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.15)', background: 'transparent', color: '#3a4a5c', fontSize: '13px', lineHeight: 1 }}>×</button>
+                </div>
+              </div>
             </div>
 
             {/* ── History drawer ────────────────────────────────────────── */}
@@ -960,20 +969,23 @@ export default function DashboardPage() {
             {/* ── Scrollable body ───────────────────────────────────────── */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-              {!selectedTask && (
-                <div style={{ color: '#3a4a5c', fontSize: '12px', textAlign: 'center', padding: '60px 0' }}>
-                  Select a task to view and edit its details
-                </div>
-              )}
-
-              {selectedTask && (<>
+              <>
 
                 {/* ── Admin fields — compact, muted (supporting context) ── */}
                 <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(168,184,200,0.07)', borderRadius: '6px', padding: '10px 12px' }}>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: '10px' }}>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Requester</label>
-                      <input value={requester} onChange={e => { setRequester(e.target.value); markDirty(); }} style={dpAdminInput} />
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
+                        <input value={requester} onChange={e => { setRequester(e.target.value); markDirty(); }} style={{ ...dpAdminInput, flex: 1 }} />
+                        <VoiceButton
+                          listening={listeningRequester}
+                          onToggle={() => listeningRequester
+                            ? stopVoice(requesterRecRef, setListeningRequester)
+                            : startVoice(wrapVoiceResult(t => { setRequester(t); markDirty(); }, () => setRequester('')), setListeningRequester, requesterRecRef, false)
+                          }
+                        />
+                      </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Assigned to</label>
@@ -998,13 +1010,22 @@ export default function DashboardPage() {
                   {isOnboarding && (
                     <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Information needed</label>
-                      <AutoTextarea
-                        style={{ ...dpAdminInput, resize: 'none' as const, lineHeight: 1.5 }}
-                        value={infoRequired}
-                        onChange={e => setInfoRequired(e.target.value)}
-                        onBlur={() => saveUpdate('details', infoRequired, savedDetailsRef)}
-                        placeholder="What information is needed or what does the checklist say..."
-                      />
+                      <div style={{ display: 'flex', alignItems: 'flex-start', gap: '2px' }}>
+                        <AutoTextarea
+                          style={{ ...dpAdminInput, resize: 'none' as const, lineHeight: 1.5, flex: 1 }}
+                          value={infoRequired}
+                          onChange={e => setInfoRequired(e.target.value)}
+                          onBlur={() => saveUpdate('details', infoRequired, savedDetailsRef)}
+                          placeholder="What information is needed or what does the checklist say..."
+                        />
+                        <VoiceButton
+                          listening={listeningInfoRequired}
+                          onToggle={() => listeningInfoRequired
+                            ? stopVoice(infoRequiredRecRef, setListeningInfoRequired)
+                            : startVoice(wrapVoiceResult(t => setInfoRequired(prev => prev ? `${prev} ${t}` : t), () => setInfoRequired('')), setListeningInfoRequired, infoRequiredRecRef, true)
+                          }
+                        />
+                      </div>
                     </div>
                   )}
                 </div>
@@ -1015,13 +1036,22 @@ export default function DashboardPage() {
                 {isOnboarding && (<>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                     <label style={dpWorkLabel}>Information to send to the AI</label>
+                    <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
                     <AutoTextarea
-                      style={dpWorkTextarea}
+                      style={{ ...dpWorkTextarea, flex: 1 }}
                       value={infoDone}
                       onChange={e => setInfoDone(e.target.value)}
                       onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
                       placeholder="What information was gathered or what actions were taken..."
                     />
+                    <VoiceButton
+                      listening={listeningInfoDone}
+                      onToggle={() => listeningInfoDone
+                        ? stopVoice(infoDoneRecRef, setListeningInfoDone)
+                        : startVoice(wrapVoiceResult(t => setInfoDone(prev => prev ? `${prev} ${t}` : t), () => setInfoDone('')), setListeningInfoDone, infoDoneRecRef, true)
+                      }
+                    />
+                    </div>
                     {diagStage === 'idle' && (
                       <button
                         style={{ marginTop: '4px', padding: '8px 16px', borderRadius: '6px', background: '#4f8ef7', color: '#fff', border: 'none', cursor: diagnosing ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: '12px', fontWeight: 500, opacity: diagnosing ? 0.7 : 1 }}
@@ -1185,13 +1215,22 @@ export default function DashboardPage() {
                     {!hideInfoDone && (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <label style={dpWorkLabel}>Problem to fix</label>
-                        <AutoTextarea
-                          style={dpWorkTextarea}
-                          value={infoDone}
-                          onChange={e => { setInfoDone(e.target.value); markDirty(); }}
-                          onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
-                          placeholder="Describe the problem..."
-                        />
+                        <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                          <AutoTextarea
+                            style={{ ...dpWorkTextarea, flex: 1 }}
+                            value={infoDone}
+                            onChange={e => { setInfoDone(e.target.value); markDirty(); }}
+                            onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
+                            placeholder="Describe the problem..."
+                          />
+                          <VoiceButton
+                            listening={listeningInfoDone}
+                            onToggle={() => listeningInfoDone
+                              ? stopVoice(infoDoneRecRef, setListeningInfoDone)
+                              : startVoice(wrapVoiceResult(t => setInfoDone(prev => prev ? `${prev} ${t}` : t), () => setInfoDone('')), setListeningInfoDone, infoDoneRecRef, true)
+                            }
+                          />
+                        </div>
                       </div>
                     )}
 
@@ -1225,13 +1264,22 @@ export default function DashboardPage() {
                 {/* Issues / Comments */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
                   <label style={dpLabel}>Issues / Comments</label>
-                  <AutoTextarea
-                    style={dpTextarea}
-                    value={issues}
-                    onChange={e => setIssues(e.target.value)}
-                    onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
-                    placeholder="Any issues or comments..."
-                  />
+                  <div style={{ display: 'flex', alignItems: 'flex-start', gap: '4px' }}>
+                    <AutoTextarea
+                      style={{ ...dpTextarea, flex: 1 }}
+                      value={issues}
+                      onChange={e => setIssues(e.target.value)}
+                      onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
+                      placeholder="Any issues or comments..."
+                    />
+                    <VoiceButton
+                      listening={listeningIssues}
+                      onToggle={() => listeningIssues
+                        ? stopVoice(issuesRecRef, setListeningIssues)
+                        : startVoice(wrapVoiceResult(t => setIssues(prev => prev ? `${prev} ${t}` : t), () => setIssues('')), setListeningIssues, issuesRecRef, true)
+                      }
+                    />
+                  </div>
                 </div>
 
                 {/* Delete — muted, bottom of panel */}
@@ -1246,7 +1294,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-              </>)}
+              </>
 
             </div>
           </div>
