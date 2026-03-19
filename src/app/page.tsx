@@ -676,8 +676,8 @@ export default function DashboardPage() {
     outline: 'none', width: '100%', resize: 'none', lineHeight: 1.55,
   };
   const dpAiCard: React.CSSProperties = {
-    border: '1px solid rgba(79,142,247,0.2)', borderRadius: '8px',
-    background: 'rgba(79,142,247,0.04)', overflow: 'hidden',
+    border: '1px solid rgba(79,142,247,0.25)', borderRadius: '8px',
+    background: '#192840', padding: '14px',
   };
   const dpAiHeader: React.CSSProperties = {
     display: 'flex', alignItems: 'center', gap: '8px',
@@ -1236,7 +1236,6 @@ export default function DashboardPage() {
 
                     {/* AI card */}
                     <div style={dpAiCard}>
-                    <div style={{ padding: '14px', background: '#f4f7fb', borderRadius: '4px' }} data-theme="light">
                       <AiDiagnoseSection
                         key={selectedTask?.id}
                         selectedType={selectedType}
@@ -1256,7 +1255,6 @@ export default function DashboardPage() {
                         initialActionsText={initialDiagActionsText}
                         initialRecommendation={initialDiagRecommendation}
                       />
-                    </div>
                     </div>
                   </div>
                 )}

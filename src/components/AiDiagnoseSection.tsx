@@ -4,17 +4,60 @@ import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
 
+// ── Dark-theme style constants ─────────────────────────────────────────────────
+
+const aiLabel: React.CSSProperties = {
+  fontSize: '11px', fontWeight: 600, color: '#a8b8c8',
+  textTransform: 'uppercase', letterSpacing: '0.06em',
+  marginBottom: '6px', display: 'block',
+};
+const aiInnerBox: React.CSSProperties = {
+  background: 'rgba(79,142,247,0.07)', border: '1px solid rgba(79,142,247,0.2)',
+  borderRadius: '7px', padding: '12px',
+};
+const aiTextareaBase: React.CSSProperties = {
+  fontSize: '13px', color: '#eef2f7', background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(168,184,200,0.2)', borderRadius: '5px',
+  padding: '8px 10px', outline: 'none', resize: 'none', overflow: 'hidden',
+  minHeight: '2.25rem', width: '100%', fontFamily: "'DM Sans', sans-serif",
+  lineHeight: 1.5,
+};
+const aiTextareaMono: React.CSSProperties = {
+  ...aiTextareaBase, fontFamily: "'DM Mono', monospace",
+};
+const aiBtnPrimary: React.CSSProperties = {
+  background: '#4f8ef7', color: '#fff', border: 'none', borderRadius: '6px',
+  padding: '8px 16px', fontSize: '13px', fontWeight: 500,
+  width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center',
+  gap: '6px', fontFamily: "'DM Sans', sans-serif",
+};
+const aiBtnPrimaryFlex: React.CSSProperties = {
+  ...aiBtnPrimary, width: 'auto', flex: 1,
+};
+const aiBtnOutline: React.CSSProperties = {
+  background: 'transparent', color: '#a8b8c8',
+  border: '1px solid rgba(168,184,200,0.3)', borderRadius: '6px',
+  padding: '8px 16px', fontSize: '13px', fontWeight: 500, flex: 1,
+  display: 'flex', alignItems: 'center', justifyContent: 'center',
+  gap: '6px', fontFamily: "'DM Sans', sans-serif",
+};
+const aiReplyBox: React.CSSProperties = {
+  background: 'rgba(79,142,247,0.07)', border: '1px solid rgba(79,142,247,0.18)',
+  borderRadius: '6px', padding: '10px 12px',
+  fontSize: '13px', color: '#eef2f7', whiteSpace: 'pre-wrap', lineHeight: 1.6,
+};
+
 // ── Shared UI helpers ──────────────────────────────────────────────────────────
 
-export function AutoTextarea({ value, onChange, onBlur, placeholder, className }: {
+export function AutoTextarea({ value, onChange, onBlur, placeholder, className, style }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onBlur?: () => void;
   placeholder?: string;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
-  // Resize whenever value changes, including when loaded externally from DB
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -24,7 +67,7 @@ export function AutoTextarea({ value, onChange, onBlur, placeholder, className }
   return (
     <textarea ref={ref} rows={1} value={value} onChange={onChange} onBlur={onBlur}
       placeholder={placeholder} className={className}
-      style={{ resize: 'none', overflow: 'hidden', minHeight: '2.25rem' }} />
+      style={{ resize: 'none', overflow: 'hidden', minHeight: '2.25rem', ...style }} />
   );
 }
 
@@ -37,8 +80,8 @@ export function VoiceButton({ listening, onToggle }: { listening: boolean; onTog
       style={{
         background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
         borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: listening ? '#16a34a' : '#9ca3af',
-        filter: listening ? 'drop-shadow(0 0 4px rgba(22,163,74,0.6))' : 'none',
+        color: listening ? '#22cc6e' : '#6b8aaa',
+        filter: listening ? 'drop-shadow(0 0 4px rgba(34,204,110,0.6))' : 'none',
         animation: listening ? 'micPulse 1.4s ease-in-out infinite' : 'none',
       }}
     >
@@ -345,13 +388,12 @@ export default function AiDiagnoseSection({
   const isOnboarding = selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding';
   const isDecision   = selectedType === 'decision_to_make';
 
-  // ── Shared "discuss further / ask for help" panel ──────────────────────────
   function AdditionalHelpPanel({ label }: { label: string }) {
     return additionalHelpOpen ? (
-      <div className="space-y-2">
-        <div className="flex gap-1 items-start">
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+        <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
           <AutoTextarea
-            className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+            style={{ ...aiTextareaBase, flex: 1 }}
             value={additionalHelpText}
             onChange={e => setAdditionalHelpText(e.target.value)}
             placeholder="What would you like to discuss?"
@@ -365,54 +407,63 @@ export default function AiDiagnoseSection({
           />
         </div>
         {additionalHelpReply && (
-          <div className="rounded-box p-3 bg-primary/10 text-sm whitespace-pre-wrap">{additionalHelpReply}</div>
+          <div style={aiReplyBox}>{additionalHelpReply}</div>
         )}
-        <button className="btn btn-primary btn-sm w-full" onClick={handleAdditionalHelp} disabled={diagnosing || !additionalHelpText.trim()}>
+        <button
+          style={{ ...aiBtnPrimary, opacity: diagnosing || !additionalHelpText.trim() ? 0.5 : 1, cursor: diagnosing || !additionalHelpText.trim() ? 'not-allowed' : 'pointer' }}
+          onClick={handleAdditionalHelp}
+          disabled={diagnosing || !additionalHelpText.trim()}
+        >
           {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
         </button>
       </div>
     ) : (
-      <button className="btn btn-primary btn-sm w-full" onClick={() => setAdditionalHelpOpen(true)}>
+      <button style={aiBtnPrimary} onClick={() => setAdditionalHelpOpen(true)}>
         {label}
       </button>
     );
   }
 
   return (
-    <div className="space-y-2">
-      {/* Ask the AI button — only when idle and not onboarding */}
-      {diagStage === 'idle' && !isOnboarding && (
-        <div className="mt-2">
-          <button className="btn btn-primary btn-sm w-full" onClick={handleDiagnose} disabled={diagnosing}>
-            {diagnosing && <span className="loading loading-spinner loading-xs" />}
-            {diagnosing ? 'Thinking…' : 'Ask the AI to diagnose'}
-          </button>
-        </div>
-      )}
+    <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
 
-      {/* Onboarding: Ask the AI button */}
+      {/* Idle state — Ask the AI button */}
+      {diagStage === 'idle' && !isOnboarding && (
+        <button
+          style={{ ...aiBtnPrimary, opacity: diagnosing ? 0.6 : 1, cursor: diagnosing ? 'not-allowed' : 'pointer' }}
+          onClick={handleDiagnose}
+          disabled={diagnosing}
+        >
+          {diagnosing && <span className="loading loading-spinner loading-xs" />}
+          {diagnosing ? 'Thinking…' : 'Ask the AI to diagnose'}
+        </button>
+      )}
       {diagStage === 'idle' && isOnboarding && (
-        <div className="mt-2">
-          <button className="btn btn-primary btn-sm w-full" onClick={handleDiagnose} disabled={diagnosing}>
-            {diagnosing && <span className="loading loading-spinner loading-xs" />}
-            {diagnosing ? 'Thinking…' : 'Ask the AI'}
-          </button>
-        </div>
+        <button
+          style={{ ...aiBtnPrimary, opacity: diagnosing ? 0.6 : 1, cursor: diagnosing ? 'not-allowed' : 'pointer' }}
+          onClick={handleDiagnose}
+          disabled={diagnosing}
+        >
+          {diagnosing && <span className="loading loading-spinner loading-xs" />}
+          {diagnosing ? 'Thinking…' : 'Ask the AI'}
+        </button>
       )}
 
       {diagStage !== 'idle' && (
-        <div className="form-control space-y-2">
+        <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
 
           {/* Questions stage */}
           {diagStage === 'questions' && diagQuestions && (
-            <div className="rounded-box p-3 bg-primary/10 space-y-2">
-              <p className="text-xs font-semibold text-base-content/50">To narrow down the cause, please answer:</p>
-              <ol className="list-decimal list-inside text-sm space-y-1">
+            <div style={aiInnerBox}>
+              <p style={{ fontSize: '12px', color: '#a8b8c8', marginBottom: '10px', margin: '0 0 10px 0' }}>
+                To narrow down the cause, please answer:
+              </p>
+              <ol style={{ paddingLeft: '18px', margin: '0 0 10px 0', color: '#eef2f7', fontSize: '13px', lineHeight: 1.6 }}>
                 {diagQuestions.map((q, i) => <li key={i}>{q}</li>)}
               </ol>
-              <div className="flex gap-1 items-start">
+              <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginBottom: '10px' }}>
                 <AutoTextarea
-                  className="textarea textarea-bordered textarea-sm flex-1 text-sm font-mono"
+                  style={{ ...aiTextareaMono, flex: 1 }}
                   value={diagAnswer}
                   onChange={e => setDiagAnswer(e.target.value)}
                   placeholder={diagQuestions.map((_, i) => `${i + 1}. `).join('\n')}
@@ -425,7 +476,11 @@ export default function AiDiagnoseSection({
                   }
                 />
               </div>
-              <button className="btn btn-primary btn-sm w-full" onClick={handleFollowUp} disabled={diagnosing || !diagAnswer.trim()}>
+              <button
+                style={{ ...aiBtnPrimary, opacity: diagnosing || !diagAnswer.trim() ? 0.5 : 1, cursor: diagnosing || !diagAnswer.trim() ? 'not-allowed' : 'pointer' }}
+                onClick={handleFollowUp}
+                disabled={diagnosing || !diagAnswer.trim()}
+              >
                 {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
               </button>
             </div>
@@ -433,12 +488,12 @@ export default function AiDiagnoseSection({
 
           {/* Cause stage */}
           {diagStage === 'cause' && !isOnboarding && diagCause && (
-            <div className="space-y-2">
-              <label className="label py-0"><span className="label-text text-xs font-semibold">Diagnosis</span></label>
-              <div className="rounded-box p-3 bg-primary/10 space-y-2">
-                <div className="flex gap-1 items-start">
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <span style={aiLabel}>Diagnosis</span>
+              <div style={aiInnerBox}>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start', marginBottom: '10px' }}>
                   <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                    style={{ ...aiTextareaBase, flex: 1 }}
                     value={diagCause}
                     onChange={e => setDiagCause(e.target.value)}
                   />
@@ -450,22 +505,36 @@ export default function AiDiagnoseSection({
                     }
                   />
                 </div>
-                <div>
-                  <button className="text-xs text-primary underline" onClick={() => setDiagDetailOpen(o => !o)}>
+                <div style={{ marginBottom: '12px' }}>
+                  <button
+                    style={{ background: 'none', border: 'none', color: '#4f8ef7', fontSize: '12px', textDecoration: 'underline', cursor: 'pointer', padding: 0 }}
+                    onClick={() => setDiagDetailOpen(o => !o)}
+                  >
                     {diagDetailOpen ? 'Hide detail' : 'More detail →'}
                   </button>
-                  {diagDetailOpen && <p className="text-xs text-base-content/70 mt-1">{diagDetail ?? 'No additional detail available.'}</p>}
+                  {diagDetailOpen && (
+                    <p style={{ fontSize: '12px', color: '#c0d0e0', marginTop: '6px', lineHeight: 1.5 }}>
+                      {diagDetail ?? 'No additional detail available.'}
+                    </p>
+                  )}
                 </div>
-                <div className="flex gap-2 pt-1">
-                  <button className="btn btn-primary btn-sm flex-1" onClick={handleConfirmCause} disabled={diagnosing}>
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    style={{ ...aiBtnPrimaryFlex, opacity: diagnosing ? 0.6 : 1, cursor: diagnosing ? 'not-allowed' : 'pointer' }}
+                    onClick={handleConfirmCause}
+                    disabled={diagnosing}
+                  >
                     {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Actions to take'}
                   </button>
-                  <button className="btn btn-outline btn-sm flex-1" disabled={diagnosing}
+                  <button
+                    style={{ ...aiBtnOutline, opacity: diagnosing ? 0.5 : 1, cursor: diagnosing ? 'not-allowed' : 'pointer' }}
+                    disabled={diagnosing}
                     onClick={() => {
                       setDiagStage('questions');
                       setDiagQuestions(['What else can you tell me about the problem?']);
                       setDiagAnswer('1. '); setDiagCause(null); setDiagDetail(null);
-                    }}>
+                    }}
+                  >
                     Not quite right
                   </button>
                 </div>
@@ -475,19 +544,15 @@ export default function AiDiagnoseSection({
 
           {/* Fix stage */}
           {diagStage === 'fix' && diagSteps && (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">
-                    Problem to fix
-                  </span>
-                </label>
-                <AutoTextarea className="textarea textarea-bordered textarea-sm w-full text-sm" value={infoDone} onChange={e => setInfoDone(e.target.value)} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <span style={aiLabel}>Problem to fix</span>
+                <AutoTextarea style={aiTextareaBase} value={infoDone} onChange={e => setInfoDone(e.target.value)} />
               </div>
-              <div className="space-y-1">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Diagnosis</span></label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea className="textarea textarea-bordered textarea-sm flex-1 text-sm" value={diagCause ?? ''} onChange={e => setDiagCause(e.target.value)} />
+              <div>
+                <span style={aiLabel}>Diagnosis</span>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                  <AutoTextarea style={{ ...aiTextareaBase, flex: 1 }} value={diagCause ?? ''} onChange={e => setDiagCause(e.target.value)} />
                   <VoiceButton
                     listening={listeningDiagCause}
                     onToggle={() => listeningDiagCause
@@ -497,10 +562,10 @@ export default function AiDiagnoseSection({
                   />
                 </div>
               </div>
-              <div className="space-y-1">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Actions to take</span></label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea className="textarea textarea-bordered textarea-sm flex-1 text-sm" value={diagActionsText} onChange={e => setDiagActionsText(e.target.value)} />
+              <div>
+                <span style={aiLabel}>Actions to take</span>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                  <AutoTextarea style={{ ...aiTextareaBase, flex: 1 }} value={diagActionsText} onChange={e => setDiagActionsText(e.target.value)} />
                   <VoiceButton
                     listening={listeningDiagActions}
                     onToggle={() => listeningDiagActions
@@ -516,15 +581,15 @@ export default function AiDiagnoseSection({
 
           {/* Recommendation stage (decision_to_make) */}
           {diagStage === 'recommendation' && isDecision && diagRecommendation !== null && (
-            <div className="space-y-3">
-              <div className="space-y-1">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Decision to make</span></label>
-                <AutoTextarea className="textarea textarea-bordered textarea-sm w-full text-sm" value={infoDone} onChange={e => setInfoDone(e.target.value)} />
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+              <div>
+                <span style={aiLabel}>Decision to make</span>
+                <AutoTextarea style={aiTextareaBase} value={infoDone} onChange={e => setInfoDone(e.target.value)} />
               </div>
-              <div className="space-y-1">
-                <label className="label py-0"><span className="label-text text-xs font-semibold">Options &amp; Recommendation</span></label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea className="textarea textarea-bordered textarea-sm flex-1 text-sm" value={diagRecommendation} onChange={e => setDiagRecommendation(e.target.value)} />
+              <div>
+                <span style={aiLabel}>Options &amp; Recommendation</span>
+                <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
+                  <AutoTextarea style={{ ...aiTextareaBase, flex: 1 }} value={diagRecommendation} onChange={e => setDiagRecommendation(e.target.value)} />
                   <VoiceButton
                     listening={listeningDiagRecommendation}
                     onToggle={() => listeningDiagRecommendation
