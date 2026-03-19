@@ -114,6 +114,8 @@ export default function DashboardPage() {
   // Left panel view
   const [activeView, setActiveView]   = useState<'open' | 'needs_info' | 'completed'>('open');
   const [filterPriority, setFilterPriority] = useState('');
+  const [visibleCols, setVisibleCols] = useState({ requester: true, dateSubmitted: false, targetDate: true });
+  const [showColPicker, setShowColPicker] = useState(false);
 
   // Panel state
   const [taskNumber, setTaskNumber] = useState('');
@@ -643,6 +645,33 @@ export default function DashboardPage() {
     padding: '7px 10px', fontFamily: "'DM Sans', sans-serif",
     outline: 'none', width: '100%', resize: 'none', lineHeight: 1.5,
   };
+  // Admin fields — compact, muted (supporting context)
+  const dpAdminLabel: React.CSSProperties = {
+    fontSize: '9px', fontWeight: 500, textTransform: 'uppercase',
+    letterSpacing: '0.06em', color: '#4a5a6b',
+  };
+  const dpAdminInput: React.CSSProperties = {
+    fontSize: '11px', color: '#7a8fa3', background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(168,184,200,0.09)', borderRadius: '4px',
+    padding: '5px 8px', fontFamily: "'DM Sans', sans-serif",
+    outline: 'none', width: '100%',
+  };
+  const dpAdminSelect: React.CSSProperties = {
+    fontSize: '11px', color: '#7a8fa3', background: 'rgba(255,255,255,0.02)',
+    border: '1px solid rgba(168,184,200,0.09)', borderRadius: '4px',
+    padding: '5px 8px', fontFamily: "'DM Sans', sans-serif",
+    outline: 'none', width: '100%', cursor: 'pointer',
+  };
+  // Work fields — prominent (primary content)
+  const dpWorkLabel: React.CSSProperties = {
+    fontSize: '12px', fontWeight: 500, color: '#c8d8e8',
+  };
+  const dpWorkTextarea: React.CSSProperties = {
+    fontSize: '13px', color: '#eef2f7', background: 'rgba(255,255,255,0.05)',
+    border: '1px solid rgba(168,184,200,0.2)', borderRadius: '6px',
+    padding: '10px 12px', fontFamily: "'DM Sans', sans-serif",
+    outline: 'none', width: '100%', resize: 'none', lineHeight: 1.55,
+  };
   const dpAiCard: React.CSSProperties = {
     border: '1px solid rgba(79,142,247,0.2)', borderRadius: '8px',
     background: 'rgba(79,142,247,0.04)', overflow: 'hidden',
@@ -697,26 +726,55 @@ export default function DashboardPage() {
           </div>
 
           {/* Toolbar */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px 9px', borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px 9px', borderBottom: '1px solid rgba(168,184,200,0.15)', position: 'relative' }}>
             <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#6b7d8f' }}>
               {visibleTasks.length} task{visibleTasks.length !== 1 ? 's' : ''}
             </span>
-            {activeView === 'open' && (
-              <button
-                onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskDetails(''); }}
-                style={{
-                  marginLeft: 'auto',
-                  display: 'flex', alignItems: 'center', gap: '5px',
-                  padding: '4px 10px', borderRadius: '5px',
-                  background: '#4f8ef7', color: '#fff',
-                  fontSize: '11px', fontWeight: 500,
-                  border: 'none', cursor: 'pointer',
-                  fontFamily: "'DM Sans', sans-serif",
-                }}
-              >
-                + Add task
-              </button>
-            )}
+            {/* Right-side controls */}
+            <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: '6px' }}>
+              {/* Column picker */}
+              <div style={{ position: 'relative' }}>
+                <button
+                  onClick={() => setShowColPicker(v => !v)}
+                  title="Choose columns"
+                  style={{ padding: '4px 8px', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.28)', background: showColPicker ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)', color: showColPicker ? '#eef2f7' : '#6b7d8f', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '4px' }}
+                >
+                  <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="7" y="1" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.2"/></svg>
+                  Columns
+                </button>
+                {showColPicker && (
+                  <>
+                    <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => setShowColPicker(false)} />
+                    <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: '#1a2535', border: '1px solid rgba(168,184,200,0.2)', borderRadius: '6px', padding: '8px 10px', zIndex: 100, minWidth: '150px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
+                      {([
+                        { key: 'requester',     label: 'Requester' },
+                        { key: 'targetDate',    label: 'Target date' },
+                        { key: 'dateSubmitted', label: 'Date submitted' },
+                      ] as const).map(col => (
+                        <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', cursor: 'pointer', fontSize: '11px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
+                          <input
+                            type="checkbox"
+                            checked={visibleCols[col.key]}
+                            onChange={e => setVisibleCols(prev => ({ ...prev, [col.key]: e.target.checked }))}
+                            style={{ cursor: 'pointer', accentColor: '#4f8ef7' }}
+                          />
+                          {col.label}
+                        </label>
+                      ))}
+                    </div>
+                  </>
+                )}
+              </div>
+              {/* Add task button — Open tab only */}
+              {activeView === 'open' && (
+                <button
+                  onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskDetails(''); }}
+                  style={{ display: 'flex', alignItems: 'center', gap: '5px', padding: '4px 10px', borderRadius: '5px', background: '#4f8ef7', color: '#fff', fontSize: '11px', fontWeight: 500, border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }}
+                >
+                  + Add task
+                </button>
+              )}
+            </div>
           </div>
 
           {/* Filter bar — Completed tab only */}
@@ -753,8 +811,8 @@ export default function DashboardPage() {
                   key={task.id}
                   onClick={() => loadTask(task)}
                   style={{
-                    display: 'flex', alignItems: 'flex-start', gap: '10px',
-                    padding: '9px 16px', cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', gap: '8px',
+                    padding: '8px 16px', cursor: 'pointer', minWidth: 0,
                     borderLeft: selectedTask?.id === task.id ? '2px solid #4f8ef7' : '2px solid transparent',
                     background: selectedTask?.id === task.id ? 'rgba(79,142,247,0.1)' : 'transparent',
                     transition: 'background 0.1s, border-color 0.1s',
@@ -762,29 +820,34 @@ export default function DashboardPage() {
                   onMouseEnter={e => { if (selectedTask?.id !== task.id) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
                   onMouseLeave={e => { if (selectedTask?.id !== task.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                 >
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#3a4a5c', width: '20px', flexShrink: 0, textAlign: 'right', paddingTop: '2px' }}>
+                  {/* Number */}
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#3a4a5c', width: '18px', flexShrink: 0, textAlign: 'right' }}>
                     {task.task_number}
                   </span>
-                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                    <span style={{ fontSize: '12px', color: '#eef2f7', lineHeight: 1.4 }}>
-                      {task.title || task.description.slice(0, 60)}
+                  {/* Urgency dot */}
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0, display: 'inline-block', background: task.priority === 'high' ? '#e85c5c' : task.priority === 'low' ? '#4db88c' : '#3a4a5c' }} />
+                  {/* Task name — truncated, dominant */}
+                  <span style={{ flex: 1, fontSize: '12px', color: '#eef2f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
+                    {task.title || task.description}
+                  </span>
+                  {/* Optional: Requester */}
+                  {visibleCols.requester && task.reported_by && (
+                    <span style={{ fontSize: '10px', color: '#3a4a5c', flexShrink: 0, maxWidth: '72px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                      {task.reported_by}
                     </span>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
-                      <span style={{
-                        width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
-                        background: task.priority === 'high' ? '#e85c5c' : task.priority === 'low' ? '#4db88c' : '#3a4a5c',
-                        display: 'inline-block',
-                      }} />
-                      {task.date_due && (
-                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#3a4a5c' }}>
-                          {formatDate(task.date_due)}
-                        </span>
-                      )}
-                      {task.reported_by && (
-                        <span style={{ fontSize: '10px', color: '#6b7d8f' }}>{task.reported_by}</span>
-                      )}
-                    </div>
-                  </div>
+                  )}
+                  {/* Optional: Target date */}
+                  {visibleCols.targetDate && task.date_due && (
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#3a4a5c', flexShrink: 0 }}>
+                      {formatDate(task.date_due)}
+                    </span>
+                  )}
+                  {/* Optional: Date submitted */}
+                  {visibleCols.dateSubmitted && (
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#3a4a5c', flexShrink: 0 }}>
+                      {formatDate(task.created_at)}
+                    </span>
+                  )}
                 </div>
               ))
             )}
@@ -859,7 +922,6 @@ export default function DashboardPage() {
                       </button>
                     )}
                     <button onClick={resetPanel} title="Deselect" style={{ padding: '4px 6px', borderRadius: '5px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.15)', background: 'transparent', color: '#3a4a5c', fontSize: '13px', lineHeight: 1 }}>×</button>
-                    <button onClick={handleDelete} title="Delete task" style={{ padding: '4px 8px', borderRadius: '5px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", border: '1px solid rgba(232,92,92,0.2)', background: 'transparent', color: '#e85c5c', fontSize: '11px' }}>Delete</button>
                   </div>
                 </>
               ) : (
@@ -893,40 +955,38 @@ export default function DashboardPage() {
 
               {selectedTask && (<>
 
-                {/* Row 1: Requester | Assigned to | Task type */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <label style={dpLabel}>Requester</label>
-                    <input value={requester} onChange={e => { setRequester(e.target.value); markDirty(); }} style={dpInput} />
+                {/* ── Admin fields — compact, muted (supporting context) ── */}
+                <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(168,184,200,0.07)', borderRadius: '6px', padding: '10px 12px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={dpAdminLabel}>Requester</label>
+                      <input value={requester} onChange={e => { setRequester(e.target.value); markDirty(); }} style={dpAdminInput} />
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={dpAdminLabel}>Assigned to</label>
+                      <select value={assignedTo} onChange={e => { setAssignedTo(e.target.value); markDirty(); }} style={dpAdminSelect}>
+                        <option value="">Unassigned</option>
+                        <option value="Bruce">Bruce</option>
+                        <option value="John">John</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={dpAdminLabel}>Task type</label>
+                      <select value={selectedType} onChange={e => selectProblemType(e.target.value)} style={dpAdminSelect}>
+                        {QUICK_TASK_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={dpAdminLabel}>Target date</label>
+                      <input type="date" value={dateDue} onChange={e => { setDateDue(e.target.value); markDirty(); }} style={dpAdminInput} />
+                    </div>
                   </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <label style={dpLabel}>Assigned to</label>
-                    <select value={assignedTo} onChange={e => { setAssignedTo(e.target.value); markDirty(); }} style={dpSelect}>
-                      <option value="">Unassigned</option>
-                      <option value="Bruce">Bruce</option>
-                      <option value="John">John</option>
-                    </select>
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <label style={dpLabel}>Task type</label>
-                    <select value={selectedType} onChange={e => selectProblemType(e.target.value)} style={dpSelect}>
-                      {QUICK_TASK_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                {/* Row 2: Target date | main info field (span 2) */}
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '12px' }}>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <label style={dpLabel}>Target date</label>
-                    <input type="date" value={dateDue} onChange={e => { setDateDue(e.target.value); markDirty(); }} style={dpInput} />
-                  </div>
-                  {/* Onboarding: Information needed */}
+                  {/* Onboarding: Information needed lives in admin context */}
                   {isOnboarding && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', gridColumn: 'span 2' }}>
-                      <label style={dpLabel}>Information needed</label>
+                    <div style={{ marginTop: '10px', display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={dpAdminLabel}>Information needed</label>
                       <AutoTextarea
-                        style={dpTextarea}
+                        style={{ ...dpAdminInput, resize: 'none' as const, lineHeight: 1.5 }}
                         value={infoRequired}
                         onChange={e => setInfoRequired(e.target.value)}
                         onBlur={() => saveUpdate('details', infoRequired, savedDetailsRef)}
@@ -934,32 +994,16 @@ export default function DashboardPage() {
                       />
                     </div>
                   )}
-                  {/* Non-onboarding: Problem to fix / Decision / etc — hidden during fix/recommendation stages */}
-                  {!isOnboarding && !hideInfoDone && (
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', gridColumn: 'span 2' }}>
-                      <label style={dpLabel}>
-                        {selectedType === 'problem_to_fix' ? 'Problem to fix'
-                          : selectedType === 'decision_to_make' ? 'Decision to make'
-                          : selectedType === 'project_to_manage' ? 'Project to manage'
-                          : 'Information for the AI'}
-                      </label>
-                      <AutoTextarea
-                        style={dpTextarea}
-                        value={infoDone}
-                        onChange={e => setInfoDone(e.target.value)}
-                        onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
-                        placeholder="Describe the problem..."
-                      />
-                    </div>
-                  )}
                 </div>
 
-                {/* Onboarding: infoDone + Ask the AI */}
-                {isOnboarding && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
-                    <label style={dpLabel}>Information to send to the AI</label>
+                {/* ── Work section — primary content ── */}
+
+                {/* Onboarding: infoDone + Ask the AI + asset proposals */}
+                {isOnboarding && (<>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={dpWorkLabel}>Information to send to the AI</label>
                     <AutoTextarea
-                      style={dpTextarea}
+                      style={dpWorkTextarea}
                       value={infoDone}
                       onChange={e => setInfoDone(e.target.value)}
                       onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
@@ -967,7 +1011,7 @@ export default function DashboardPage() {
                     />
                     {diagStage === 'idle' && (
                       <button
-                        style={{ marginTop: '6px', padding: '8px 16px', borderRadius: '6px', background: '#4f8ef7', color: '#fff', border: 'none', cursor: diagnosing ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: '12px', fontWeight: 500, opacity: diagnosing ? 0.7 : 1 }}
+                        style={{ marginTop: '4px', padding: '8px 16px', borderRadius: '6px', background: '#4f8ef7', color: '#fff', border: 'none', cursor: diagnosing ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: '12px', fontWeight: 500, opacity: diagnosing ? 0.7 : 1 }}
                         onClick={handleDiagnose}
                         disabled={diagnosing}
                       >
@@ -976,10 +1020,8 @@ export default function DashboardPage() {
                       </button>
                     )}
                   </div>
-                )}
-
-                {/* Onboarding asset proposals — shown after AI extracts structured data */}
-                {diagStage === 'cause' && isOnboarding && onboardingData && (
+                  {/* Onboarding asset proposals */}
+                  {diagStage === 'cause' && onboardingData && (
                   <div style={dpAiCard}>
                     <div style={dpAiHeader}>
                       <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f8ef7', display: 'inline-block', flexShrink: 0 }} />
@@ -1162,6 +1204,18 @@ export default function DashboardPage() {
                     onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
                     placeholder="Any issues or comments..."
                   />
+                </div>
+
+                {/* Delete — muted, bottom of panel */}
+                <div style={{ paddingTop: '4px', textAlign: 'right' }}>
+                  <button
+                    onClick={handleDelete}
+                    style={{ fontSize: '11px', color: '#3a4a5c', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "'DM Sans', sans-serif" }}
+                    onMouseEnter={e => { (e.currentTarget as HTMLElement).style.color = '#e85c5c'; }}
+                    onMouseLeave={e => { (e.currentTarget as HTMLElement).style.color = '#3a4a5c'; }}
+                  >
+                    Delete this task
+                  </button>
                 </div>
 
               </>)}
