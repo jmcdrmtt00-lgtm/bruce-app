@@ -17,3 +17,8 @@ body {
     display: none !important;
   }
 }
+
+@keyframes micPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.65; transform: scale(1.15); }
+}

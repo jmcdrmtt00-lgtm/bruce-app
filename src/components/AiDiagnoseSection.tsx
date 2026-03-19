@@ -32,14 +32,21 @@ export function VoiceButton({ listening, onToggle }: { listening: boolean; onTog
   return (
     <button
       type="button"
-      className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${
-        listening
-          ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200'
-          : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'
-      }`}
       onClick={onToggle}
+      title={listening ? 'Stop listening' : 'Tap to speak'}
+      style={{
+        background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+        borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: listening ? '#16a34a' : '#9ca3af',
+        filter: listening ? 'drop-shadow(0 0 4px rgba(22,163,74,0.6))' : 'none',
+        animation: listening ? 'micPulse 1.4s ease-in-out infinite' : 'none',
+      }}
     >
-      {listening ? 'listening' : 'not listening'}
+      <svg width="13" height="16" viewBox="0 0 13 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3.5" y="0.75" width="6" height="8.5" rx="3" stroke="currentColor" strokeWidth="1.4"/>
+        <path d="M1 8.5C1 11.54 3.46 14 6.5 14s5.5-2.46 5.5-5.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+        <line x1="6.5" y1="14" x2="6.5" y2="16" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      </svg>
     </button>
   );
 }

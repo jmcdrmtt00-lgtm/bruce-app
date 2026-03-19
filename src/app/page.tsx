@@ -84,23 +84,25 @@ function AutoTextarea({
   );
 }
 
-function VoiceButton({
-  listening,
-  onToggle,
-}: {
-  listening: boolean;
-  onToggle: () => void;
-}) {
+function VoiceButton({ listening, onToggle }: { listening: boolean; onToggle: () => void }) {
   return (
     <button
-      className={`btn btn-xs text-[7px] whitespace-nowrap shrink-0 ${
-        listening
-          ? 'bg-green-100 border-green-300 text-green-700 hover:bg-green-200'
-          : 'bg-base-200 border-base-300 text-base-content/50 hover:bg-base-300'
-      }`}
+      type="button"
       onClick={onToggle}
+      title={listening ? 'Stop listening' : 'Tap to speak'}
+      style={{
+        background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+        borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+        color: listening ? '#22cc6e' : '#3a4a5c',
+        filter: listening ? 'drop-shadow(0 0 5px rgba(34,204,110,0.7))' : 'none',
+        animation: listening ? 'micPulse 1.4s ease-in-out infinite' : 'none',
+      }}
     >
-      {listening ? 'listening' : 'not listening'}
+      <svg width="13" height="16" viewBox="0 0 13 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="3.5" y="0.75" width="6" height="8.5" rx="3" stroke="currentColor" strokeWidth="1.4"/>
+        <path d="M1 8.5C1 11.54 3.46 14 6.5 14s5.5-2.46 5.5-5.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+        <line x1="6.5" y1="14" x2="6.5" y2="16" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round"/>
+      </svg>
     </button>
   );
 }
@@ -647,28 +649,29 @@ export default function DashboardPage() {
   };
   // Admin fields — compact, muted (supporting context)
   const dpAdminLabel: React.CSSProperties = {
-    fontSize: '9px', fontWeight: 500, textTransform: 'uppercase',
-    letterSpacing: '0.06em', color: '#4a5a6b',
+    fontSize: '9px', fontWeight: 600, textTransform: 'uppercase',
+    letterSpacing: '0.07em', color: '#7a9ab8',
   };
   const dpAdminInput: React.CSSProperties = {
-    fontSize: '11px', color: '#7a8fa3', background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(168,184,200,0.09)', borderRadius: '4px',
+    fontSize: '11px', color: '#b8d0e8', background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(168,184,200,0.15)', borderRadius: '4px',
     padding: '5px 8px', fontFamily: "'DM Sans', sans-serif",
     outline: 'none', width: '100%',
   };
   const dpAdminSelect: React.CSSProperties = {
-    fontSize: '11px', color: '#7a8fa3', background: 'rgba(255,255,255,0.02)',
-    border: '1px solid rgba(168,184,200,0.09)', borderRadius: '4px',
+    fontSize: '11px', color: '#b8d0e8', background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(168,184,200,0.15)', borderRadius: '4px',
     padding: '5px 8px', fontFamily: "'DM Sans', sans-serif",
     outline: 'none', width: '100%', cursor: 'pointer',
   };
   // Work fields — prominent (primary content)
   const dpWorkLabel: React.CSSProperties = {
-    fontSize: '12px', fontWeight: 500, color: '#c8d8e8',
+    fontSize: '10px', fontWeight: 600, textTransform: 'uppercase',
+    letterSpacing: '0.07em', color: '#4f8ef7',
   };
   const dpWorkTextarea: React.CSSProperties = {
-    fontSize: '13px', color: '#eef2f7', background: 'rgba(255,255,255,0.05)',
-    border: '1px solid rgba(168,184,200,0.2)', borderRadius: '6px',
+    fontSize: '13px', color: '#ffffff', background: 'rgba(255,255,255,0.07)',
+    border: '1px solid rgba(79,142,247,0.25)', borderRadius: '6px',
     padding: '10px 12px', fontFamily: "'DM Sans', sans-serif",
     outline: 'none', width: '100%', resize: 'none', lineHeight: 1.55,
   };
@@ -803,10 +806,10 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 16px 3px', borderBottom: '1px solid rgba(168,184,200,0.1)', background: 'rgba(0,0,0,0.1)' }}>
             <span style={{ width: '18px', flexShrink: 0 }} />
             <span style={{ width: '5px', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '9px', color: '#4a5a6b', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Task</span>
-            {visibleCols.requester && <span style={{ width: '90px', flexShrink: 0, fontSize: '9px', color: '#4a5a6b', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Requester</span>}
-            {visibleCols.targetDate && <span style={{ width: '52px', flexShrink: 0, fontSize: '9px', color: '#4a5a6b', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Due</span>}
-            {visibleCols.dateSubmitted && <span style={{ width: '60px', flexShrink: 0, fontSize: '9px', color: '#4a5a6b', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Submitted</span>}
+            <span style={{ flex: 1, fontSize: '9px', color: '#7a9ab8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Task</span>
+            {visibleCols.requester && <span style={{ width: '90px', flexShrink: 0, fontSize: '9px', color: '#7a9ab8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Requester</span>}
+            {visibleCols.targetDate && <span style={{ width: '52px', flexShrink: 0, fontSize: '9px', color: '#7a9ab8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Due</span>}
+            {visibleCols.dateSubmitted && <span style={{ width: '60px', flexShrink: 0, fontSize: '9px', color: '#7a9ab8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Submitted</span>}
           </div>
 
           {/* Task list */}
@@ -835,7 +838,7 @@ export default function DashboardPage() {
                     {task.task_number}
                   </span>
                   {/* Urgency dot */}
-                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0, display: 'inline-block', background: task.priority === 'high' ? '#e85c5c' : task.priority === 'low' ? '#4db88c' : '#3a4a5c' }} />
+                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0, display: 'inline-block', background: task.priority === 'high' ? '#ff4444' : task.priority === 'low' ? '#22cc6e' : '#3a4a5c' }} />
                   {/* Task name — truncated, dominant */}
                   <span style={{ flex: 1, fontSize: '12px', color: '#eef2f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
                     {task.title || task.description}
@@ -883,7 +886,7 @@ export default function DashboardPage() {
                   <input
                     value={taskName}
                     onChange={e => { setTaskName(e.target.value); markDirty(); }}
-                    style={{ flex: 1, fontSize: '14px', fontWeight: 500, color: '#eef2f7', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
+                    style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
                   />
                   {/* Urgency badge-select */}
                   <select
@@ -893,9 +896,9 @@ export default function DashboardPage() {
                       padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
                       cursor: 'pointer', flexShrink: 0, appearance: 'none',
                       fontFamily: "'DM Sans', sans-serif",
-                      border: priority === 'high' ? '1px solid rgba(232,92,92,0.22)' : priority === 'low' ? '1px solid rgba(77,184,140,0.22)' : '1px solid rgba(168,184,200,0.28)',
-                      background: priority === 'high' ? 'rgba(232,92,92,0.1)' : priority === 'low' ? 'rgba(77,184,140,0.1)' : 'rgba(255,255,255,0.03)',
-                      color: priority === 'high' ? '#e85c5c' : priority === 'low' ? '#4db88c' : '#6b7d8f',
+                      border: priority === 'high' ? '1px solid rgba(255,68,68,0.5)' : priority === 'low' ? '1px solid rgba(34,204,110,0.35)' : '1px solid rgba(168,184,200,0.28)',
+                      background: priority === 'high' ? 'rgba(255,68,68,0.18)' : priority === 'low' ? 'rgba(34,204,110,0.12)' : 'rgba(255,255,255,0.03)',
+                      color: priority === 'high' ? '#ff6060' : priority === 'low' ? '#22cc6e' : '#6b7d8f',
                     }}
                   >
                     <option value="" style={{ background: '#141f2d', color: '#eef2f7' }}>— urgency</option>
@@ -1174,23 +1177,26 @@ export default function DashboardPage() {
                 )}
                 </>)}
 
-                {/* Non-onboarding: Problem to fix textarea (hidden once AI reaches fix/recommendation) */}
-                {!isOnboarding && !hideInfoDone && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-                    <label style={dpWorkLabel}>Problem to fix</label>
-                    <AutoTextarea
-                      style={dpWorkTextarea}
-                      value={infoDone}
-                      onChange={e => { setInfoDone(e.target.value); markDirty(); }}
-                      onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
-                      placeholder="Describe the problem..."
-                    />
-                  </div>
-                )}
-
-                {/* AI Diagnose Section */}
+                {/* ── Working area: Problem to fix + AI ── */}
                 {!isOnboarding && (
-                  <div style={dpAiCard}>
+                  <div style={{ borderLeft: '3px solid #4f8ef7', borderRadius: '6px', background: 'rgba(79,142,247,0.06)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+                    {/* Problem to fix (hidden once AI reaches fix/recommendation) */}
+                    {!hideInfoDone && (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                        <label style={dpWorkLabel}>Problem to fix</label>
+                        <AutoTextarea
+                          style={dpWorkTextarea}
+                          value={infoDone}
+                          onChange={e => { setInfoDone(e.target.value); markDirty(); }}
+                          onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
+                          placeholder="Describe the problem..."
+                        />
+                      </div>
+                    )}
+
+                    {/* AI card */}
+                    <div style={dpAiCard}>
                     <div style={{ padding: '14px', background: '#f4f7fb', borderRadius: '4px' }} data-theme="light">
                       <AiDiagnoseSection
                         key={selectedTask?.id}
@@ -1211,6 +1217,7 @@ export default function DashboardPage() {
                         initialActionsText={initialDiagActionsText}
                         initialRecommendation={initialDiagRecommendation}
                       />
+                    </div>
                     </div>
                   </div>
                 )}
