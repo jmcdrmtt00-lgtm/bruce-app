@@ -14,6 +14,7 @@ const NAV = [
   { href: '/',                   label: 'Dashboard'        },
   { href: '/tickets',            label: 'Tickets'          },
   { href: '/ask-ai',             label: 'Inventory'        },
+  { href: '/task-intelligence',  label: 'Task Intelligence'},
   { href: '/maybe-by-myself',    label: 'Submit Ticket'    },
 ];
 

@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Link from 'next/link';
 import { ChevronDown, ChevronUp, Download, Upload, FileSpreadsheet, CheckCircle } from 'lucide-react';
 import { formatDate } from '@/lib/formatDate';
 import toast from 'react-hot-toast';
@@ -17,7 +16,7 @@ const CARD: React.CSSProperties = {
 };
 const SECTION_LABEL: React.CSSProperties = {
   fontSize: '10px', fontWeight: 600, textTransform: 'uppercase',
-  letterSpacing: '0.08em', color: '#7a9ab8', marginBottom: '6px',
+  letterSpacing: '0.08em', color: '#a8b8c8', marginBottom: '6px',
 };
 const INPUT: React.CSSProperties = {
   fontSize: '13px', color: '#eef2f7', background: 'rgba(255,255,255,0.05)',
@@ -47,7 +46,7 @@ const BTN_SUCCESS: React.CSSProperties = {
   border: '1px solid rgba(34,204,110,0.25)',
 };
 const SELECT: React.CSSProperties = {
-  fontSize: '12px', color: '#b8d0e8', background: 'rgba(255,255,255,0.04)',
+  fontSize: '12px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)',
   border: '1px solid rgba(168,184,200,0.18)', borderRadius: '5px',
   padding: '5px 10px', fontFamily: "'DM Sans', sans-serif", outline: 'none', cursor: 'pointer',
 };
@@ -523,7 +522,7 @@ function InventoryTab() {
             <div style={{ fontSize: '13px', fontWeight: 600, color: mode === opt.id ? '#4f8ef7' : '#eef2f7', marginBottom: '2px' }}>
               {opt.label}
             </div>
-            <div style={{ fontSize: '11px', color: '#6b7d8f' }}>{opt.sub}</div>
+            <div style={{ fontSize: '11px', color: '#a8b8c8' }}>{opt.sub}</div>
           </button>
         ))}
       </div>
@@ -544,11 +543,11 @@ function InventoryTab() {
               </button>
             )}
             {tableRows.length > 0 && (
-              <span style={{ marginTop: '16px', fontSize: '11px', color: '#6b7d8f', fontFamily: "'DM Mono', monospace" }}>
+              <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8', fontFamily: "'DM Mono', monospace" }}>
                 {tableRows.length} record{tableRows.length !== 1 ? 's' : ''}
               </span>
             )}
-            {tableLoading && <span style={{ marginTop: '16px', fontSize: '11px', color: '#6b7d8f' }}>Loading…</span>}
+            {tableLoading && <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8' }}>Loading…</span>}
           </div>
 
           {/* Column picker */}
@@ -605,7 +604,7 @@ function InventoryTab() {
       {/* ── Ask mode ── */}
       {mode === 'ask' && (
         <div style={CARD}>
-          <p style={{ fontSize: '12px', color: '#7a9ab8', marginBottom: '14px' }}>
+          <p style={{ fontSize: '12px', color: '#a8b8c8', marginBottom: '14px' }}>
             Ask a question in plain English — IT Buddy will query the inventory database and show you the results.
           </p>
           <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -628,10 +627,10 @@ function InventoryTab() {
               <button style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#4a5a6b', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }} onClick={() => setShowSql(v => !v)}>
                 {showSql ? <ChevronUp size={12} /> : <ChevronDown size={12} />}{showSql ? 'Hide' : 'Show'} generated query
               </button>
-              {showSql && <pre style={{ marginTop: '6px', fontSize: '11px', background: 'rgba(0,0,0,0.2)', borderRadius: '5px', padding: '10px', overflowX: 'auto', color: '#8ba0b4', fontFamily: "'DM Mono', monospace", whiteSpace: 'pre-wrap' }}>{sql}</pre>}
+              {showSql && <pre style={{ marginTop: '6px', fontSize: '11px', background: 'rgba(0,0,0,0.2)', borderRadius: '5px', padding: '10px', overflowX: 'auto', color: '#a8b8c8', fontFamily: "'DM Mono', monospace", whiteSpace: 'pre-wrap' }}>{sql}</pre>}
             </div>
           )}
-          {message && <p style={{ fontSize: '12px', color: '#6b7d8f', textAlign: 'center', padding: '12px 0' }}>{message}</p>}
+          {message && <p style={{ fontSize: '12px', color: '#a8b8c8', textAlign: 'center', padding: '12px 0' }}>{message}</p>}
           {results.length > 0 && (
             <div style={{ overflowX: 'auto' }} data-theme="light">
               <table className="table table-sm w-full" style={{ fontSize: '12px' }}>
@@ -658,170 +657,7 @@ function InventoryTab() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Tab 2 — Task Intelligence
-// ─────────────────────────────────────────────────────────────────────────────
-
-interface TaskResult {
-  id?: string; task_number?: number; title?: string; reported_by?: string;
-  status?: string; date_completed?: string; priority?: string; [key: string]: unknown;
-}
-interface SimResult { id: string; task_number: number; title: string; similarity: string; }
-
-function IntelligenceTab() {
-  const [question, setQuestion]   = useState('');
-  const [loading, setLoading]     = useState(false);
-  const [results, setResults]     = useState<TaskResult[]>([]);
-  const [sql, setSql]             = useState('');
-  const [showSql, setShowSql]     = useState(false);
-  const [message, setMessage]     = useState('');
-  const [listening, setListening] = useState(false);
-  const recRef = useRef<{ stop: () => void } | null>(null);
-
-  const [simName, setSimName]           = useState('');
-  const [simElab, setSimElab]           = useState('');
-  const [simLoading, setSimLoading]     = useState(false);
-  const [simResults, setSimResults]     = useState<SimResult[]>([]);
-  const [simMessage, setSimMessage]     = useState('');
-  const [listeningName, setListeningName] = useState(false);
-  const [listeningElab, setListeningElab] = useState(false);
-  const nameRecRef = useRef<{ stop: () => void } | null>(null);
-  const elabRecRef = useRef<{ stop: () => void } | null>(null);
-
-  function stopVoice() { recRef.current?.stop(); setListening(false); }
-
-  async function handleQuery() {
-    if (!question.trim()) { toast.error('Enter a question first.'); return; }
-    setLoading(true); setResults([]); setSql(''); setMessage('');
-    try {
-      const res = await fetch('/api/query/tasks', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: question.trim() }) });
-      const data = await res.json();
-      if (!res.ok) { setMessage(data.error || 'Query failed.'); if (data.sql) setSql(data.sql); }
-      else { setSql(data.sql ?? ''); setResults(data.results ?? []); if ((data.results ?? []).length === 0) setMessage('No matching tasks found.'); }
-    } catch { setMessage('Query failed.'); }
-    setLoading(false);
-  }
-
-  async function handleFindSimilar() {
-    if (!simName.trim()) { toast.error('Enter a task name to search.'); return; }
-    setSimLoading(true); setSimResults([]); setSimMessage('');
-    try {
-      const res = await fetch('/api/similar', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ taskName: simName.trim(), elaboration: simElab.trim() }) });
-      const data = await res.json();
-      if (!res.ok) setSimMessage(data.error || 'Search failed.');
-      else { setSimResults(data.results ?? []); if ((data.results ?? []).length === 0) setSimMessage(data.message || 'No similar tasks found.'); }
-    } catch { setSimMessage('Search failed.'); }
-    setSimLoading(false);
-  }
-
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '20px' }}>
-
-      {/* Query Completed Tasks */}
-      <div style={CARD}>
-        <p style={{ fontSize: '16px', fontWeight: 600, color: '#eef2f7', marginBottom: '4px' }}>Query Completed Tasks</p>
-        <p style={{ fontSize: '12px', color: '#7a9ab8', marginBottom: '14px' }}>
-          Ask a question in plain English — IT Buddy will find the answer from your task history.
-        </p>
-        <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
-          <input
-            style={{ ...INPUT, flex: 1 }}
-            placeholder='e.g. "When did I last replace a hard drive?"'
-            value={question} onChange={e => setQuestion(e.target.value)}
-            onKeyDown={e => e.key === 'Enter' && handleQuery()}
-          />
-          <MicIcon listening={listening} onToggle={() => {
-            if (listening) { stopVoice(); return; }
-            try { recRef.current = startVoiceRec(t => setQuestion(t), () => setListening(false)); setListening(true); } catch { setListening(false); }
-          }} />
-          <button style={{ ...BTN_PRIMARY, opacity: loading ? 0.7 : 1 }} onClick={handleQuery} disabled={loading}>
-            {loading ? <span className="loading loading-spinner loading-sm" /> : 'Ask'}
-          </button>
-        </div>
-        {sql && (
-          <div style={{ marginBottom: '10px' }}>
-            <button style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#4a5a6b', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }} onClick={() => setShowSql(v => !v)}>
-              {showSql ? <ChevronUp size={12} /> : <ChevronDown size={12} />}{showSql ? 'Hide' : 'Show'} generated query
-            </button>
-            {showSql && <pre style={{ marginTop: '6px', fontSize: '11px', background: 'rgba(0,0,0,0.2)', borderRadius: '5px', padding: '10px', overflowX: 'auto', color: '#8ba0b4', fontFamily: "'DM Mono', monospace", whiteSpace: 'pre-wrap' }}>{sql}</pre>}
-          </div>
-        )}
-        {message && <p style={{ fontSize: '12px', color: '#6b7d8f', textAlign: 'center', padding: '12px 0' }}>{message}</p>}
-        {results.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-            {results.map((r, i) => (
-              <div key={r.id ?? i} style={RESULT_CARD}>
-                <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '12px' }}>
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <p style={{ fontWeight: 600, fontSize: '13px', color: '#eef2f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {r.task_number ? `#${r.task_number} ` : ''}{r.title ?? JSON.stringify(r)}
-                    </p>
-                    <div style={{ display: 'flex', gap: '12px', marginTop: '4px', fontSize: '11px', color: '#6b7d8f' }}>
-                      {r.reported_by && <span>{r.reported_by}</span>}
-                      {r.date_completed && <span>Completed {formatDate(r.date_completed)}</span>}
-                      {r.status && r.status !== 'resolved' && <span style={{ textTransform: 'capitalize' }}>{(r.status as string).replace('_', ' ')}</span>}
-                    </div>
-                  </div>
-                  {r.id && <Link href={`/issues/${r.id}`} style={{ ...BTN_GHOST, fontSize: '11px', padding: '4px 10px', flexShrink: 0 }}>Review</Link>}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* Find Similar Tasks */}
-      <div style={CARD}>
-        <p style={{ fontSize: '16px', fontWeight: 600, color: '#eef2f7', marginBottom: '4px' }}>Find Similar Tasks in the Past</p>
-        <p style={{ fontSize: '12px', color: '#7a9ab8', marginBottom: '14px' }}>
-          Describe a task — IT Buddy will find past tasks whose solutions might help.
-        </p>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
-            <div style={{ flex: 1 }}>
-              <div style={SECTION_LABEL}>Task name</div>
-              <input style={INPUT} placeholder="e.g. Hard drive replacement" value={simName} onChange={e => setSimName(e.target.value)} />
-            </div>
-            <MicIcon listening={listeningName} onToggle={() => {
-              if (listeningName) { nameRecRef.current?.stop(); setListeningName(false); return; }
-              try { nameRecRef.current = startVoiceRec(t => setSimName(t), () => setListeningName(false)); setListeningName(true); } catch { setListeningName(false); }
-            }} />
-          </div>
-          <div style={{ display: 'flex', gap: '6px', alignItems: 'flex-start' }}>
-            <div style={{ flex: 1 }}>
-              <div style={SECTION_LABEL}>Elaboration (optional)</div>
-              <textarea style={{ ...TEXTAREA, minHeight: '64px' }} rows={2} placeholder="What kind of similarity are you looking for?" value={simElab} onChange={e => setSimElab(e.target.value)} />
-            </div>
-            <div style={{ marginTop: '18px' }}>
-              <MicIcon listening={listeningElab} onToggle={() => {
-                if (listeningElab) { elabRecRef.current?.stop(); setListeningElab(false); return; }
-                try { elabRecRef.current = startVoiceRec(t => setSimElab(prev => prev ? `${prev} ${t}` : t), () => setListeningElab(false)); setListeningElab(true); } catch { setListeningElab(false); }
-              }} />
-            </div>
-          </div>
-          <button style={{ ...BTN_GHOST, width: '100%', justifyContent: 'center', opacity: simLoading ? 0.7 : 1 }} onClick={handleFindSimilar} disabled={simLoading}>
-            {simLoading ? <><span className="loading loading-spinner loading-sm" /> Searching…</> : 'Find similar tasks'}
-          </button>
-          {simMessage && <p style={{ fontSize: '12px', color: '#6b7d8f', textAlign: 'center' }}>{simMessage}</p>}
-          {simResults.length > 0 && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-              {simResults.map(r => (
-                <div key={r.id} style={RESULT_CARD}>
-                  <Link href={`/issues/${r.id}`} style={{ fontSize: '13px', fontWeight: 600, color: '#4f8ef7', textDecoration: 'none' }}>
-                    #{r.task_number} {r.title}
-                  </Link>
-                  <p style={{ fontSize: '11px', color: '#6b7d8f', marginTop: '4px' }}>{r.similarity}</p>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Tab 3 — Data Tools (upload/download, visually de-emphasized)
+// Tab 2 — Data Tools (upload/download, visually de-emphasized)
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DataToolsTab() {
@@ -907,12 +743,12 @@ function DataToolsTab() {
 
       {/* Inventory */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <p style={{ fontSize: '14px', fontWeight: 600, color: '#7a9ab8' }}>Inventory</p>
+        <p style={{ fontSize: '14px', fontWeight: 600, color: '#a8b8c8' }}>Inventory</p>
 
         {/* Download */}
         <div style={CARD}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#eef2f7', marginBottom: '4px' }}>Download</p>
-          <p style={{ fontSize: '11px', color: '#6b7d8f', marginBottom: '12px' }}>Export everything to Excel — one sheet per asset category.</p>
+          <p style={{ fontSize: '11px', color: '#a8b8c8', marginBottom: '12px' }}>Export everything to Excel — one sheet per asset category.</p>
           <button style={{ ...BTN_SUCCESS, opacity: invDownloading ? 0.7 : 1 }} onClick={handleInvDownload} disabled={invDownloading}>
             {invDownloading ? <span className="loading loading-spinner loading-sm" /> : <><Download size={13} /> Download to Excel</>}
           </button>
@@ -921,10 +757,10 @@ function DataToolsTab() {
         {/* Upload */}
         <div style={CARD}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#eef2f7', marginBottom: '4px' }}>Upload</p>
-          <p style={{ fontSize: '11px', color: '#6b7d8f', marginBottom: '12px' }}>Select an Excel file. IT Buddy detects each sheet&apos;s asset type automatically.</p>
+          <p style={{ fontSize: '11px', color: '#a8b8c8', marginBottom: '12px' }}>Select an Excel file. IT Buddy detects each sheet&apos;s asset type automatically.</p>
           <div style={dropZoneStyle} onClick={() => invFileRef.current?.click()}>
             {invFileName
-              ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#7a9ab8' }}><FileSpreadsheet size={16} /><span style={{ fontSize: '13px' }}>{invFileName}</span></div>
+              ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#a8b8c8' }}><FileSpreadsheet size={16} /><span style={{ fontSize: '13px' }}>{invFileName}</span></div>
               : <div style={{ color: '#3a4a5c' }}><Upload size={24} style={{ margin: '0 auto 8px' }} /><p style={{ fontSize: '12px' }}>Click to select an Excel file</p></div>
             }
           </div>
@@ -940,7 +776,7 @@ function DataToolsTab() {
                   <input type="checkbox" checked={s.selected} onChange={() => toggleSheet(i)} style={{ cursor: 'pointer', accentColor: '#4f8ef7' }} />
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <p style={{ fontSize: '12px', color: '#eef2f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{s.name}</p>
-                    {s.site && <p style={{ fontSize: '10px', color: '#6b7d8f' }}>{s.site}</p>}
+                    {s.site && <p style={{ fontSize: '10px', color: '#a8b8c8' }}>{s.site}</p>}
                   </div>
                   <select style={{ ...SELECT, fontSize: '11px', padding: '3px 8px' }} value={s.category} onChange={e => changeCategory(i, e.target.value)} onClick={e => e.stopPropagation()}>
                     {ASSET_CATEGORIES.map(c => <option key={c} style={{ background: '#1a2535' }}>{c}</option>)}
@@ -950,7 +786,7 @@ function DataToolsTab() {
               ))}
             </div>
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-              <span style={{ fontSize: '11px', color: '#6b7d8f' }}>{selectedCount} assets selected</span>
+              <span style={{ fontSize: '11px', color: '#a8b8c8' }}>{selectedCount} assets selected</span>
               <button style={{ ...BTN_PRIMARY, opacity: uploading || selectedCount === 0 ? 0.5 : 1 }} onClick={handleInvUpload} disabled={uploading || selectedCount === 0}>
                 {uploading ? <span className="loading loading-spinner loading-sm" /> : <><Upload size={13} /> Upload</>}
               </button>
@@ -958,17 +794,17 @@ function DataToolsTab() {
           </div>
         )}
         {invError && <div style={{ ...CARD, border: '1px solid rgba(255,68,68,0.3)', background: 'rgba(255,68,68,0.05)' }}><p style={{ fontSize: '12px', color: '#ff6060', fontWeight: 600, marginBottom: '4px' }}>Upload failed</p><p style={{ fontSize: '11px', color: '#a8b8c8' }}>{invError}</p></div>}
-        {uploadResult && <div style={{ ...CARD, border: '1px solid rgba(34,204,110,0.2)' }}><div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#22cc6e', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}><CheckCircle size={16} /> Upload complete</div><p style={{ fontSize: '11px', color: '#7a9ab8' }}>{uploadResult.inserted} added, {uploadResult.updated} updated.</p></div>}
+        {uploadResult && <div style={{ ...CARD, border: '1px solid rgba(34,204,110,0.2)' }}><div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#22cc6e', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}><CheckCircle size={16} /> Upload complete</div><p style={{ fontSize: '11px', color: '#a8b8c8' }}>{uploadResult.inserted} added, {uploadResult.updated} updated.</p></div>}
       </div>
 
       {/* Tasks */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-        <p style={{ fontSize: '14px', fontWeight: 600, color: '#7a9ab8' }}>Tasks</p>
+        <p style={{ fontSize: '14px', fontWeight: 600, color: '#a8b8c8' }}>Tasks</p>
 
         {/* Download */}
         <div style={CARD}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#eef2f7', marginBottom: '4px' }}>Download</p>
-          <p style={{ fontSize: '11px', color: '#6b7d8f', marginBottom: '12px' }}>Export your current task list to Excel.</p>
+          <p style={{ fontSize: '11px', color: '#a8b8c8', marginBottom: '12px' }}>Export your current task list to Excel.</p>
           <button style={{ ...BTN_SUCCESS, opacity: taskDownloading ? 0.7 : 1 }} onClick={handleTaskDownload} disabled={taskDownloading}>
             {taskDownloading ? <span className="loading loading-spinner loading-sm" /> : <><Download size={13} /> Download to Excel</>}
           </button>
@@ -977,10 +813,10 @@ function DataToolsTab() {
         {/* Upload */}
         <div style={CARD}>
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#eef2f7', marginBottom: '4px' }}>Upload</p>
-          <p style={{ fontSize: '11px', color: '#6b7d8f', marginBottom: '12px' }}>Select an Excel or CSV file. Replaces all existing tasks for your account.</p>
+          <p style={{ fontSize: '11px', color: '#a8b8c8', marginBottom: '12px' }}>Select an Excel or CSV file. Replaces all existing tasks for your account.</p>
           <div style={dropZoneStyle} onClick={() => taskFileRef.current?.click()}>
             {taskFileName
-              ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#7a9ab8' }}><FileSpreadsheet size={16} /><span style={{ fontSize: '13px' }}>{taskFileName}</span>{taskRows.length > 0 && <span style={{ fontSize: '11px', color: '#4a5a6b' }}>({taskRows.length} rows)</span>}</div>
+              ? <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '8px', color: '#a8b8c8' }}><FileSpreadsheet size={16} /><span style={{ fontSize: '13px' }}>{taskFileName}</span>{taskRows.length > 0 && <span style={{ fontSize: '11px', color: '#a8b8c8' }}>({taskRows.length} rows)</span>}</div>
               : <div style={{ color: '#3a4a5c' }}><Upload size={24} style={{ margin: '0 auto 8px' }} /><p style={{ fontSize: '12px' }}>Click to select a file</p></div>
             }
           </div>
@@ -993,7 +829,7 @@ function DataToolsTab() {
         </div>
 
         {taskError && <div style={{ ...CARD, border: '1px solid rgba(255,68,68,0.3)', background: 'rgba(255,68,68,0.05)' }}><p style={{ fontSize: '12px', color: '#ff6060', fontWeight: 600, marginBottom: '4px' }}>Upload failed</p><p style={{ fontSize: '11px', color: '#a8b8c8' }}>{taskError}</p></div>}
-        {taskUploadResult && <div style={{ ...CARD, border: '1px solid rgba(34,204,110,0.2)' }}><div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#22cc6e', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}><CheckCircle size={16} /> Upload complete</div><p style={{ fontSize: '11px', color: '#7a9ab8' }}>{taskUploadResult.inserted} tasks loaded — {taskUploadResult.issues ?? '?'} dashboard tasks, {taskUploadResult.tickets ?? '?'} tickets.</p></div>}
+        {taskUploadResult && <div style={{ ...CARD, border: '1px solid rgba(34,204,110,0.2)' }}><div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#22cc6e', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}><CheckCircle size={16} /> Upload complete</div><p style={{ fontSize: '11px', color: '#a8b8c8' }}>{taskUploadResult.inserted} tasks loaded — {taskUploadResult.issues ?? '?'} dashboard tasks, {taskUploadResult.tickets ?? '?'} tickets.</p></div>}
       </div>
     </div>
   );
@@ -1005,7 +841,7 @@ function DataToolsTab() {
 
 export default function IntelligencePage() {
   useEffect(() => { fetch('/api/track-click', { method: 'POST' }).catch(() => {}); }, []);
-  const [tab, setTab] = useState<'inventory' | 'intelligence' | 'tools'>('inventory');
+  const [tab, setTab] = useState<'inventory' | 'tools'>('inventory');
 
   return (
     <main style={{ minHeight: '100vh', background: '#111a26', fontFamily: "'DM Sans', sans-serif", padding: '24px 16px 48px' }}>
@@ -1013,26 +849,21 @@ export default function IntelligencePage() {
 
         {/* Tab bar */}
         <div style={{ display: 'flex', borderBottom: '1px solid rgba(168,184,200,0.15)', marginBottom: '28px' }}>
-          {([
-            { id: 'inventory'    as const, label: 'Inventory' },
-            { id: 'intelligence' as const, label: 'Task Intelligence' },
-          ]).map(t => (
-            <button key={t.id} onClick={() => setTab(t.id)} style={{
-              padding: '10px 22px', border: 'none', background: 'none',
-              fontFamily: "'DM Sans', sans-serif", fontSize: '13px', fontWeight: 500,
-              color: tab === t.id ? '#4f8ef7' : '#6b7d8f',
-              borderBottom: `2px solid ${tab === t.id ? '#4f8ef7' : 'transparent'}`,
-              cursor: 'pointer', transition: 'color 0.15s, border-color 0.15s',
-            }}>
-              {t.label}
-            </button>
-          ))}
+          <button onClick={() => setTab('inventory')} style={{
+            padding: '10px 22px', border: 'none', background: 'none',
+            fontFamily: "'DM Sans', sans-serif", fontSize: '13px', fontWeight: 500,
+            color: tab === 'inventory' ? '#4f8ef7' : '#a8b8c8',
+            borderBottom: `2px solid ${tab === 'inventory' ? '#4f8ef7' : 'transparent'}`,
+            cursor: 'pointer', transition: 'color 0.15s, border-color 0.15s',
+          }}>
+            Inventory
+          </button>
           {/* Data Tools — visually de-emphasized */}
           <button onClick={() => setTab('tools')} style={{
             padding: '10px 22px', border: 'none', background: 'none',
             fontFamily: "'DM Sans', sans-serif", fontSize: '13px', fontWeight: 500,
-            color: tab === 'tools' ? '#7a9ab8' : '#3a4a5c',
-            borderBottom: `2px solid ${tab === 'tools' ? '#7a9ab8' : 'transparent'}`,
+            color: tab === 'tools' ? '#a8b8c8' : '#3a4a5c',
+            borderBottom: `2px solid ${tab === 'tools' ? '#a8b8c8' : 'transparent'}`,
             cursor: 'pointer', transition: 'color 0.15s, border-color 0.15s',
             display: 'flex', alignItems: 'center', gap: '7px',
           }}>
@@ -1043,9 +874,8 @@ export default function IntelligencePage() {
           </button>
         </div>
 
-        {tab === 'inventory'    && <InventoryTab />}
-        {tab === 'intelligence' && <IntelligenceTab />}
-        {tab === 'tools'        && <DataToolsTab />}
+        {tab === 'inventory' && <InventoryTab />}
+        {tab === 'tools'     && <DataToolsTab />}
       </div>
     </main>
   );

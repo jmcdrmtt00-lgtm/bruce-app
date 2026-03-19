@@ -627,7 +627,7 @@ export default function DashboardPage() {
   // ── Dark panel style constants ──────────────────────────────────────────
   const dpLabel: React.CSSProperties = {
     fontSize: '10px', fontWeight: 500, textTransform: 'uppercase',
-    letterSpacing: '0.07em', color: '#6b7d8f',
+    letterSpacing: '0.07em', color: '#a8b8c8',
   };
   const dpInput: React.CSSProperties = {
     fontSize: '12px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)',
@@ -650,16 +650,16 @@ export default function DashboardPage() {
   // Admin fields — compact, muted (supporting context)
   const dpAdminLabel: React.CSSProperties = {
     fontSize: '9px', fontWeight: 600, textTransform: 'uppercase',
-    letterSpacing: '0.07em', color: '#7a9ab8',
+    letterSpacing: '0.07em', color: '#a8b8c8',
   };
   const dpAdminInput: React.CSSProperties = {
-    fontSize: '11px', color: '#b8d0e8', background: 'rgba(255,255,255,0.04)',
+    fontSize: '11px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(168,184,200,0.15)', borderRadius: '4px',
     padding: '5px 8px', fontFamily: "'DM Sans', sans-serif",
     outline: 'none', width: '100%',
   };
   const dpAdminSelect: React.CSSProperties = {
-    fontSize: '11px', color: '#b8d0e8', background: 'rgba(255,255,255,0.04)',
+    fontSize: '11px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)',
     border: '1px solid rgba(168,184,200,0.15)', borderRadius: '4px',
     padding: '5px 8px', fontFamily: "'DM Sans', sans-serif",
     outline: 'none', width: '100%', cursor: 'pointer',
@@ -717,7 +717,7 @@ export default function DashboardPage() {
                   border: 'none', background: 'none',
                   fontFamily: "'DM Sans', sans-serif",
                   fontSize: '11px', fontWeight: 500,
-                  color: activeView === view ? '#4f8ef7' : '#6b7d8f',
+                  color: activeView === view ? '#4f8ef7' : '#a8b8c8',
                   borderBottom: `2px solid ${activeView === view ? '#4f8ef7' : 'transparent'}`,
                   cursor: 'pointer',
                   transition: 'color 0.15s, border-color 0.15s',
@@ -730,7 +730,7 @@ export default function DashboardPage() {
 
           {/* Toolbar */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px 9px', borderBottom: '1px solid rgba(168,184,200,0.15)', position: 'relative' }}>
-            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#6b7d8f' }}>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#a8b8c8' }}>
               {visibleTasks.length} task{visibleTasks.length !== 1 ? 's' : ''}
             </span>
             {/* Right-side controls */}
@@ -740,7 +740,7 @@ export default function DashboardPage() {
                 <button
                   onClick={() => setShowColPicker(v => !v)}
                   title="Choose columns"
-                  style={{ padding: '4px 8px', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.28)', background: showColPicker ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)', color: showColPicker ? '#eef2f7' : '#6b7d8f', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '4px' }}
+                  style={{ padding: '4px 8px', borderRadius: '5px', fontSize: '10px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.28)', background: showColPicker ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)', color: showColPicker ? '#eef2f7' : '#a8b8c8', fontFamily: "'DM Sans', sans-serif", display: 'flex', alignItems: 'center', gap: '4px' }}
                 >
                   <svg width="11" height="11" viewBox="0 0 12 12" fill="none"><rect x="1" y="1" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.2"/><rect x="7" y="1" width="4" height="10" rx="1" stroke="currentColor" strokeWidth="1.2"/></svg>
                   Columns
@@ -806,10 +806,10 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 16px 3px', borderBottom: '1px solid rgba(168,184,200,0.1)', background: 'rgba(0,0,0,0.1)' }}>
             <span style={{ width: '18px', flexShrink: 0 }} />
             <span style={{ width: '5px', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '9px', color: '#7a9ab8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Task</span>
-            {visibleCols.requester && <span style={{ width: '90px', flexShrink: 0, fontSize: '9px', color: '#7a9ab8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Requester</span>}
-            {visibleCols.targetDate && <span style={{ width: '52px', flexShrink: 0, fontSize: '9px', color: '#7a9ab8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Due</span>}
-            {visibleCols.dateSubmitted && <span style={{ width: '60px', flexShrink: 0, fontSize: '9px', color: '#7a9ab8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Submitted</span>}
+            <span style={{ flex: 1, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Task</span>
+            {visibleCols.requester && <span style={{ width: '90px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Requester</span>}
+            {visibleCols.targetDate && <span style={{ width: '52px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Due</span>}
+            {visibleCols.dateSubmitted && <span style={{ width: '60px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Submitted</span>}
           </div>
 
           {/* Task list */}
@@ -845,19 +845,19 @@ export default function DashboardPage() {
                   </span>
                   {/* Optional: Requester */}
                   {visibleCols.requester && (
-                    <span style={{ fontSize: '10px', color: task.reported_by ? '#8ba0b4' : 'transparent', flexShrink: 0, width: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                    <span style={{ fontSize: '10px', color: task.reported_by ? '#eef2f7' : 'transparent', flexShrink: 0, width: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
                       {task.reported_by ?? '—'}
                     </span>
                   )}
                   {/* Optional: Target date */}
                   {visibleCols.targetDate && (
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: task.date_due ? '#8ba0b4' : 'transparent', flexShrink: 0, width: '52px', textAlign: 'right' }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: task.date_due ? '#a8b8c8' : 'transparent', flexShrink: 0, width: '52px', textAlign: 'right' }}>
                       {task.date_due ? formatDate(task.date_due) : '—'}
                     </span>
                   )}
                   {/* Optional: Date submitted */}
                   {visibleCols.dateSubmitted && (
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#8ba0b4', flexShrink: 0, width: '60px', textAlign: 'right' }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#a8b8c8', flexShrink: 0, width: '60px', textAlign: 'right' }}>
                       {formatDate(task.created_at)}
                     </span>
                   )}
@@ -956,7 +956,7 @@ export default function DashboardPage() {
               <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(168,184,200,0.15)', maxHeight: '180px', overflowY: 'auto' }}>
                 {allUpdates.map((u, i) => (
                   <div key={i} style={{ fontSize: '11px', borderBottom: i < allUpdates.length - 1 ? '1px solid rgba(168,184,200,0.08)' : 'none', paddingBottom: '6px', marginBottom: '6px' }}>
-                    <span style={{ fontWeight: 500, color: '#6b7d8f', marginRight: '6px' }}>
+                    <span style={{ fontWeight: 500, color: '#a8b8c8', marginRight: '6px' }}>
                       {u.type === 'details' ? 'Task details' : u.type === 'progress' ? 'Progress' : u.type === 'ai_response' ? 'IT Buddy' : u.type === 'user_reply' ? 'Reply' : u.type}
                     </span>
                     <span style={{ color: '#3a4a5c' }}>{u.created_at ? new Date(u.created_at).toLocaleString() : ''}</span>
