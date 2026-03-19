@@ -799,6 +799,16 @@ export default function DashboardPage() {
             </div>
           )}
 
+          {/* Column headers */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 16px 3px', borderBottom: '1px solid rgba(168,184,200,0.1)', background: 'rgba(0,0,0,0.1)' }}>
+            <span style={{ width: '18px', flexShrink: 0 }} />
+            <span style={{ width: '5px', flexShrink: 0 }} />
+            <span style={{ flex: 1, fontSize: '9px', color: '#4a5a6b', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Task</span>
+            {visibleCols.requester && <span style={{ width: '90px', flexShrink: 0, fontSize: '9px', color: '#4a5a6b', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Requester</span>}
+            {visibleCols.targetDate && <span style={{ width: '52px', flexShrink: 0, fontSize: '9px', color: '#4a5a6b', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Due</span>}
+            {visibleCols.dateSubmitted && <span style={{ width: '60px', flexShrink: 0, fontSize: '9px', color: '#4a5a6b', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Submitted</span>}
+          </div>
+
           {/* Task list */}
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {visibleTasks.length === 0 ? (
@@ -812,7 +822,7 @@ export default function DashboardPage() {
                   onClick={() => loadTask(task)}
                   style={{
                     display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '8px 16px', cursor: 'pointer', minWidth: 0,
+                    padding: '5px 16px', cursor: 'pointer', minWidth: 0,
                     borderLeft: selectedTask?.id === task.id ? '2px solid #4f8ef7' : '2px solid transparent',
                     background: selectedTask?.id === task.id ? 'rgba(79,142,247,0.1)' : 'transparent',
                     transition: 'background 0.1s, border-color 0.1s',
@@ -821,7 +831,7 @@ export default function DashboardPage() {
                   onMouseLeave={e => { if (selectedTask?.id !== task.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
                 >
                   {/* Number */}
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#3a4a5c', width: '18px', flexShrink: 0, textAlign: 'right' }}>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#7a8fa3', width: '18px', flexShrink: 0, textAlign: 'right' }}>
                     {task.task_number}
                   </span>
                   {/* Urgency dot */}
@@ -831,20 +841,20 @@ export default function DashboardPage() {
                     {task.title || task.description}
                   </span>
                   {/* Optional: Requester */}
-                  {visibleCols.requester && task.reported_by && (
-                    <span style={{ fontSize: '10px', color: '#3a4a5c', flexShrink: 0, maxWidth: '72px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {task.reported_by}
+                  {visibleCols.requester && (
+                    <span style={{ fontSize: '10px', color: task.reported_by ? '#8ba0b4' : 'transparent', flexShrink: 0, width: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                      {task.reported_by ?? '—'}
                     </span>
                   )}
                   {/* Optional: Target date */}
-                  {visibleCols.targetDate && task.date_due && (
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#3a4a5c', flexShrink: 0 }}>
-                      {formatDate(task.date_due)}
+                  {visibleCols.targetDate && (
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: task.date_due ? '#8ba0b4' : 'transparent', flexShrink: 0, width: '52px', textAlign: 'right' }}>
+                      {task.date_due ? formatDate(task.date_due) : '—'}
                     </span>
                   )}
                   {/* Optional: Date submitted */}
                   {visibleCols.dateSubmitted && (
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#3a4a5c', flexShrink: 0 }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#8ba0b4', flexShrink: 0, width: '60px', textAlign: 'right' }}>
                       {formatDate(task.created_at)}
                     </span>
                   )}
@@ -1164,14 +1174,24 @@ export default function DashboardPage() {
                 )}
                 </>)}
 
-                {/* AI Diagnose Section — wrapped in IT Buddy card */}
+                {/* Non-onboarding: Problem to fix textarea (hidden once AI reaches fix/recommendation) */}
+                {!isOnboarding && !hideInfoDone && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
+                    <label style={dpWorkLabel}>Problem to fix</label>
+                    <AutoTextarea
+                      style={dpWorkTextarea}
+                      value={infoDone}
+                      onChange={e => { setInfoDone(e.target.value); markDirty(); }}
+                      onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
+                      placeholder="Describe the problem..."
+                    />
+                  </div>
+                )}
+
+                {/* AI Diagnose Section */}
                 {!isOnboarding && (
                   <div style={dpAiCard}>
-                    <div style={dpAiHeader}>
-                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f8ef7', display: 'inline-block', flexShrink: 0 }} />
-                      <span style={{ fontSize: '11px', color: '#4f8ef7', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>IT Buddy</span>
-                    </div>
-                    <div style={{ padding: '14px' }}>
+                    <div style={{ padding: '14px', background: '#f4f7fb', borderRadius: '4px' }} data-theme="light">
                       <AiDiagnoseSection
                         key={selectedTask?.id}
                         selectedType={selectedType}

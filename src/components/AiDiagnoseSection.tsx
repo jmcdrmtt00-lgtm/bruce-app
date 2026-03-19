@@ -431,7 +431,7 @@ export default function AiDiagnoseSection({
               <div className="rounded-box p-3 bg-primary/10 space-y-2">
                 <div className="flex gap-1 items-start">
                   <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm bg-white"
+                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
                     value={diagCause}
                     onChange={e => setDiagCause(e.target.value)}
                   />
