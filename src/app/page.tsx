@@ -906,38 +906,38 @@ export default function DashboardPage() {
                   value={priority}
                   onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }}
                   style={{
-                    padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
-                    cursor: 'pointer', flexShrink: 0, appearance: 'none',
+                    padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600,
+                    cursor: 'pointer', flexShrink: 0, appearance: 'none', colorScheme: 'normal',
                     fontFamily: "'DM Sans', sans-serif",
-                    border: priority === 'high' ? '1.5px solid #ff4444' : priority === 'low' ? '1.5px solid #22cc6e' : '1.5px solid #6b8aaa',
-                    background: priority === 'high' ? 'rgba(255,68,68,0.22)' : priority === 'low' ? 'rgba(34,204,110,0.18)' : 'rgba(107,138,170,0.18)',
-                    color: priority === 'high' ? '#ff7878' : priority === 'low' ? '#4ddd90' : '#eef2f7',
+                    border: priority === 'high' ? '2px solid #ff4444' : priority === 'low' ? '2px solid #22cc6e' : '2px solid #8ba8c8',
+                    background: priority === 'high' ? '#3a1a1a' : priority === 'low' ? '#1a3328' : '#223044',
+                    color: '#ffffff',
                   }}
                 >
-                  <option value="" style={{ background: '#141f2d', color: '#eef2f7' }}>— urgency</option>
-                  <option value="high" style={{ background: '#141f2d', color: '#eef2f7' }}>High</option>
-                  <option value="low" style={{ background: '#141f2d', color: '#eef2f7' }}>Low</option>
+                  <option value="" style={{ background: '#1a2535', color: '#ffffff' }}>— urgency</option>
+                  <option value="high" style={{ background: '#1a2535', color: '#ffffff' }}>High</option>
+                  <option value="low" style={{ background: '#1a2535', color: '#ffffff' }}>Low</option>
                 </select>
                 {/* Status badge-select */}
                 <select
                   value={status}
                   onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }}
                   style={{
-                    padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
-                    cursor: 'pointer', flexShrink: 0, appearance: 'none',
+                    padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600,
+                    cursor: 'pointer', flexShrink: 0, appearance: 'none', colorScheme: 'normal',
                     fontFamily: "'DM Sans', sans-serif",
-                    border: status === 'resolved' ? '1.5px solid #4db88c' : status === 'needs_info' ? '1.5px solid #f0a040' : '1.5px solid #6b8aaa',
-                    background: status === 'resolved' ? 'rgba(77,184,140,0.18)' : status === 'needs_info' ? 'rgba(240,160,64,0.18)' : 'rgba(107,138,170,0.18)',
-                    color: status === 'resolved' ? '#5dd9a8' : status === 'needs_info' ? '#f5b554' : '#eef2f7',
+                    border: status === 'resolved' ? '2px solid #4db88c' : status === 'needs_info' ? '2px solid #f0a040' : '2px solid #8ba8c8',
+                    background: status === 'resolved' ? '#1a3328' : status === 'needs_info' ? '#3a2a10' : '#223044',
+                    color: '#ffffff',
                   }}
                 >
-                  <option value="open" style={{ background: '#141f2d', color: '#eef2f7' }}>Open</option>
-                  <option value="needs_info" style={{ background: '#141f2d', color: '#eef2f7' }}>Needs info</option>
-                  <option value="resolved" style={{ background: '#141f2d', color: '#eef2f7' }}>Completed</option>
+                  <option value="open" style={{ background: '#1a2535', color: '#ffffff' }}>Open</option>
+                  <option value="needs_info" style={{ background: '#1a2535', color: '#ffffff' }}>Needs info</option>
+                  <option value="resolved" style={{ background: '#1a2535', color: '#ffffff' }}>Completed</option>
                 </select>
                 {/* Right-side actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {saveStatus === 'saving' && <span style={{ fontSize: '10px', color: '#6b7d8f' }}>Saving…</span>}
+                  {saveStatus === 'saving' && <span style={{ fontSize: '10px', color: '#a8b8c8' }}>Saving…</span>}
                   {saveStatus === 'saved'  && <span style={{ fontSize: '10px', color: '#4db88c' }}>Saved ✓</span>}
                   {allUpdates.length > 0 && (
                     <button
