@@ -44,14 +44,6 @@ const SITE_LABELS: Record<string, string> = {
   business_office: 'Business Office',
 };
 
-const PRIORITY_BADGE: Record<string, string> = {
-  high: 'badge-error',
-  low:  'badge-success',
-};
-
-const PRIORITY_LABEL: Record<string, string> = {
-  high: 'H', low: 'L',
-};
 
 function normalizeScreenToTypeId(screen: string): string {
   if (!screen) return '';
@@ -61,62 +53,6 @@ function normalizeScreenToTypeId(screen: string): string {
   return '';
 }
 
-function TaskTable({
-  tasks,
-  onRowClick,
-  variant,
-}: {
-  tasks: Incident[];
-  onRowClick: (task: Incident) => void;
-  variant: 'inProgress' | 'queue';
-}) {
-  return (
-    <div className="overflow-x-auto rounded-box shadow">
-      <table className="table table-xs table-fixed bg-base-100 w-full">
-        <thead>
-          <tr>
-            <th className="w-8">#</th>
-            <th className="w-14 text-center">Urgency</th>
-            <th className="text-left">Task Name</th>
-            <th className="w-28">Requester</th>
-            <th className="w-24 text-center">Target Date</th>
-          </tr>
-        </thead>
-        <tbody>
-          {tasks.length === 0 ? (
-            <tr><td colSpan={5} className="text-center text-base-content/40 text-sm py-3">No tasks</td></tr>
-          ) : tasks.map(task => (
-            <tr
-              key={task.id}
-              className="hover cursor-pointer [&>td]:py-0.5"
-              onClick={() => onRowClick(task)}
-            >
-              <td className="text-base-content/40 text-xs">{task.task_number}</td>
-              <td className="text-center">
-                {task.priority && (
-                  <span className={`badge badge-sm ${PRIORITY_BADGE[task.priority]}`}>
-                    {PRIORITY_LABEL[task.priority]}
-                  </span>
-                )}
-              </td>
-              <td>
-                <p className="truncate font-medium text-sm">
-                  {task.title || task.description.slice(0, 60)}
-                </p>
-              </td>
-              <td className="text-xs text-base-content/70 truncate max-w-0">
-                {task.reported_by || ''}
-              </td>
-              <td className="text-center text-xs text-base-content/70">
-                {formatDate(task.date_due)}
-              </td>
-            </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
-  );
-}
 
 function AutoTextarea({
   value, onChange, onBlur, placeholder, className,
@@ -175,12 +111,16 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
 
+  // Left panel view
+  const [activeView, setActiveView]   = useState<'open' | 'needs_info' | 'completed'>('open');
+  const [filterPriority, setFilterPriority] = useState('');
+
   // Panel state
   const [taskNumber, setTaskNumber] = useState('');
   const [taskName, setTaskName]   = useState('');
   const [priority, setPriority]   = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]     = useState('');
-  const [status, setStatus]       = useState<'pending' | 'in_progress' | 'resolved'>('pending');
+  const [status, setStatus]       = useState<'open' | 'needs_info' | 'resolved'>('open');
   const [requester, setRequester] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
 
@@ -299,26 +239,37 @@ export default function DashboardPage() {
 
   function markDirty() { panelDirtyRef.current = true; }
 
-  const inProgress = useMemo(() => {
+  const openTasks = useMemo(() => {
     const priorityOrder = (t: Incident) => t.priority === 'high' ? 0 : t.priority === null ? 1 : 2;
     const byDue = (t: Incident) => t.date_due ? new Date(t.date_due).getTime() : Infinity;
     return tasks
-      .filter(t => t.status === 'in_progress')
+      .filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'open')
       .sort((a, b) => priorityOrder(a) - priorityOrder(b) || byDue(a) - byDue(b));
   }, [tasks]);
 
-  const queue = useMemo(
-    () => tasks.filter(t => t.status === 'pending' || t.status === 'open').sort((a, b) => a.task_number - b.task_number),
+  const needsInfoTasks = useMemo(
+    () => tasks.filter(t => t.status === 'needs_info').sort((a, b) => a.task_number - b.task_number),
     [tasks]
   );
-  const allActive = useMemo(() => [...inProgress, ...queue], [inProgress, queue]);
+
+  const completedTasks = useMemo(() => {
+    let filtered = tasks.filter(t => t.status === 'resolved');
+    if (filterPriority) filtered = filtered.filter(t => t.priority === filterPriority);
+    return filtered.sort((a, b) => b.task_number - a.task_number);
+  }, [tasks, filterPriority]);
+
+  const visibleTasks = useMemo(() => {
+    if (activeView === 'open') return openTasks;
+    if (activeView === 'needs_info') return needsInfoTasks;
+    return completedTasks;
+  }, [activeView, openTasks, needsInfoTasks, completedTasks]);
 
   function resetPanel() {
     setTaskNumber('');
     setTaskName('');
     setPriority('');
     setDateDue('');
-    setStatus('pending');
+    setStatus('open');
     setRequester('');
     setAssignedTo('');
     setInfoRequired('');
@@ -341,8 +292,11 @@ export default function DashboardPage() {
     setTaskName(task.title || task.description);
     setPriority(task.priority || '');
     setDateDue(task.date_due || '');
-    const s = task.status === 'open' ? 'pending' : task.status;
-    setStatus(s as 'pending' | 'in_progress' | 'resolved');
+    const raw = task.status;
+    const s = (raw === 'pending' || raw === 'in_progress' || raw === 'open') ? 'open'
+            : raw === 'needs_info' ? 'needs_info'
+            : 'resolved';
+    setStatus(s);
     setRequester(task.reported_by || '');
     setAssignedTo(task.assigned_to || '');
 
@@ -408,7 +362,7 @@ export default function DashboardPage() {
     setTaskNumber(val);
     const num = parseInt(val.trim());
     if (!isNaN(num)) {
-      const found = allActive.find(t => t.task_number === num);
+      const found = tasks.find(t => t.task_number === num);
       if (found) loadTask(found);
     }
   }
@@ -668,24 +622,134 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="min-h-screen bg-base-200 px-8 py-4">
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_1fr] gap-6 items-start">
+    <main className="min-h-screen bg-base-200 p-6">
+      <div className="grid grid-cols-1 lg:grid-cols-[400px_1fr] gap-6 items-start">
 
-        {/* Tables column */}
-        <div className="space-y-6">
-
-          {/* In Progress */}
-          <div>
-            <h2 className="text-lg font-bold mb-2">Tasks in process</h2>
-            <TaskTable tasks={inProgress} onRowClick={loadTask} variant="inProgress" />
+        {/* Left panel — dark navy tabbed task list */}
+        <div
+          className="rounded-xl overflow-hidden flex flex-col"
+          style={{
+            background: '#0f1923',
+            border: '1px solid rgba(168,184,200,0.15)',
+            fontFamily: "'DM Sans', sans-serif",
+            minHeight: '600px',
+          }}
+        >
+          {/* View tabs */}
+          <div style={{ display: 'flex', padding: '10px 16px 0', gap: '2px' }}>
+            {(['open', 'needs_info', 'completed'] as const).map(view => (
+              <button
+                key={view}
+                onClick={() => setActiveView(view)}
+                style={{
+                  flex: 1, padding: '7px 4px',
+                  border: 'none', background: 'none',
+                  fontFamily: "'DM Sans', sans-serif",
+                  fontSize: '11px', fontWeight: 500,
+                  color: activeView === view ? '#4f8ef7' : '#6b7d8f',
+                  borderBottom: `2px solid ${activeView === view ? '#4f8ef7' : 'transparent'}`,
+                  cursor: 'pointer',
+                  transition: 'color 0.15s, border-color 0.15s',
+                }}
+              >
+                {view === 'open' ? 'Open' : view === 'needs_info' ? 'Needs info' : 'Completed'}
+              </button>
+            ))}
           </div>
 
-          {/* Queue */}
-          <div>
-            <h2 className="text-lg font-bold mb-2">Tasks in the queue</h2>
-            <TaskTable tasks={queue} onRowClick={loadTask} variant="queue" />
+          {/* Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '10px 16px 9px', borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
+            <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#6b7d8f' }}>
+              {visibleTasks.length} task{visibleTasks.length !== 1 ? 's' : ''}
+            </span>
+            {activeView === 'open' && (
+              <button
+                onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskDetails(''); }}
+                style={{
+                  marginLeft: 'auto',
+                  display: 'flex', alignItems: 'center', gap: '5px',
+                  padding: '4px 10px', borderRadius: '5px',
+                  background: '#4f8ef7', color: '#fff',
+                  fontSize: '11px', fontWeight: 500,
+                  border: 'none', cursor: 'pointer',
+                  fontFamily: "'DM Sans', sans-serif",
+                }}
+              >
+                + Add task
+              </button>
+            )}
           </div>
 
+          {/* Filter bar — Completed tab only */}
+          {activeView === 'completed' && (
+            <div style={{ display: 'flex', gap: '6px', padding: '8px 16px', borderBottom: '1px solid rgba(168,184,200,0.15)', flexWrap: 'wrap' }}>
+              <select
+                value={filterPriority}
+                onChange={e => setFilterPriority(e.target.value)}
+                style={{
+                  padding: '3px 22px 3px 9px', borderRadius: '4px',
+                  fontSize: '11px', border: '1px solid rgba(168,184,200,0.28)',
+                  background: 'none', color: '#6b7d8f', cursor: 'pointer',
+                  fontFamily: "'DM Sans', sans-serif", appearance: 'none',
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='8' height='5' fill='none'%3E%3Cpath d='M1 1l3 3 3-3' stroke='%236b7d8f' stroke-width='1.4' stroke-linecap='round'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: 'no-repeat', backgroundPosition: 'right 7px center',
+                }}
+              >
+                <option value="">All urgency</option>
+                <option value="high">High</option>
+                <option value="low">Low</option>
+              </select>
+            </div>
+          )}
+
+          {/* Task list */}
+          <div style={{ overflowY: 'auto', flex: 1 }}>
+            {visibleTasks.length === 0 ? (
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 20px', color: '#3a4a5c', fontSize: '12px' }}>
+                No tasks
+              </div>
+            ) : (
+              visibleTasks.map(task => (
+                <div
+                  key={task.id}
+                  onClick={() => loadTask(task)}
+                  style={{
+                    display: 'flex', alignItems: 'flex-start', gap: '10px',
+                    padding: '9px 16px', cursor: 'pointer',
+                    borderLeft: selectedTask?.id === task.id ? '2px solid #4f8ef7' : '2px solid transparent',
+                    background: selectedTask?.id === task.id ? 'rgba(79,142,247,0.1)' : 'transparent',
+                    transition: 'background 0.1s, border-color 0.1s',
+                  }}
+                  onMouseEnter={e => { if (selectedTask?.id !== task.id) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
+                  onMouseLeave={e => { if (selectedTask?.id !== task.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                >
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#3a4a5c', width: '20px', flexShrink: 0, textAlign: 'right', paddingTop: '2px' }}>
+                    {task.task_number}
+                  </span>
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                    <span style={{ fontSize: '12px', color: '#eef2f7', lineHeight: 1.4 }}>
+                      {task.title || task.description.slice(0, 60)}
+                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+                      <span style={{
+                        width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0,
+                        background: task.priority === 'high' ? '#e85c5c' : task.priority === 'low' ? '#4db88c' : '#3a4a5c',
+                        display: 'inline-block',
+                      }} />
+                      {task.date_due && (
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#3a4a5c' }}>
+                          {formatDate(task.date_due)}
+                        </span>
+                      )}
+                      {task.reported_by && (
+                        <span style={{ fontSize: '10px', color: '#6b7d8f' }}>{task.reported_by}</span>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
         </div>
 
         {/* Add / Update Panel */}
@@ -693,20 +757,14 @@ export default function DashboardPage() {
           <div className="card bg-base-100 shadow">
             <div className="card-body p-4 space-y-2">
 
-              {/* Add task button */}
-              <div className="flex justify-between items-center">
-                <button
-                  className="btn btn-primary btn-sm"
-                  onClick={() => { setShowAddModal(true); setNewTaskName(''); setNewTaskDetails(''); }}
-                >
-                  + Add task
-                </button>
-                {selectedTask && (
+              {/* Clear button */}
+              {selectedTask && (
+                <div className="flex justify-end">
                   <button className="btn btn-ghost btn-xs text-base-content/40" onClick={resetPanel}>
                     clear
                   </button>
-                )}
-              </div>
+                </div>
+              )}
 
               {/* Task fields */}
               <>
@@ -770,11 +828,11 @@ export default function DashboardPage() {
                   <select
                     className="select select-bordered select-sm text-sm w-full"
                     value={status}
-                    onChange={e => { setStatus(e.target.value as 'pending' | 'in_progress' | 'resolved'); markDirty(); }}
+                    onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }}
                   >
-                    <option value="pending">Queue</option>
-                    <option value="in_progress">In Progress</option>
-                    <option value="resolved">Complete</option>
+                    <option value="open">Open</option>
+                    <option value="needs_info">Needs info</option>
+                    <option value="resolved">Completed</option>
                   </select>
                 </div>
 

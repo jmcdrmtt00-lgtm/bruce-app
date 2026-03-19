@@ -13,6 +13,7 @@ const STATUS_CONFIG = {
   open:        { label: 'Open',        className: 'badge-error'   },
   in_progress: { label: 'In Progress', className: 'badge-warning' },
   resolved:    { label: 'Resolved',    className: 'badge-success' },
+  needs_info:  { label: 'Needs info',  className: 'badge-warning' },
 };
 
 const PRIORITY_BADGE: Record<string, string> = {
