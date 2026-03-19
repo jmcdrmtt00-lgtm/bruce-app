@@ -888,7 +888,8 @@ export default function DashboardPage() {
                 onChange={e => { setTaskName(e.target.value); markDirty(); }}
                 readOnly={!selectedTask}
                 placeholder={selectedTask ? '' : 'Select a task from the list →'}
-                style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: selectedTask ? '#ffffff' : '#a8b8c8', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
+                className="rp-task-input"
+                style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
               />
               {/* Mic for task name */}
               <VoiceButton
@@ -908,9 +909,9 @@ export default function DashboardPage() {
                     padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
                     cursor: 'pointer', flexShrink: 0, appearance: 'none',
                     fontFamily: "'DM Sans', sans-serif",
-                    border: priority === 'high' ? '1px solid rgba(255,68,68,0.65)' : priority === 'low' ? '1px solid rgba(34,204,110,0.55)' : '1px solid rgba(168,184,200,0.45)',
-                    background: priority === 'high' ? 'rgba(255,68,68,0.18)' : priority === 'low' ? 'rgba(34,204,110,0.12)' : 'rgba(255,255,255,0.04)',
-                    color: priority === 'high' ? '#ff6060' : priority === 'low' ? '#22cc6e' : '#a8b8c8',
+                    border: priority === 'high' ? '1.5px solid #ff4444' : priority === 'low' ? '1.5px solid #22cc6e' : '1.5px solid #6b8aaa',
+                    background: priority === 'high' ? 'rgba(255,68,68,0.22)' : priority === 'low' ? 'rgba(34,204,110,0.18)' : 'rgba(107,138,170,0.18)',
+                    color: priority === 'high' ? '#ff7878' : priority === 'low' ? '#4ddd90' : '#eef2f7',
                   }}
                 >
                   <option value="" style={{ background: '#141f2d', color: '#eef2f7' }}>— urgency</option>
@@ -925,9 +926,9 @@ export default function DashboardPage() {
                     padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
                     cursor: 'pointer', flexShrink: 0, appearance: 'none',
                     fontFamily: "'DM Sans', sans-serif",
-                    border: status === 'resolved' ? '1px solid rgba(77,184,140,0.6)' : status === 'needs_info' ? '1px solid rgba(240,160,64,0.55)' : '1px solid rgba(168,184,200,0.45)',
-                    background: status === 'resolved' ? 'rgba(77,184,140,0.12)' : status === 'needs_info' ? 'rgba(240,160,64,0.12)' : 'rgba(255,255,255,0.04)',
-                    color: status === 'resolved' ? '#4db88c' : status === 'needs_info' ? '#f0a040' : '#c8d8e8',
+                    border: status === 'resolved' ? '1.5px solid #4db88c' : status === 'needs_info' ? '1.5px solid #f0a040' : '1.5px solid #6b8aaa',
+                    background: status === 'resolved' ? 'rgba(77,184,140,0.18)' : status === 'needs_info' ? 'rgba(240,160,64,0.18)' : 'rgba(107,138,170,0.18)',
+                    color: status === 'resolved' ? '#5dd9a8' : status === 'needs_info' ? '#f5b554' : '#eef2f7',
                   }}
                 >
                   <option value="open" style={{ background: '#141f2d', color: '#eef2f7' }}>Open</option>

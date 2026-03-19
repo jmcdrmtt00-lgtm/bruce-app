@@ -12,6 +12,12 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Right-panel task name input — placeholder when no task selected */
+.rp-task-input::placeholder {
+  color: #a8b8c8;
+  opacity: 1;
+}
+
 @media print {
   .print\:hidden {
     display: none !important;
