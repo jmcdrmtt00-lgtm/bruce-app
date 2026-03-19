@@ -2,7 +2,6 @@
 
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-import { Trash2 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { Incident, IncidentUpdate } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
@@ -55,13 +54,14 @@ function normalizeScreenToTypeId(screen: string): string {
 
 
 function AutoTextarea({
-  value, onChange, onBlur, placeholder, className,
+  value, onChange, onBlur, placeholder, className, style,
 }: {
   value: string;
   onChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onBlur?: () => void;
   placeholder?: string;
   className?: string;
+  style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLTextAreaElement>(null);
   useEffect(() => {
@@ -79,7 +79,7 @@ function AutoTextarea({
       onBlur={onBlur}
       placeholder={placeholder}
       className={className}
-      style={{ resize: 'none', overflow: 'hidden', minHeight: '2.25rem' }}
+      style={{ resize: 'none', overflow: 'hidden', minHeight: '2.25rem', ...style }}
     />
   );
 }
@@ -607,11 +607,50 @@ export default function DashboardPage() {
     setSeeding(false);
   }
 
-  // Suppress unused variable warnings for voice refs not used in current render
+  // Suppress unused variable warnings for voice state no longer rendered in right panel
   void numRecRef; void parseSpokenNumber; void listeningNum; void setListeningNum;
+  void nameRecRef; void listeningName; void setListeningName;
+  void dateRecRef; void listeningDate; void setListeningDate; void parseSpokenDate;
+  void requesterRecRef; void listeningRequester; void setListeningRequester;
+  void infoRequiredRecRef; void listeningInfoRequired; void setListeningInfoRequired;
+  void infoDoneRecRef; void listeningInfoDone; void setListeningInfoDone;
+  void issuesRecRef; void listeningIssues; void setListeningIssues;
+  void wrapVoiceResult; void clearLastVoiceFieldRef; void handleVoiceCommand;
 
   const isOnboarding = selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding';
   const hideInfoDone = !isOnboarding && (aiStage === 'fix' || aiStage === 'recommendation');
+
+  // ── Dark panel style constants ──────────────────────────────────────────
+  const dpLabel: React.CSSProperties = {
+    fontSize: '10px', fontWeight: 500, textTransform: 'uppercase',
+    letterSpacing: '0.07em', color: '#6b7d8f',
+  };
+  const dpInput: React.CSSProperties = {
+    fontSize: '12px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(168,184,200,0.15)', borderRadius: '5px',
+    padding: '7px 10px', fontFamily: "'DM Sans', sans-serif",
+    outline: 'none', width: '100%',
+  };
+  const dpSelect: React.CSSProperties = {
+    fontSize: '12px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(168,184,200,0.15)', borderRadius: '5px',
+    padding: '7px 10px', fontFamily: "'DM Sans', sans-serif",
+    outline: 'none', width: '100%', cursor: 'pointer',
+  };
+  const dpTextarea: React.CSSProperties = {
+    fontSize: '12px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)',
+    border: '1px solid rgba(168,184,200,0.15)', borderRadius: '5px',
+    padding: '7px 10px', fontFamily: "'DM Sans', sans-serif",
+    outline: 'none', width: '100%', resize: 'none', lineHeight: 1.5,
+  };
+  const dpAiCard: React.CSSProperties = {
+    border: '1px solid rgba(79,142,247,0.2)', borderRadius: '8px',
+    background: 'rgba(79,142,247,0.04)', overflow: 'hidden',
+  };
+  const dpAiHeader: React.CSSProperties = {
+    display: 'flex', alignItems: 'center', gap: '8px',
+    padding: '10px 14px', borderBottom: '1px solid rgba(79,142,247,0.12)',
+  };
 
   if (loading) {
     return (
@@ -752,261 +791,201 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Add / Update Panel */}
+        {/* Right panel — dark detail panel */}
         <div className="lg:sticky lg:top-4">
-          <div className="card bg-base-100 shadow">
-            <div className="card-body p-4 space-y-2">
+          <div
+            className="rounded-xl overflow-hidden flex flex-col"
+            style={{ background: '#141f2d', border: '1px solid rgba(168,184,200,0.15)', fontFamily: "'DM Sans', sans-serif", minHeight: '600px' }}
+          >
 
-              {/* Clear button */}
-              {selectedTask && (
-                <div className="flex justify-end">
-                  <button className="btn btn-ghost btn-xs text-base-content/40" onClick={resetPanel}>
-                    clear
-                  </button>
+            {/* ── Header strip ─────────────────────────────────────────── */}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 20px 10px', borderBottom: '1px solid rgba(168,184,200,0.15)', flexShrink: 0, minHeight: '46px' }}>
+              {selectedTask ? (
+                <>
+                  {/* Task number */}
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#3a4a5c', flexShrink: 0 }}>
+                    #{taskNumber}
+                  </span>
+                  {/* Task name — inline editable */}
+                  <input
+                    value={taskName}
+                    onChange={e => { setTaskName(e.target.value); markDirty(); }}
+                    style={{ flex: 1, fontSize: '14px', fontWeight: 500, color: '#eef2f7', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
+                  />
+                  {/* Urgency badge-select */}
+                  <select
+                    value={priority}
+                    onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }}
+                    style={{
+                      padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
+                      cursor: 'pointer', flexShrink: 0, appearance: 'none',
+                      fontFamily: "'DM Sans', sans-serif",
+                      border: priority === 'high' ? '1px solid rgba(232,92,92,0.22)' : priority === 'low' ? '1px solid rgba(77,184,140,0.22)' : '1px solid rgba(168,184,200,0.28)',
+                      background: priority === 'high' ? 'rgba(232,92,92,0.1)' : priority === 'low' ? 'rgba(77,184,140,0.1)' : 'rgba(255,255,255,0.03)',
+                      color: priority === 'high' ? '#e85c5c' : priority === 'low' ? '#4db88c' : '#6b7d8f',
+                    }}
+                  >
+                    <option value="" style={{ background: '#141f2d', color: '#eef2f7' }}>— urgency</option>
+                    <option value="high" style={{ background: '#141f2d', color: '#eef2f7' }}>High</option>
+                    <option value="low" style={{ background: '#141f2d', color: '#eef2f7' }}>Low</option>
+                  </select>
+                  {/* Status badge-select */}
+                  <select
+                    value={status}
+                    onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }}
+                    style={{
+                      padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
+                      cursor: 'pointer', flexShrink: 0, appearance: 'none',
+                      fontFamily: "'DM Sans', sans-serif",
+                      border: status === 'resolved' ? '1px solid rgba(77,184,140,0.22)' : status === 'needs_info' ? '1px solid rgba(240,160,64,0.2)' : '1px solid rgba(168,184,200,0.28)',
+                      background: status === 'resolved' ? 'rgba(77,184,140,0.1)' : status === 'needs_info' ? 'rgba(240,160,64,0.1)' : 'rgba(255,255,255,0.03)',
+                      color: status === 'resolved' ? '#4db88c' : status === 'needs_info' ? '#f0a040' : '#a8b8c8',
+                    }}
+                  >
+                    <option value="open" style={{ background: '#141f2d', color: '#eef2f7' }}>Open</option>
+                    <option value="needs_info" style={{ background: '#141f2d', color: '#eef2f7' }}>Needs info</option>
+                    <option value="resolved" style={{ background: '#141f2d', color: '#eef2f7' }}>Completed</option>
+                  </select>
+                  {/* Right-side actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                    {saveStatus === 'saving' && <span style={{ fontSize: '10px', color: '#6b7d8f' }}>Saving…</span>}
+                    {saveStatus === 'saved'  && <span style={{ fontSize: '10px', color: '#4db88c' }}>Saved ✓</span>}
+                    {allUpdates.length > 0 && (
+                      <button
+                        onClick={() => setHistoryOpen(o => !o)}
+                        style={{ padding: '4px 8px', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", border: '1px solid rgba(168,184,200,0.28)', background: historyOpen ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)', color: historyOpen ? '#eef2f7' : '#a8b8c8' }}
+                      >
+                        History
+                      </button>
+                    )}
+                    <button onClick={resetPanel} title="Deselect" style={{ padding: '4px 6px', borderRadius: '5px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.15)', background: 'transparent', color: '#3a4a5c', fontSize: '13px', lineHeight: 1 }}>×</button>
+                    <button onClick={handleDelete} title="Delete task" style={{ padding: '4px 8px', borderRadius: '5px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", border: '1px solid rgba(232,92,92,0.2)', background: 'transparent', color: '#e85c5c', fontSize: '11px' }}>Delete</button>
+                  </div>
+                </>
+              ) : (
+                <span style={{ fontSize: '12px', color: '#3a4a5c' }}>Select a task from the list</span>
+              )}
+            </div>
+
+            {/* ── History drawer ────────────────────────────────────────── */}
+            {historyOpen && allUpdates.length > 0 && (
+              <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(168,184,200,0.15)', maxHeight: '180px', overflowY: 'auto' }}>
+                {allUpdates.map((u, i) => (
+                  <div key={i} style={{ fontSize: '11px', borderBottom: i < allUpdates.length - 1 ? '1px solid rgba(168,184,200,0.08)' : 'none', paddingBottom: '6px', marginBottom: '6px' }}>
+                    <span style={{ fontWeight: 500, color: '#6b7d8f', marginRight: '6px' }}>
+                      {u.type === 'details' ? 'Task details' : u.type === 'progress' ? 'Progress' : u.type === 'ai_response' ? 'IT Buddy' : u.type === 'user_reply' ? 'Reply' : u.type}
+                    </span>
+                    <span style={{ color: '#3a4a5c' }}>{u.created_at ? new Date(u.created_at).toLocaleString() : ''}</span>
+                    <p style={{ color: '#a8b8c8', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{u.note}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* ── Scrollable body ───────────────────────────────────────── */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
+
+              {!selectedTask && (
+                <div style={{ color: '#3a4a5c', fontSize: '12px', textAlign: 'center', padding: '60px 0' }}>
+                  Select a task to view and edit its details
                 </div>
               )}
 
-              {/* Task fields */}
-              <>
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Task Name</span>
-                </label>
-                <div className="flex gap-1">
-                  <input
-                    type="text"
-                    className="input input-bordered input-sm w-12 text-center px-1"
-                    placeholder="#"
-                    value={taskNumber}
-                    onChange={e => handleTaskNumberInput(e.target.value)}
-                  />
-                  <input
-                    className="input input-bordered input-sm flex-1"
-                    value={taskName}
-                    onChange={e => { setTaskName(e.target.value); markDirty(); }}
-                    placeholder=""
-                  />
-                  <VoiceButton
-                    listening={listeningName}
-                    onToggle={() => listeningName
-                      ? stopVoice(nameRecRef as React.MutableRefObject<unknown>, setListeningName)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setTaskName(prev => prev ? `${prev} ${text}` : text),
-                            () => setTaskName('')
-                          ),
-                          setListeningName,
-                          nameRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
-                </div>
-              </div>
+              {selectedTask && (<>
 
-              {/* Priority + Status + Date Due (three-column row) */}
-              <div className="grid grid-cols-3 gap-3">
-                <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Urgency</span>
-                  </label>
-                  <select
-                    className="select select-bordered select-sm text-sm w-full"
-                    value={priority}
-                    onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }}
-                  >
-                    <option value="">—</option>
-                    <option value="high">High</option>
-                    <option value="low">Low</option>
-                  </select>
-                </div>
-
-                <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Status</span>
-                  </label>
-                  <select
-                    className="select select-bordered select-sm text-sm w-full"
-                    value={status}
-                    onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }}
-                  >
-                    <option value="open">Open</option>
-                    <option value="needs_info">Needs info</option>
-                    <option value="resolved">Completed</option>
-                  </select>
-                </div>
-
-                <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Target Date</span>
-                  </label>
-                  <div className="flex gap-1">
-                    <input
-                      type="date"
-                      className="input input-bordered input-sm flex-1 min-w-0"
-                      value={dateDue}
-                      onChange={e => { setDateDue(e.target.value); markDirty(); }}
-                    />
-                    <VoiceButton
-                      listening={listeningDate}
-                      onToggle={() => listeningDate
-                        ? stopVoice(dateRecRef as React.MutableRefObject<unknown>, setListeningDate)
-                        : startVoice(
-                            wrapVoiceResult(
-                              text => { const d = parseSpokenDate(text); if (d) setDateDue(d); },
-                              () => setDateDue('')
-                            ),
-                            setListeningDate,
-                            dateRecRef as React.MutableRefObject<unknown>,
-                            false
-                          )
-                      }
-                    />
+                {/* Row 1: Requester | Assigned to | Task type */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={dpLabel}>Requester</label>
+                    <input value={requester} onChange={e => { setRequester(e.target.value); markDirty(); }} style={dpInput} />
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={dpLabel}>Assigned to</label>
+                    <select value={assignedTo} onChange={e => { setAssignedTo(e.target.value); markDirty(); }} style={dpSelect}>
+                      <option value="">Unassigned</option>
+                      <option value="Bruce">Bruce</option>
+                      <option value="John">John</option>
+                    </select>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={dpLabel}>Task type</label>
+                    <select value={selectedType} onChange={e => selectProblemType(e.target.value)} style={dpSelect}>
+                      {QUICK_TASK_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                    </select>
                   </div>
                 </div>
-              </div>
 
-              {/* Requester + Assigned to + Task type */}
-              <div className="grid grid-cols-3 gap-2">
-                <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Requester</span>
-                  </label>
-                  <div className="flex gap-1">
-                    <input
-                      className="input input-bordered input-sm flex-1 min-w-0"
-                      value={requester}
-                      onChange={e => { setRequester(e.target.value); markDirty(); }}
-                      placeholder=""
-                    />
-                    <VoiceButton
-                      listening={listeningRequester}
-                      onToggle={() => listeningRequester
-                        ? stopVoice(requesterRecRef as React.MutableRefObject<unknown>, setListeningRequester)
-                        : startVoice(
-                            wrapVoiceResult(
-                              text => setRequester(prev => prev ? `${prev} ${text}` : text),
-                              () => setRequester('')
-                            ),
-                            setListeningRequester,
-                            requesterRecRef as React.MutableRefObject<unknown>,
-                            true
-                          )
-                      }
-                    />
+                {/* Row 2: Target date | main info field (span 2) */}
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '12px' }}>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={dpLabel}>Target date</label>
+                    <input type="date" value={dateDue} onChange={e => { setDateDue(e.target.value); markDirty(); }} style={dpInput} />
                   </div>
+                  {/* Onboarding: Information needed */}
+                  {isOnboarding && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', gridColumn: 'span 2' }}>
+                      <label style={dpLabel}>Information needed</label>
+                      <AutoTextarea
+                        style={dpTextarea}
+                        value={infoRequired}
+                        onChange={e => setInfoRequired(e.target.value)}
+                        onBlur={() => saveUpdate('details', infoRequired, savedDetailsRef)}
+                        placeholder="What information is needed or what does the checklist say..."
+                      />
+                    </div>
+                  )}
+                  {/* Non-onboarding: Problem to fix / Decision / etc — hidden during fix/recommendation stages */}
+                  {!isOnboarding && !hideInfoDone && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', gridColumn: 'span 2' }}>
+                      <label style={dpLabel}>
+                        {selectedType === 'problem_to_fix' ? 'Problem to fix'
+                          : selectedType === 'decision_to_make' ? 'Decision to make'
+                          : selectedType === 'project_to_manage' ? 'Project to manage'
+                          : 'Information for the AI'}
+                      </label>
+                      <AutoTextarea
+                        style={dpTextarea}
+                        value={infoDone}
+                        onChange={e => setInfoDone(e.target.value)}
+                        onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
+                        placeholder="Describe the problem..."
+                      />
+                    </div>
+                  )}
                 </div>
-                <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Assigned to</span>
-                  </label>
-                  <select className="select select-bordered select-sm text-sm w-full" value={assignedTo}
-                    onChange={e => { setAssignedTo(e.target.value); markDirty(); }}>
-                    <option value="">Unassigned</option>
-                    <option value="Bruce">Bruce</option>
-                    <option value="John">John</option>
-                  </select>
-                </div>
-                <div className="form-control">
-                  <label className="label py-0">
-                    <span className="label-text text-xs font-semibold">Task type</span>
-                  </label>
-                  <select
-                    className="select select-bordered select-sm text-sm w-full"
-                    value={selectedType}
-                    onChange={e => selectProblemType(e.target.value)}
-                  >
-                    {QUICK_TASK_TYPES.map(t => (
-                      <option key={t.id} value={t.id}>{t.label}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
 
-              {/* Task details — only for onboarding/offboarding */}
-              {(selectedType === 'onboarding' || selectedType === 'offboarding' || selectedType === 'onboarding_offboarding') && <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Information needed</span>
-                </label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    value={infoRequired}
-                    onChange={e => setInfoRequired(e.target.value)}
-                    onBlur={() => saveUpdate('details', infoRequired, savedDetailsRef)}
-                    placeholder="What information is needed or what does the checklist say..."
-                  />
-                  <VoiceButton
-                    listening={listeningInfoRequired}
-                    onToggle={() => listeningInfoRequired
-                      ? stopVoice(infoRequiredRecRef as React.MutableRefObject<unknown>, setListeningInfoRequired)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setInfoRequired(prev => prev ? `${prev} ${text}` : text),
-                            () => setInfoRequired('')
-                          ),
-                          setListeningInfoRequired,
-                          infoRequiredRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
-                </div>
-              </div>}
-
-              {/* infoDone — label varies by task type; hidden when AiDiagnoseSection shows fix/recommendation */}
-              <div className={`form-control${hideInfoDone ? ' hidden' : ''}`}>
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">
-                    {selectedType === 'problem_to_fix' ? 'Problem to fix'
-                      : selectedType === 'decision_to_make' ? 'Decision to make'
-                      : selectedType === 'project_to_manage' ? 'Project to manage'
-                      : 'Information to send to the AI'}
-                  </span>
-                </label>
-                <div className="flex gap-1 items-start">
-                  <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
-                    value={infoDone}
-                    onChange={e => setInfoDone(e.target.value)}
-                    onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
-                    placeholder="What information was gathered or what actions were taken..."
-                  />
-                  <VoiceButton
-                    listening={listeningInfoDone}
-                    onToggle={() => listeningInfoDone
-                      ? stopVoice(infoDoneRecRef as React.MutableRefObject<unknown>, setListeningInfoDone)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setInfoDone(prev => prev ? `${prev} ${text}` : text),
-                            () => setInfoDone('')
-                          ),
-                          setListeningInfoDone,
-                          infoDoneRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
-                </div>
-                {/* Onboarding: Ask the AI button (non-onboarding types get their button from AiDiagnoseSection) */}
-                {isOnboarding && diagStage === 'idle' && (
-                  <div className="mt-2">
-                    <button
-                      className="btn btn-primary btn-sm w-full"
-                      onClick={handleDiagnose}
-                      disabled={diagnosing}
-                    >
-                      {diagnosing && <span className="loading loading-spinner loading-xs" />}
-                      {diagnosing ? 'Thinking…' : 'Ask the AI'}
-                    </button>
+                {/* Onboarding: infoDone + Ask the AI */}
+                {isOnboarding && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                    <label style={dpLabel}>Information to send to the AI</label>
+                    <AutoTextarea
+                      style={dpTextarea}
+                      value={infoDone}
+                      onChange={e => setInfoDone(e.target.value)}
+                      onBlur={() => saveUpdate('progress', infoDone, savedInfoDoneRef)}
+                      placeholder="What information was gathered or what actions were taken..."
+                    />
+                    {diagStage === 'idle' && (
+                      <button
+                        style={{ marginTop: '6px', padding: '8px 16px', borderRadius: '6px', background: '#4f8ef7', color: '#fff', border: 'none', cursor: diagnosing ? 'not-allowed' : 'pointer', fontFamily: "'DM Sans', sans-serif", fontSize: '12px', fontWeight: 500, opacity: diagnosing ? 0.7 : 1 }}
+                        onClick={handleDiagnose}
+                        disabled={diagnosing}
+                      >
+                        {diagnosing && <span className="loading loading-spinner loading-xs mr-1" />}
+                        {diagnosing ? 'Thinking…' : 'Ask the AI'}
+                      </button>
+                    )}
                   </div>
                 )}
-              </div>
 
-              {/* Onboarding asset proposals — shown after AI extracts structured data */}
-              {diagStage === 'cause' && isOnboarding && onboardingData && (
-                <div className="form-control">
-                  <div className="rounded-box p-3 bg-primary/10 space-y-4">
+                {/* Onboarding asset proposals — shown after AI extracts structured data */}
+                {diagStage === 'cause' && isOnboarding && onboardingData && (
+                  <div style={dpAiCard}>
+                    <div style={dpAiHeader}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f8ef7', display: 'inline-block', flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', color: '#4f8ef7', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>IT Buddy</span>
+                    </div>
+                    <div style={{ padding: '14px' }} className="space-y-4">
 
                       {(['Computer', 'Phone', 'iPad'] as const).map(cat => {
                         const catState = cat === 'Computer' ? computer : cat === 'Phone' ? phone : ipad;
@@ -1142,102 +1121,50 @@ export default function DashboardPage() {
                   </div>
                 )}
 
-              {/* AI Diagnose Section — all non-onboarding task types */}
-              {!isOnboarding && (
-                <AiDiagnoseSection
-                  key={selectedTask?.id}
-                  selectedType={selectedType}
-                  infoDone={infoDone}
-                  setInfoDone={setInfoDone}
-                  infoRequired={infoRequired}
-                  onSaveUpdate={async (type, note) => {
-                    if (!selectedTask) return;
-                    await fetch(`/api/issues/${selectedTask.id}/updates`, {
-                      method: 'POST',
-                      headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ type, note }),
-                    });
-                  }}
-                  onStageChange={setAiStage}
-                  initialCause={initialDiagCause}
-                  initialActionsText={initialDiagActionsText}
-                  initialRecommendation={initialDiagRecommendation}
-                />
-              )}
+                {/* AI Diagnose Section — wrapped in IT Buddy card */}
+                {!isOnboarding && (
+                  <div style={dpAiCard}>
+                    <div style={dpAiHeader}>
+                      <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: '#4f8ef7', display: 'inline-block', flexShrink: 0 }} />
+                      <span style={{ fontSize: '11px', color: '#4f8ef7', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>IT Buddy</span>
+                    </div>
+                    <div style={{ padding: '14px' }}>
+                      <AiDiagnoseSection
+                        key={selectedTask?.id}
+                        selectedType={selectedType}
+                        infoDone={infoDone}
+                        setInfoDone={setInfoDone}
+                        infoRequired={infoRequired}
+                        onSaveUpdate={async (type, note) => {
+                          if (!selectedTask) return;
+                          await fetch(`/api/issues/${selectedTask.id}/updates`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ type, note }),
+                          });
+                        }}
+                        onStageChange={setAiStage}
+                        initialCause={initialDiagCause}
+                        initialActionsText={initialDiagActionsText}
+                        initialRecommendation={initialDiagRecommendation}
+                      />
+                    </div>
+                  </div>
+                )}
 
-              {/* Issues / Comments */}
-              <div className="form-control">
-                <label className="label py-0">
-                  <span className="label-text text-xs font-semibold">Issues / Comments</span>
-                </label>
-                <div className="flex gap-1 items-start">
+                {/* Issues / Comments */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '5px' }}>
+                  <label style={dpLabel}>Issues / Comments</label>
                   <AutoTextarea
-                    className="textarea textarea-bordered textarea-sm flex-1 text-sm"
+                    style={dpTextarea}
                     value={issues}
                     onChange={e => setIssues(e.target.value)}
                     onBlur={() => saveUpdate('progress', issues.trim() ? `Issues/Comments: ${issues.trim()}` : '', savedIssuesRef)}
                     placeholder="Any issues or comments..."
                   />
-                  <VoiceButton
-                    listening={listeningIssues}
-                    onToggle={() => listeningIssues
-                      ? stopVoice(issuesRecRef as React.MutableRefObject<unknown>, setListeningIssues)
-                      : startVoice(
-                          wrapVoiceResult(
-                            text => setIssues(prev => prev ? `${prev} ${text}` : text),
-                            () => setIssues('')
-                          ),
-                          setListeningIssues,
-                          issuesRecRef as React.MutableRefObject<unknown>,
-                          true
-                        )
-                    }
-                  />
                 </div>
-              </div>
 
-              {/* Delete */}
-              {/* Update history */}
-              {allUpdates.length > 0 && (
-                <div>
-                  <button className="text-xs text-primary underline" onClick={() => setHistoryOpen(o => !o)}>
-                    {historyOpen ? 'Hide history' : `View history (${allUpdates.length} entries)`}
-                  </button>
-                  {historyOpen && (
-                    <div className="mt-2 space-y-1 max-h-48 overflow-y-auto border border-base-200 rounded-box p-2">
-                      {allUpdates.map((u, i) => (
-                        <div key={i} className="text-xs border-b border-base-200 last:border-0 pb-1 last:pb-0">
-                          <span className="font-semibold text-base-content/50 mr-1">
-                            {u.type === 'details' ? 'Task details' : u.type === 'progress' ? 'Info sent to AI' : u.type === 'ai_response' ? 'IT Buddy' : u.type === 'user_reply' ? 'Reply' : u.type}
-                          </span>
-                          <span className="text-base-content/30">{u.created_at ? new Date(u.created_at).toLocaleString() : ''}</span>
-                          <p className="text-base-content/70 whitespace-pre-wrap mt-0.5">{u.note}</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              )}
-
-              {selectedTask && (
-                <div className="flex justify-end">
-                  <button
-                    className="btn btn-ghost btn-xs text-base-content/25 hover:text-error hover:bg-transparent"
-                    onClick={handleDelete}
-                    title="Delete task"
-                  >
-                    <Trash2 className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              )}
-              </>
-
-              {/* Autosave status */}
-              <div className="h-4 text-right">
-                {saveStatus === 'saving' && <span className="text-xs text-base-content/40">Saving…</span>}
-                {saveStatus === 'saved'  && <span className="text-xs text-success">Saved ✓</span>}
-              </div>
-
+              </>)}
 
             </div>
           </div>
