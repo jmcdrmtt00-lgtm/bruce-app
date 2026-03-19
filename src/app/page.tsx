@@ -888,7 +888,7 @@ export default function DashboardPage() {
                 onChange={e => { setTaskName(e.target.value); markDirty(); }}
                 readOnly={!selectedTask}
                 placeholder={selectedTask ? '' : 'Select a task from the list →'}
-                style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: selectedTask ? '#ffffff' : '#3a4a5c', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
+                style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: selectedTask ? '#ffffff' : '#a8b8c8', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
               />
               {/* Mic for task name */}
               <VoiceButton
@@ -908,9 +908,9 @@ export default function DashboardPage() {
                     padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
                     cursor: 'pointer', flexShrink: 0, appearance: 'none',
                     fontFamily: "'DM Sans', sans-serif",
-                    border: priority === 'high' ? '1px solid rgba(255,68,68,0.5)' : priority === 'low' ? '1px solid rgba(34,204,110,0.35)' : '1px solid rgba(168,184,200,0.28)',
-                    background: priority === 'high' ? 'rgba(255,68,68,0.18)' : priority === 'low' ? 'rgba(34,204,110,0.12)' : 'rgba(255,255,255,0.03)',
-                    color: priority === 'high' ? '#ff6060' : priority === 'low' ? '#22cc6e' : '#6b7d8f',
+                    border: priority === 'high' ? '1px solid rgba(255,68,68,0.65)' : priority === 'low' ? '1px solid rgba(34,204,110,0.55)' : '1px solid rgba(168,184,200,0.45)',
+                    background: priority === 'high' ? 'rgba(255,68,68,0.18)' : priority === 'low' ? 'rgba(34,204,110,0.12)' : 'rgba(255,255,255,0.04)',
+                    color: priority === 'high' ? '#ff6060' : priority === 'low' ? '#22cc6e' : '#a8b8c8',
                   }}
                 >
                   <option value="" style={{ background: '#141f2d', color: '#eef2f7' }}>— urgency</option>
@@ -925,9 +925,9 @@ export default function DashboardPage() {
                     padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 500,
                     cursor: 'pointer', flexShrink: 0, appearance: 'none',
                     fontFamily: "'DM Sans', sans-serif",
-                    border: status === 'resolved' ? '1px solid rgba(77,184,140,0.22)' : status === 'needs_info' ? '1px solid rgba(240,160,64,0.2)' : '1px solid rgba(168,184,200,0.28)',
-                    background: status === 'resolved' ? 'rgba(77,184,140,0.1)' : status === 'needs_info' ? 'rgba(240,160,64,0.1)' : 'rgba(255,255,255,0.03)',
-                    color: status === 'resolved' ? '#4db88c' : status === 'needs_info' ? '#f0a040' : '#a8b8c8',
+                    border: status === 'resolved' ? '1px solid rgba(77,184,140,0.6)' : status === 'needs_info' ? '1px solid rgba(240,160,64,0.55)' : '1px solid rgba(168,184,200,0.45)',
+                    background: status === 'resolved' ? 'rgba(77,184,140,0.12)' : status === 'needs_info' ? 'rgba(240,160,64,0.12)' : 'rgba(255,255,255,0.04)',
+                    color: status === 'resolved' ? '#4db88c' : status === 'needs_info' ? '#f0a040' : '#c8d8e8',
                   }}
                 >
                   <option value="open" style={{ background: '#141f2d', color: '#eef2f7' }}>Open</option>
@@ -946,7 +946,7 @@ export default function DashboardPage() {
                       History
                     </button>
                   )}
-                  <button onClick={resetPanel} title="Deselect" style={{ padding: '4px 6px', borderRadius: '5px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.15)', background: 'transparent', color: '#3a4a5c', fontSize: '13px', lineHeight: 1 }}>×</button>
+                  <button onClick={resetPanel} title="Deselect" style={{ padding: '4px 6px', borderRadius: '5px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.3)', background: 'transparent', color: '#6b8aaa', fontSize: '13px', lineHeight: 1 }}>×</button>
                 </div>
               </div>
             </div>
