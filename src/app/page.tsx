@@ -1162,6 +1162,7 @@ export default function DashboardPage() {
                     </div>
                   </div>
                 )}
+                </>)}
 
                 {/* AI Diagnose Section — wrapped in IT Buddy card */}
                 {!isOnboarding && (
