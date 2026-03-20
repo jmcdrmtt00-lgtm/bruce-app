@@ -414,7 +414,7 @@ export default function AiDiagnoseSection({
           onClick={handleAdditionalHelp}
           disabled={diagnosing || !additionalHelpText.trim()}
         >
-          {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
+          {diagnosing ? <span className="spinner spinner-sm" /> : 'Send'}
         </button>
       </div>
     ) : (
@@ -434,7 +434,7 @@ export default function AiDiagnoseSection({
           onClick={handleDiagnose}
           disabled={diagnosing}
         >
-          {diagnosing && <span className="loading loading-spinner loading-xs" />}
+          {diagnosing && <span className="spinner spinner-sm" />}
           {diagnosing ? 'Thinking…' : 'Ask the AI to diagnose'}
         </button>
       )}
@@ -444,7 +444,7 @@ export default function AiDiagnoseSection({
           onClick={handleDiagnose}
           disabled={diagnosing}
         >
-          {diagnosing && <span className="loading loading-spinner loading-xs" />}
+          {diagnosing && <span className="spinner spinner-sm" />}
           {diagnosing ? 'Thinking…' : 'Ask the AI'}
         </button>
       )}
@@ -481,7 +481,7 @@ export default function AiDiagnoseSection({
                 onClick={handleFollowUp}
                 disabled={diagnosing || !diagAnswer.trim()}
               >
-                {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
+                {diagnosing ? <span className="spinner spinner-sm" /> : 'Send'}
               </button>
             </div>
           )}
@@ -524,7 +524,7 @@ export default function AiDiagnoseSection({
                     onClick={handleConfirmCause}
                     disabled={diagnosing}
                   >
-                    {diagnosing ? <span className="loading loading-spinner loading-xs" /> : 'Actions to take'}
+                    {diagnosing ? <span className="spinner spinner-sm" /> : 'Actions to take'}
                   </button>
                   <button
                     style={{ ...aiBtnOutline, opacity: diagnosing ? 0.5 : 1, cursor: diagnosing ? 'not-allowed' : 'pointer' }}

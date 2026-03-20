@@ -619,7 +619,7 @@ function InventoryTab() {
               try { recRef.current = startVoiceRec(t => setQuestion(t), () => setListening(false)); setListening(true); } catch { setListening(false); }
             }} />
             <button style={{ ...BTN_PRIMARY, opacity: loading ? 0.7 : 1 }} onClick={handleQuery} disabled={loading}>
-              {loading ? <span className="loading loading-spinner loading-sm" /> : 'Ask'}
+              {loading ? <span className="spinner spinner-sm" /> : 'Ask'}
             </button>
           </div>
           {sql && (
@@ -750,7 +750,7 @@ function DataToolsTab() {
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#eef2f7', marginBottom: '4px' }}>Download</p>
           <p style={{ fontSize: '11px', color: '#a8b8c8', marginBottom: '12px' }}>Export everything to Excel — one sheet per asset category.</p>
           <button style={{ ...BTN_SUCCESS, opacity: invDownloading ? 0.7 : 1 }} onClick={handleInvDownload} disabled={invDownloading}>
-            {invDownloading ? <span className="loading loading-spinner loading-sm" /> : <><Download size={13} /> Download to Excel</>}
+            {invDownloading ? <span className="spinner spinner-sm" /> : <><Download size={13} /> Download to Excel</>}
           </button>
         </div>
 
@@ -788,7 +788,7 @@ function DataToolsTab() {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '11px', color: '#a8b8c8' }}>{selectedCount} assets selected</span>
               <button style={{ ...BTN_PRIMARY, opacity: uploading || selectedCount === 0 ? 0.5 : 1 }} onClick={handleInvUpload} disabled={uploading || selectedCount === 0}>
-                {uploading ? <span className="loading loading-spinner loading-sm" /> : <><Upload size={13} /> Upload</>}
+                {uploading ? <span className="spinner spinner-sm" /> : <><Upload size={13} /> Upload</>}
               </button>
             </div>
           </div>
@@ -806,7 +806,7 @@ function DataToolsTab() {
           <p style={{ fontSize: '13px', fontWeight: 600, color: '#eef2f7', marginBottom: '4px' }}>Download</p>
           <p style={{ fontSize: '11px', color: '#a8b8c8', marginBottom: '12px' }}>Export your current task list to Excel.</p>
           <button style={{ ...BTN_SUCCESS, opacity: taskDownloading ? 0.7 : 1 }} onClick={handleTaskDownload} disabled={taskDownloading}>
-            {taskDownloading ? <span className="loading loading-spinner loading-sm" /> : <><Download size={13} /> Download to Excel</>}
+            {taskDownloading ? <span className="spinner spinner-sm" /> : <><Download size={13} /> Download to Excel</>}
           </button>
         </div>
 
@@ -823,7 +823,7 @@ function DataToolsTab() {
           <input ref={taskFileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={handleTaskFileChange} />
           {taskRows.length > 0 && (
             <button style={{ ...BTN_PRIMARY, marginTop: '10px', width: '100%', justifyContent: 'center', opacity: taskUploading ? 0.7 : 1 }} onClick={handleTaskUpload} disabled={taskUploading}>
-              {taskUploading ? <span className="loading loading-spinner loading-sm" /> : <><Upload size={13} /> Upload {taskRows.length} tasks</>}
+              {taskUploading ? <span className="spinner spinner-sm" /> : <><Upload size={13} /> Upload {taskRows.length} tasks</>}
             </button>
           )}
         </div>

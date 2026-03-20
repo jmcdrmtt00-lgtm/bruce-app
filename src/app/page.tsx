@@ -686,8 +686,8 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-base-200 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg" />
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f1923" }}>
+        <span className="spinner spinner-lg" />
       </div>
     );
   }
@@ -1059,7 +1059,7 @@ export default function DashboardPage() {
                         onClick={handleDiagnose}
                         disabled={diagnosing}
                       >
-                        {diagnosing && <span className="loading loading-spinner loading-xs mr-1" />}
+                        {diagnosing && <span className="spinner spinner-sm mr-1" />}
                         {diagnosing ? 'Thinking…' : 'Ask the AI'}
                       </button>
                     )}

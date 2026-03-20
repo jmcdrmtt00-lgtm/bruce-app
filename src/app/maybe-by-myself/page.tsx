@@ -277,7 +277,7 @@ export default function MaybeByMyselfPage() {
       {!submitted && (
         <button className="btn btn-primary btn-sm w-full" onClick={handleSubmit}
           disabled={loading || !subject.trim() || !problem.trim()}>
-          {loading ? <span className="loading loading-spinner loading-xs" /> : 'Submit'}
+          {loading ? <span className="spinner spinner-sm" /> : 'Submit'}
         </button>
       )}
 
@@ -315,7 +315,7 @@ export default function MaybeByMyselfPage() {
           </div>
           <button className="btn btn-primary btn-sm w-full" onClick={handleSendAnswer}
             disabled={loading || !answer.trim()}>
-            {loading ? <span className="loading loading-spinner loading-xs" /> : 'Send'}
+            {loading ? <span className="spinner spinner-sm" /> : 'Send'}
           </button>
         </div>
       )}
@@ -337,7 +337,7 @@ export default function MaybeByMyselfPage() {
           <p className="text-sm">Would you like step-by-step coaching to try to fix it yourself?</p>
           <div className="flex gap-2">
             <button className="btn btn-primary btn-sm flex-1" onClick={handleWantCoaching} disabled={loading}>
-              {loading ? <span className="loading loading-spinner loading-xs" /> : 'Yes, walk me through it'}
+              {loading ? <span className="spinner spinner-sm" /> : 'Yes, walk me through it'}
             </button>
             <button className="btn btn-outline btn-sm flex-1" onClick={handleNoCoaching} disabled={loading}>
               No, let IT handle it
@@ -402,13 +402,13 @@ export default function MaybeByMyselfPage() {
             </div>
             <button className="btn btn-primary btn-sm w-full" onClick={handleClarification}
               disabled={loading || !clarificationQ.trim()}>
-              {loading ? <span className="loading loading-spinner loading-xs" /> : 'Ask IT Buddy'}
+              {loading ? <span className="spinner spinner-sm" /> : 'Ask IT Buddy'}
             </button>
           </div>
 
           {/* Action buttons */}
           <button className="btn btn-success btn-sm w-full" onClick={handleMarkCompleted} disabled={loading}>
-            {loading ? <span className="loading loading-spinner loading-xs" /> : 'Mark as completed'}
+            {loading ? <span className="spinner spinner-sm" /> : 'Mark as completed'}
           </button>
           <button className="btn btn-outline btn-sm w-full" onClick={handleNoCoaching} disabled={loading}>
             I can&apos;t fix it — let IT handle it

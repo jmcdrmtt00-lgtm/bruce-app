@@ -210,7 +210,7 @@ export default function TaskManagementPage() {
               disabled={downloading}
             >
               {downloading
-                ? <span className="loading loading-spinner loading-sm" />
+                ? <span className="spinner spinner-sm" />
                 : <><Download className="w-4 h-4" /> Download to Excel</>}
             </button>
           </div>
@@ -260,7 +260,7 @@ export default function TaskManagementPage() {
                 disabled={uploading}
               >
                 {uploading
-                  ? <span className="loading loading-spinner loading-sm" />
+                  ? <span className="spinner spinner-sm" />
                   : <><Upload className="w-4 h-4" /> Upload {rows.length} tasks</>}
               </button>
             )}

@@ -25,7 +25,7 @@ function AuthCallbackInner() {
 
   return (
     <div className="min-h-screen bg-base-200 flex items-center justify-center">
-      <span className="loading loading-spinner loading-lg" />
+      <span className="spinner spinner-lg" />
     </div>
   );
 }
@@ -34,7 +34,7 @@ export default function AuthCallbackPage() {
   return (
     <Suspense fallback={
       <div className="min-h-screen bg-base-200 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg" />
+        <span className="spinner spinner-lg" />
       </div>
     }>
       <AuthCallbackInner />

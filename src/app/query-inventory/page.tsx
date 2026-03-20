@@ -292,7 +292,7 @@ export default function QueryInventoryPage() {
                     onClick={handleQuery}
                     disabled={loading}
                   >
-                    {loading ? <span className="loading loading-spinner loading-sm" /> : 'Ask'}
+                    {loading ? <span className="spinner spinner-sm" /> : 'Ask'}
                   </button>
                 </div>
 
@@ -384,7 +384,7 @@ export default function QueryInventoryPage() {
                     disabled={tableLoading || selectedCols.size === 0}
                   >
                     {tableLoading
-                      ? <span className="loading loading-spinner loading-xs" />
+                      ? <span className="spinner spinner-sm" />
                       : 'Populate'}
                   </button>
                   {tableRows.length > 0 && (

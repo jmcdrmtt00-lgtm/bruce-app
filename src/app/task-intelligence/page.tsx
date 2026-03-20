@@ -170,7 +170,7 @@ export default function TaskIntelligencePage() {
               try { recRef.current = startVoiceRec(t => setQuestion(t), () => setListening(false)); setListening(true); } catch { setListening(false); }
             }} />
             <button style={{ ...BTN_PRIMARY, opacity: loading ? 0.7 : 1 }} onClick={handleQuery} disabled={loading}>
-              {loading ? <span className="loading loading-spinner loading-sm" /> : 'Ask'}
+              {loading ? <span className="spinner spinner-sm" /> : 'Ask'}
             </button>
           </div>
           {sql && (
@@ -235,7 +235,7 @@ export default function TaskIntelligencePage() {
               </div>
             </div>
             <button style={{ ...BTN_GHOST, width: '100%', justifyContent: 'center', opacity: simLoading ? 0.7 : 1 }} onClick={handleFindSimilar} disabled={simLoading}>
-              {simLoading ? <><span className="loading loading-spinner loading-sm" /> Searching…</> : 'Find similar tasks'}
+              {simLoading ? <><span className="spinner spinner-sm" /> Searching…</> : 'Find similar tasks'}
             </button>
             {simMessage && <p style={{ fontSize: '12px', color: '#a8b8c8', textAlign: 'center' }}>{simMessage}</p>}
             {simResults.length > 0 && (

@@ -241,7 +241,7 @@ export default function OnboardingPage() {
                   disabled={approveStatus === 'approving' || !currentAsset}
                   data-demo="approve"
                 >
-                  {approveStatus === 'approving' && <span className="loading loading-spinner loading-xs" />}
+                  {approveStatus === 'approving' && <span className="spinner spinner-sm" />}
                   Approve update to assets table
                 </button>
               )}

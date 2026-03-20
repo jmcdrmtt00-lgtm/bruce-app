@@ -84,7 +84,7 @@ export default function SimulateTicketModal({ isOpen, onClose, onSubmitted }: Pr
         <div className="modal-action">
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSubmit} disabled={submitting}>
-            {submitting ? <span className="loading loading-spinner loading-sm" /> : 'Submit'}
+            {submitting ? <span className="spinner spinner-sm" /> : 'Submit'}
           </button>
         </div>
       </div>

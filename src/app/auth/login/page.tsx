@@ -56,7 +56,7 @@ function LoginForm() {
             />
           </div>
           <button type="submit" className="btn btn-primary w-full" disabled={loading}>
-            {loading ? <span className="loading loading-spinner loading-sm" /> : 'Sign In'}
+            {loading ? <span className="spinner spinner-sm" /> : 'Sign In'}
           </button>
         </form>
         <p className="text-center text-sm mt-4">
@@ -71,7 +71,7 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <div className="min-h-screen bg-base-200 flex items-center justify-center px-4">
-      <Suspense fallback={<div className="loading loading-spinner loading-lg" />}>
+      <Suspense fallback={<div className="spinner spinner-lg" />}>
         <LoginForm />
       </Suspense>
     </div>

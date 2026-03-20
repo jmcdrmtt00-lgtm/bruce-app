@@ -602,7 +602,7 @@ export default function TicketsPage() {
                 Cancel
               </button>
               <button className="btn btn-primary btn-sm" onClick={handleAddTicket} disabled={addingTicket || !newTaskName.trim() || !newTaskDetails.trim()}>
-                {addingTicket && <span className="loading loading-spinner loading-xs" />}
+                {addingTicket && <span className="spinner spinner-sm" />}
                 Add Ticket
               </button>
             </div>

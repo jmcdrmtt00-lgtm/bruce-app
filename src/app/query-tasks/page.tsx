@@ -147,7 +147,7 @@ export default function QueryTasksPage() {
                 onClick={handleQuery}
                 disabled={loading}
               >
-                {loading ? <span className="loading loading-spinner loading-sm" /> : 'Ask'}
+                {loading ? <span className="spinner spinner-sm" /> : 'Ask'}
               </button>
             </div>
 
@@ -232,7 +232,7 @@ export default function QueryTasksPage() {
               onClick={handleFindSimilar}
               disabled={simLoading}
             >
-              {simLoading ? <span className="loading loading-spinner loading-sm" /> : 'Find'}
+              {simLoading ? <span className="spinner spinner-sm" /> : 'Find'}
             </button>
 
             {simMessage && (

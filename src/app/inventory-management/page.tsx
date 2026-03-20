@@ -426,7 +426,7 @@ export default function InventoryManagementPage() {
               disabled={downloading}
             >
               {downloading
-                ? <span className="loading loading-spinner loading-sm" />
+                ? <span className="spinner spinner-sm" />
                 : <><Download className="w-4 h-4" /> Download to Excel</>
               }
             </button>
@@ -514,7 +514,7 @@ export default function InventoryManagementPage() {
                   disabled={uploading || selectedCount === 0}
                 >
                   {uploading
-                    ? <span className="loading loading-spinner loading-sm" />
+                    ? <span className="spinner spinner-sm" />
                     : <><Upload className="w-4 h-4" /> Upload</>
                   }
                 </button>
