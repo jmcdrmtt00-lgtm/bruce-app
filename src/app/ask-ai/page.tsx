@@ -564,7 +564,7 @@ function InventoryTab() {
 
           {/* Column picker */}
           <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '6px', padding: '12px', marginBottom: '14px', border: '1px solid rgba(168,184,200,0.08)' }}>
-            <p style={{ ...SECTION_LABEL, marginBottom: '10px' }}>Columns</p>
+            <p style={{ ...SECTION_LABEL, marginBottom: '10px' }}>Columns ✓</p>
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, max-content)', rowGap: '6px', columnGap: '60px' }}>
               {primaryFields.map(f => (
                 <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
