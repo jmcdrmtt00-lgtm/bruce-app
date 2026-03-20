@@ -593,18 +593,20 @@ function InventoryTab() {
           {/* Table */}
           {tableRows.length > 0 && activeCols.length > 0 && (
             <div style={{ overflowX: 'auto' }} data-theme="light">
-              <table className="table table-sm w-full" style={{ fontSize: '12px' }}>
+              <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
                 <thead>
-                  <tr>{activeCols.map(f => (
-                    <th key={f.key} style={{ whiteSpace: 'nowrap' }}>{f.label}</th>
-                  ))}</tr>
+                  <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
+                    {activeCols.map(f => (
+                      <th key={f.key} style={{ whiteSpace: 'nowrap', padding: '6px 14px', textAlign: 'left', fontWeight: 600, fontSize: '11px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</th>
+                    ))}
+                  </tr>
                 </thead>
                 <tbody>
                   {tableRows.map((r, i) => (
-                    <tr key={i} className="hover">
+                    <tr key={i} style={{ borderBottom: '1px solid rgba(168,184,200,0.06)' }}>
                       {activeCols.map(f => f.key === 'name'
-                        ? <td key={f.key} style={{ maxWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cellValue(r, f.key) || '—'}</td>
-                        : <td key={f.key} style={{ whiteSpace: 'nowrap' }}>{cellValue(r, f.key) || '—'}</td>
+                        ? <td key={f.key} style={{ padding: '6px 14px', maxWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
+                        : <td key={f.key} style={{ padding: '6px 14px', whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
                       )}
                     </tr>
                   ))}
