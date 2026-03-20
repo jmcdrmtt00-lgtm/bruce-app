@@ -12,7 +12,7 @@ export default function UserMenu({ user }: Props) {
     return (
       <div className="flex gap-2">
         <Link href="/auth/login" className="btn btn-ghost btn-sm">Sign In</Link>
-        <Link href="/auth/signup" className="btn btn-primary btn-sm">Sign Up</Link>
+        <Link href="/auth/signup" className="btn btn-sm" style={{ background: '#4f8ef7', color: '#ffffff', borderColor: '#4f8ef7' }}>Sign Up</Link>
       </div>
     );
   }
@@ -22,7 +22,7 @@ export default function UserMenu({ user }: Props) {
   return (
     <div className="dropdown dropdown-end">
       <div tabIndex={0} role="button" className="btn btn-ghost btn-circle avatar placeholder">
-        <div className="bg-primary text-primary-content rounded-full w-9">
+        <div className="rounded-full w-9" style={{ background: '#4f8ef7', color: '#ffffff', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
           <span className="text-sm font-bold">{initial}</span>
         </div>
       </div>
