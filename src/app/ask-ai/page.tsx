@@ -441,17 +441,22 @@ function InventoryTab() {
   // Browse mode state
   const [tableCategory, setTableCategory]   = useState('Computer');
   const [selectedCols, setSelectedCols]     = useState<Set<string>>(new Set(DEFAULT_COLS));
+  const [colsLoaded, setColsLoaded]         = useState(false);
 
+  // Load from localStorage once on mount
   useEffect(() => {
     try {
       const saved = localStorage.getItem('inventory-cols');
       if (saved) setSelectedCols(new Set(JSON.parse(saved) as string[]));
     } catch { /* ignore */ }
+    setColsLoaded(true);
   }, []);
 
+  // Save whenever selectedCols changes — but only after initial load
   useEffect(() => {
+    if (!colsLoaded) return;
     try { localStorage.setItem('inventory-cols', JSON.stringify([...selectedCols])); } catch { /* ignore */ }
-  }, [selectedCols]);
+  }, [selectedCols, colsLoaded]);
   const [tableRows, setTableRows]           = useState<AssetResult[]>([]);
   const [tableLoading, setTableLoading]     = useState(false);
   const [extraFields, setExtraFields]       = useState<FieldDef[]>([]);
