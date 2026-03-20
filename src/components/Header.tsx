@@ -64,8 +64,10 @@ export default function Header() {
             <Link
               key={href}
               href={href}
-              className={`btn btn-sm ${isActive(href) ? '' : 'btn-ghost'}`}
-              style={isActive(href) ? { background: '#4f8ef7', color: '#ffffff', border: 'none' } : {}}
+              className="btn btn-sm"
+              style={isActive(href)
+                ? { background: '#4f8ef7', color: '#ffffff', borderColor: '#4f8ef7' }
+                : { background: 'transparent', border: 'none', boxShadow: 'none' }}
             >
               {label}
             </Link>
