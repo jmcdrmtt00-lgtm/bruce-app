@@ -553,7 +553,7 @@ function InventoryTab() {
           {/* Column picker */}
           <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '6px', padding: '12px', marginBottom: '14px', border: '1px solid rgba(168,184,200,0.08)' }}>
             <p style={{ ...SECTION_LABEL, marginBottom: '10px' }}>Columns</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px 12px' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px 28px' }}>
               {primaryFields.map(f => (
                 <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
                   <input type="checkbox" checked={selectedCols.has(f.key)} onChange={e => toggleCol(f.key, e.target.checked)} style={{ cursor: 'pointer', accentColor: '#4f8ef7' }} />
@@ -567,7 +567,7 @@ function InventoryTab() {
               )}
             </div>
             {showMoreCols && moreFields.length > 0 && (
-              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(168,184,200,0.08)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px 12px' }}>
+              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(168,184,200,0.08)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px 28px' }}>
                 {moreFields.map(f => (
                   <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
                     <input type="checkbox" checked={selectedCols.has(f.key)} onChange={e => toggleCol(f.key, e.target.checked)} style={{ cursor: 'pointer', accentColor: '#4f8ef7' }} />
