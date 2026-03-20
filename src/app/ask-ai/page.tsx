@@ -595,12 +595,17 @@ function InventoryTab() {
             <div style={{ overflowX: 'auto' }} data-theme="light">
               <table className="table table-sm w-full" style={{ fontSize: '12px' }}>
                 <thead>
-                  <tr>{activeCols.map(f => <th key={f.key} style={{ whiteSpace: 'nowrap' }}>{f.label}</th>)}</tr>
+                  <tr>{activeCols.map(f => (
+                    <th key={f.key} style={{ whiteSpace: 'nowrap' }}>{f.label}</th>
+                  ))}</tr>
                 </thead>
                 <tbody>
                   {tableRows.map((r, i) => (
                     <tr key={i} className="hover">
-                      {activeCols.map(f => <td key={f.key} style={{ whiteSpace: 'nowrap' }}>{cellValue(r, f.key) || '—'}</td>)}
+                      {activeCols.map(f => f.key === 'name'
+                        ? <td key={f.key} style={{ maxWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{cellValue(r, f.key) || '—'}</td>
+                        : <td key={f.key} style={{ whiteSpace: 'nowrap' }}>{cellValue(r, f.key) || '—'}</td>
+                      )}
                     </tr>
                   ))}
                 </tbody>
