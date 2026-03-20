@@ -448,6 +448,10 @@ function InventoryTab() {
       if (saved) setSelectedCols(new Set(JSON.parse(saved) as string[]));
     } catch { /* ignore */ }
   }, []);
+
+  useEffect(() => {
+    try { localStorage.setItem('inventory-cols', JSON.stringify([...selectedCols])); } catch { /* ignore */ }
+  }, [selectedCols]);
   const [tableRows, setTableRows]           = useState<AssetResult[]>([]);
   const [tableLoading, setTableLoading]     = useState(false);
   const [extraFields, setExtraFields]       = useState<FieldDef[]>([]);
@@ -489,12 +493,7 @@ function InventoryTab() {
   }
 
   function toggleCol(key: string, checked: boolean) {
-    setSelectedCols(prev => {
-      const next = new Set(prev);
-      if (checked) next.add(key); else next.delete(key);
-      try { localStorage.setItem('inventory-cols', JSON.stringify([...next])); } catch { /* ignore */ }
-      return next;
-    });
+    setSelectedCols(prev => { const next = new Set(prev); if (checked) next.add(key); else next.delete(key); return next; });
   }
 
   function downloadExcel() {
