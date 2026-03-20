@@ -117,7 +117,21 @@ export default function DashboardPage() {
   const [activeView, setActiveView]   = useState<'open' | 'needs_info' | 'completed'>('open');
   const [filterPriority, setFilterPriority] = useState('');
   const [visibleCols, setVisibleCols] = useState({ requester: true, dateSubmitted: false, targetDate: true });
+  const [colsLoaded, setColsLoaded]   = useState(false);
   const [showColPicker, setShowColPicker] = useState(false);
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('dashboard-cols');
+      if (saved) setVisibleCols(JSON.parse(saved));
+    } catch { /* ignore */ }
+    setColsLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    if (!colsLoaded) return;
+    try { localStorage.setItem('dashboard-cols', JSON.stringify(visibleCols)); } catch { /* ignore */ }
+  }, [visibleCols, colsLoaded]);
 
   // Panel state
   const [taskNumber, setTaskNumber] = useState('');
@@ -807,9 +821,9 @@ export default function DashboardPage() {
             <span style={{ width: '18px', flexShrink: 0 }} />
             <span style={{ width: '5px', flexShrink: 0 }} />
             <span style={{ flex: 1, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Task</span>
-            {visibleCols.requester && <span style={{ width: '90px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Requester</span>}
-            {visibleCols.targetDate && <span style={{ width: '52px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Due</span>}
-            {visibleCols.dateSubmitted && <span style={{ width: '60px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right' }}>Submitted</span>}
+            {visibleCols.requester && <span style={{ width: '90px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right', paddingLeft: '16px' }}>Requester</span>}
+            {visibleCols.targetDate && <span style={{ width: '52px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right', paddingLeft: '16px' }}>Due</span>}
+            {visibleCols.dateSubmitted && <span style={{ width: '60px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right', paddingLeft: '16px' }}>Submitted</span>}
           </div>
 
           {/* Task list */}
@@ -845,19 +859,19 @@ export default function DashboardPage() {
                   </span>
                   {/* Optional: Requester */}
                   {visibleCols.requester && (
-                    <span style={{ fontSize: '10px', color: task.reported_by ? '#eef2f7' : 'transparent', flexShrink: 0, width: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right' }}>
+                    <span style={{ fontSize: '10px', color: task.reported_by ? '#eef2f7' : 'transparent', flexShrink: 0, width: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', paddingLeft: '16px' }}>
                       {task.reported_by ?? '—'}
                     </span>
                   )}
                   {/* Optional: Target date */}
                   {visibleCols.targetDate && (
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: task.date_due ? '#a8b8c8' : 'transparent', flexShrink: 0, width: '52px', textAlign: 'right' }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: task.date_due ? '#a8b8c8' : 'transparent', flexShrink: 0, width: '52px', textAlign: 'right', paddingLeft: '16px' }}>
                       {task.date_due ? formatDate(task.date_due) : '—'}
                     </span>
                   )}
                   {/* Optional: Date submitted */}
                   {visibleCols.dateSubmitted && (
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#a8b8c8', flexShrink: 0, width: '60px', textAlign: 'right' }}>
+                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#a8b8c8', flexShrink: 0, width: '60px', textAlign: 'right', paddingLeft: '16px' }}>
                       {formatDate(task.created_at)}
                     </span>
                   )}
