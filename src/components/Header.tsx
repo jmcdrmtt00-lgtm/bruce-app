@@ -64,7 +64,8 @@ export default function Header() {
             <Link
               key={href}
               href={href}
-              className={`btn btn-sm ${isActive(href) ? 'btn-primary' : 'btn-ghost'}`}
+              className={`btn btn-sm ${isActive(href) ? '' : 'btn-ghost'}`}
+              style={isActive(href) ? { background: '#4f8ef7', color: '#ffffff', border: 'none' } : {}}
             >
               {label}
             </Link>
