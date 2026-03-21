@@ -816,67 +816,61 @@ export default function DashboardPage() {
             </div>
           )}
 
-          {/* Column headers */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '4px 16px 3px', borderBottom: '1px solid rgba(168,184,200,0.1)', background: 'rgba(0,0,0,0.1)' }}>
-            <span style={{ width: '18px', flexShrink: 0 }} />
-            <span style={{ width: '5px', flexShrink: 0 }} />
-            <span style={{ flex: 1, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif" }}>Task</span>
-            {visibleCols.requester && <span style={{ width: '90px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right', paddingLeft: '16px' }}>Requester</span>}
-            {visibleCols.targetDate && <span style={{ width: '52px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right', paddingLeft: '16px' }}>Due</span>}
-            {visibleCols.dateSubmitted && <span style={{ width: '60px', flexShrink: 0, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", textAlign: 'right', paddingLeft: '16px' }}>Submitted</span>}
-          </div>
-
-          {/* Task list */}
+          {/* Task table — header + rows in one grid so columns auto-size together */}
           <div style={{ overflowY: 'auto', flex: 1 }}>
             {visibleTasks.length === 0 ? (
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '48px 20px', color: '#3a4a5c', fontSize: '12px' }}>
                 No tasks
               </div>
             ) : (
-              visibleTasks.map(task => (
-                <div
-                  key={task.id}
-                  onClick={() => loadTask(task)}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: '8px',
-                    padding: '5px 16px', cursor: 'pointer', minWidth: 0,
-                    borderLeft: selectedTask?.id === task.id ? '2px solid #4f8ef7' : '2px solid transparent',
-                    background: selectedTask?.id === task.id ? 'rgba(79,142,247,0.1)' : 'transparent',
-                    transition: 'background 0.1s, border-color 0.1s',
-                  }}
-                  onMouseEnter={e => { if (selectedTask?.id !== task.id) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
-                  onMouseLeave={e => { if (selectedTask?.id !== task.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
-                >
-                  {/* Number */}
-                  <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#7a8fa3', width: '18px', flexShrink: 0, textAlign: 'right' }}>
-                    {task.task_number}
-                  </span>
-                  {/* Urgency dot */}
-                  <span style={{ width: '5px', height: '5px', borderRadius: '50%', flexShrink: 0, display: 'inline-block', background: task.priority === 'high' ? '#ff4444' : task.priority === 'low' ? '#22cc6e' : '#3a4a5c' }} />
-                  {/* Task name — truncated, dominant */}
-                  <span style={{ flex: 1, fontSize: '12px', color: '#eef2f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', minWidth: 0 }}>
-                    {task.title || task.description}
-                  </span>
-                  {/* Optional: Requester */}
-                  {visibleCols.requester && (
-                    <span style={{ fontSize: '10px', color: task.reported_by ? '#eef2f7' : 'transparent', flexShrink: 0, width: '90px', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', textAlign: 'right', paddingLeft: '16px' }}>
-                      {task.reported_by ?? '—'}
-                    </span>
-                  )}
-                  {/* Optional: Target date */}
-                  {visibleCols.targetDate && (
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: task.date_due ? '#a8b8c8' : 'transparent', flexShrink: 0, width: '52px', textAlign: 'right', paddingLeft: '16px' }}>
-                      {task.date_due ? formatDate(task.date_due) : '—'}
-                    </span>
-                  )}
-                  {/* Optional: Date submitted */}
-                  {visibleCols.dateSubmitted && (
-                    <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#a8b8c8', flexShrink: 0, width: '60px', textAlign: 'right', paddingLeft: '16px' }}>
-                      {formatDate(task.created_at)}
-                    </span>
-                  )}
-                </div>
-              ))
+              <table style={{ width: '100%', borderCollapse: 'separate', borderSpacing: 0, tableLayout: 'auto', fontFamily: "'DM Sans', sans-serif" }}>
+                <thead>
+                  <tr style={{ position: 'sticky', top: 0, background: 'rgba(15,25,35,0.97)', zIndex: 1 }}>
+                    <th style={{ padding: '4px 4px 3px 16px', textAlign: 'right', whiteSpace: 'nowrap', fontSize: '9px', color: '#a8b8c8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid rgba(168,184,200,0.1)' }} />
+                    <th style={{ padding: '4px 8px 3px 4px', borderBottom: '1px solid rgba(168,184,200,0.1)' }} />
+                    <th style={{ padding: '4px 8px 3px', width: '100%', textAlign: 'left', whiteSpace: 'nowrap', fontSize: '9px', color: '#a8b8c8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid rgba(168,184,200,0.1)' }}>Task</th>
+                    {visibleCols.requester    && <th style={{ padding: '4px 16px 3px', textAlign: 'right', whiteSpace: 'nowrap', fontSize: '9px', color: '#a8b8c8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid rgba(168,184,200,0.1)' }}>Requester</th>}
+                    {visibleCols.targetDate   && <th style={{ padding: '4px 16px 3px', textAlign: 'right', whiteSpace: 'nowrap', fontSize: '9px', color: '#a8b8c8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid rgba(168,184,200,0.1)' }}>Due</th>}
+                    {visibleCols.dateSubmitted && <th style={{ padding: '4px 16px 3px', textAlign: 'right', whiteSpace: 'nowrap', fontSize: '9px', color: '#a8b8c8', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.07em', borderBottom: '1px solid rgba(168,184,200,0.1)' }}>Submitted</th>}
+                  </tr>
+                </thead>
+                <tbody>
+                  {visibleTasks.map(task => (
+                    <tr
+                      key={task.id}
+                      onClick={() => loadTask(task)}
+                      style={{ background: selectedTask?.id === task.id ? 'rgba(79,142,247,0.1)' : 'transparent', cursor: 'pointer', transition: 'background 0.1s' }}
+                      onMouseEnter={e => { if (selectedTask?.id !== task.id) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.03)'; }}
+                      onMouseLeave={e => { if (selectedTask?.id !== task.id) (e.currentTarget as HTMLElement).style.background = 'transparent'; }}
+                    >
+                      <td style={{ padding: '5px 4px 5px 16px', fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#7a8fa3', textAlign: 'right', whiteSpace: 'nowrap', borderLeft: selectedTask?.id === task.id ? '2px solid #4f8ef7' : '2px solid transparent' }}>
+                        {task.task_number}
+                      </td>
+                      <td style={{ padding: '5px 8px 5px 4px' }}>
+                        <span style={{ width: '5px', height: '5px', borderRadius: '50%', display: 'inline-block', background: task.priority === 'high' ? '#ff4444' : task.priority === 'low' ? '#22cc6e' : '#3a4a5c' }} />
+                      </td>
+                      <td style={{ padding: '5px 8px', fontSize: '12px', color: '#eef2f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '0' }}>
+                        {task.title || task.description}
+                      </td>
+                      {visibleCols.requester && (
+                        <td style={{ padding: '5px 16px', fontSize: '10px', color: task.reported_by ? '#eef2f7' : '#3a4a5c', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {task.reported_by ?? '—'}
+                        </td>
+                      )}
+                      {visibleCols.targetDate && (
+                        <td style={{ padding: '5px 16px', fontFamily: "'DM Mono', monospace", fontSize: '10px', color: task.date_due ? '#a8b8c8' : '#3a4a5c', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {task.date_due ? formatDate(task.date_due) : '—'}
+                        </td>
+                      )}
+                      {visibleCols.dateSubmitted && (
+                        <td style={{ padding: '5px 16px', fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#a8b8c8', textAlign: 'right', whiteSpace: 'nowrap' }}>
+                          {formatDate(task.created_at)}
+                        </td>
+                      )}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             )}
           </div>
         </div>
