@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Download, Upload, FileSpreadsheet, CheckCircle, Check, Pencil, Trash2, Plus, X } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Upload, FileSpreadsheet, CheckCircle, Check, Pencil, Trash2, Plus, X, Search, SlidersHorizontal } from 'lucide-react';
 import { formatDate } from '@/lib/formatDate';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -142,6 +142,13 @@ const ALL_FIELDS: FieldDef[] = [
   { key: 'install_date', label: 'Install Date' }, { key: 'warranty_expires', label: 'Warranty Expires' },
   { key: 'notes', label: 'Notes' },
 ];
+const ASK_SUGGESTIONS = [
+  'Who has a ThinkCentre Mini?',
+  'Show all Oakdale computers',
+  'Find unassigned iPads',
+  'Computers older than 2021',
+];
+
 const EMPLOYEE_FIELDS: FieldDef[] = [
   { key: 'first_name', label: 'First Name' }, { key: 'last_name', label: 'Last Name' },
   { key: 'ee_number', label: 'EE #' }, { key: 'email', label: 'Email' },
@@ -510,6 +517,11 @@ function InventoryTab() {
 
   const isEmployee = tableCategory === 'Employees';
 
+  // UI state
+  const [search, setSearch]               = useState('');
+  const [showColPicker, setShowColPicker] = useState(false);
+  const [hoveredRow, setHoveredRow]       = useState<string | number | null>(null);
+
   // Auto-load data on browse mode / category change
   useEffect(() => {
     if (mode !== 'browse') return;
@@ -661,98 +673,123 @@ function InventoryTab() {
   const activeCols = allAvailableFields.filter(f => selectedCols.has(f.key));
   const editCols = ALL_FIELDS.filter(f => selectedCols.has(f.key)); // no extra.* in edit
 
-  return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
+  const filteredRows = tableRows.filter(r =>
+    !search.trim() || activeCols.some(f => cellValue(r, f.key).toLowerCase().includes(search.toLowerCase()))
+  );
+  const filteredEmployees = employeeRows.filter(r =>
+    !search.trim() || EMPLOYEE_FIELDS.some(f => {
+      const v = f.key === 'is_approved_submitter' ? (r.is_approved_submitter ? 'yes approved' : 'no') : String((r as Record<string, unknown>)[f.key] ?? '');
+      return v.toLowerCase().includes(search.toLowerCase());
+    })
+  );
 
-      {/* Mode switcher */}
-      <div style={{ display: 'flex', gap: '8px' }}>
-        {([
-          { id: 'browse' as const, label: 'Browse / Edit', sub: 'View and manage the database' },
-          { id: 'ask'    as const, label: 'Ask a Question', sub: 'Natural language query' },
-        ]).map(opt => (
-          <button
-            key={opt.id} onClick={() => setMode(opt.id)}
-            style={{
-              flex: 1, textAlign: 'left', padding: '12px 16px', borderRadius: '8px', cursor: 'pointer',
-              border: mode === opt.id ? '1.5px solid #4f8ef7' : '1px solid rgba(168,184,200,0.15)',
-              background: mode === opt.id ? 'rgba(79,142,247,0.08)' : 'rgba(255,255,255,0.02)',
-              fontFamily: "'DM Sans', sans-serif",
-            }}
-          >
-            <div style={{ fontSize: '13px', fontWeight: 600, color: mode === opt.id ? '#4f8ef7' : '#eef2f7', marginBottom: '2px' }}>
-              {opt.label}
-            </div>
-            <div style={{ fontSize: '11px', color: '#a8b8c8' }}>{opt.sub}</div>
-          </button>
-        ))}
+  const rowCount = isEmployee ? employeeRows.length : tableRows.length;
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column' }}>
+
+      {/* ── Hero mode switcher ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', borderRadius: '12px 12px 0 0', overflow: 'hidden', border: '1px solid rgba(168,184,200,0.1)', borderBottom: 'none' }}>
+        <button onClick={() => setMode('browse')} style={{
+          padding: '20px 24px', border: 'none', borderRight: '1px solid rgba(168,184,200,0.1)', cursor: 'pointer', textAlign: 'left',
+          background: mode === 'browse' ? '#1c2635' : 'rgba(20,28,44,0.6)', fontFamily: "'DM Sans', sans-serif",
+          transition: 'background 0.15s',
+        }}>
+          <div style={{ fontSize: '15px', fontWeight: 700, color: mode === 'browse' ? '#eef2f7' : '#4a5a6b', marginBottom: '4px' }}>Browse / Edit</div>
+          <div style={{ fontSize: '11px', color: mode === 'browse' ? '#7a8fa8' : '#2e3e50' }}>View and manage your inventory</div>
+        </button>
+        <button onClick={() => setMode('ask')} style={{
+          padding: '20px 24px', border: 'none', cursor: 'pointer', textAlign: 'left',
+          background: mode === 'ask' ? '#091828' : 'rgba(9,18,36,0.6)', fontFamily: "'DM Sans', sans-serif",
+          transition: 'background 0.15s',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
+            <span style={{ fontSize: '15px', fontWeight: 700, color: mode === 'ask' ? '#eef2f7' : '#4a5a6b' }}>Ask the AI</span>
+            <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#4f8ef7,#7c5cf7)', color: '#fff', padding: '2px 7px', borderRadius: '4px' }}>AI</span>
+          </div>
+          <div style={{ fontSize: '11px', color: mode === 'ask' ? '#3a6090' : '#2e3e50' }}>Natural language inventory search</div>
+        </button>
       </div>
 
       {/* ── Browse mode ── */}
       {mode === 'browse' && (
-        <div style={CARD}>
-          {/* Header: table selector + action buttons */}
-          <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
-            <div>
-              <div style={SECTION_LABEL}>Table</div>
-              <select style={SELECT} value={tableCategory} onChange={e => {
-                setTableCategory(e.target.value); setTableRows([]); setExtraFields([]);
-                setShowMoreCols(false); setEmployeeRows([]); setEditingAssetId(null);
-                setAddingAsset(false); setEditingEmployeeId(null); setAddingEmployee(false);
-              }}>
-                {ASSET_CATEGORIES.map(c => <option key={c} style={{ background: '#1a2535' }}>{c}</option>)}
-                <option value="Employees" style={{ background: '#1a2535' }}>Employees</option>
-              </select>
+        <div style={{ background: '#1c2635', borderRadius: '0 0 12px 12px', border: '1px solid rgba(168,184,200,0.1)', borderTop: 'none' }}>
+
+          {/* Toolbar */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '12px 16px', borderBottom: '1px solid rgba(168,184,200,0.08)', flexWrap: 'wrap' }}>
+            <select style={{ ...SELECT, background: 'rgba(0,0,0,0.25)' }} value={tableCategory} onChange={e => {
+              setTableCategory(e.target.value); setTableRows([]); setExtraFields([]);
+              setShowMoreCols(false); setEmployeeRows([]); setEditingAssetId(null);
+              setAddingAsset(false); setEditingEmployeeId(null); setAddingEmployee(false);
+              setSearch('');
+            }}>
+              {ASSET_CATEGORIES.map(c => <option key={c} style={{ background: '#1a2535' }}>{c}</option>)}
+              <option value="Employees" style={{ background: '#1a2535' }}>Employees</option>
+            </select>
+
+            {/* Search */}
+            <div style={{ flex: 1, minWidth: '160px', position: 'relative' }}>
+              <div style={{ position: 'absolute', left: '9px', top: '50%', transform: 'translateY(-50%)', pointerEvents: 'none', display: 'flex' }}>
+                <Search size={12} color="#4a5a6b" />
+              </div>
+              <input
+                style={{ ...INPUT, paddingLeft: '28px', background: 'rgba(0,0,0,0.25)', border: '1px solid rgba(168,184,200,0.12)', fontSize: '12px', padding: '6px 10px 6px 28px' }}
+                placeholder={`Search ${isEmployee ? 'employees' : tableCategory.toLowerCase()}…`}
+                value={search} onChange={e => setSearch(e.target.value)}
+              />
             </div>
 
+            {/* Add */}
+            <button style={BTN_PRIMARY} onClick={isEmployee
+              ? () => { setAddingEmployee(true); setNewEmployeeDraft({ site: 'Holden', is_approved_submitter: 'false' }); }
+              : () => { setAddingAsset(true); setNewAssetDraft({}); }
+            }>
+              <Plus size={13} /> Add
+            </button>
+
+            {/* Download (assets only) */}
+            {!isEmployee && tableRows.length > 0 && (
+              <button style={{ ...BTN_GHOST, padding: '6px 10px' }} onClick={downloadExcel} title="Download Excel">
+                <Download size={14} />
+              </button>
+            )}
+
+            {/* Column picker toggle (assets only) */}
             {!isEmployee && (
-              <button style={{ ...BTN_PRIMARY, marginTop: '16px' }} onClick={() => { setAddingAsset(true); setNewAssetDraft({}); }}>
-                <Plus size={13} /> Add Row
+              <button
+                style={{ ...BTN_GHOST, padding: '6px 10px', background: showColPicker ? 'rgba(79,142,247,0.15)' : undefined, color: showColPicker ? '#4f8ef7' : undefined }}
+                onClick={() => setShowColPicker(v => !v)} title="Configure columns"
+              >
+                <SlidersHorizontal size={14} />
               </button>
             )}
-            {isEmployee && (
-              <button style={{ ...BTN_PRIMARY, marginTop: '16px' }} onClick={() => { setAddingEmployee(true); setNewEmployeeDraft({ site: 'Holden', is_approved_submitter: 'false' }); }}>
-                <Plus size={13} /> Add
-              </button>
-            )}
-            {!isEmployee && tableRows.length > 0 && (
-              <button style={{ ...BTN_GHOST, marginTop: '16px' }} onClick={downloadExcel}>
-                <Download size={13} /> Download Excel
-              </button>
-            )}
-            {!isEmployee && tableRows.length > 0 && (
-              <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8', fontFamily: "'DM Mono', monospace" }}>
-                {tableRows.length} record{tableRows.length !== 1 ? 's' : ''}
-              </span>
-            )}
-            {isEmployee && employeeRows.length > 0 && (
-              <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8', fontFamily: "'DM Mono', monospace" }}>
-                {employeeRows.length} record{employeeRows.length !== 1 ? 's' : ''}
-              </span>
-            )}
-            {(tableLoading || employeeLoading) && <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8' }}>Loading…</span>}
+
+            <span style={{ fontSize: '11px', color: '#3a4a5c', fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap' }}>
+              {rowCount} row{rowCount !== 1 ? 's' : ''}
+            </span>
+            {(tableLoading || employeeLoading) && <span style={{ fontSize: '11px', color: '#4a5a6b' }}>Loading…</span>}
           </div>
 
-          {/* Column picker — asset categories only */}
-          {!isEmployee && (
-            <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '6px', padding: '12px', marginBottom: '14px', border: '1px solid rgba(168,184,200,0.08)' }}>
-              <p style={{ ...SECTION_LABEL, marginBottom: '10px' }}>Columns</p>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, max-content)', rowGap: '6px', columnGap: '60px' }}>
+          {/* Column picker — hidden by default, toggled by sliders icon */}
+          {!isEmployee && showColPicker && (
+            <div style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(168,184,200,0.08)', padding: '12px 16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px 20px' }}>
                 {primaryFields.map(f => (
-                  <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
+                  <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
                     <input type="checkbox" checked={selectedCols.has(f.key)} onChange={e => toggleCol(f.key, e.target.checked)} style={{ cursor: 'pointer', accentColor: '#4f8ef7' }} />
                     {f.label}
                   </label>
                 ))}
                 {needsMore && (
-                  <button onClick={() => setShowMoreCols(v => !v)} style={{ ...BTN_GHOST, fontSize: '11px', padding: '3px 10px' }}>
+                  <button onClick={() => setShowMoreCols(v => !v)} style={{ ...BTN_GHOST, fontSize: '11px', padding: '3px 10px', alignSelf: 'center' }}>
                     {showMoreCols ? '− Less' : '+ More'}
                   </button>
                 )}
               </div>
               {showMoreCols && moreFields.length > 0 && (
-                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(168,184,200,0.08)', display: 'grid', gridTemplateColumns: 'repeat(4, max-content)', rowGap: '6px', columnGap: '60px' }}>
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(168,184,200,0.08)', display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(130px, 1fr))', gap: '6px 20px' }}>
                   {moreFields.map(f => (
-                    <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
+                    <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '6px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
                       <input type="checkbox" checked={selectedCols.has(f.key)} onChange={e => toggleCol(f.key, e.target.checked)} style={{ cursor: 'pointer', accentColor: '#4f8ef7' }} />
                       {f.label}
                     </label>
@@ -765,26 +802,21 @@ function InventoryTab() {
           {/* ── Asset table ── */}
           {!isEmployee && (
             <>
-              {(tableRows.length > 0 || addingAsset) && activeCols.length > 0 && (
+              {(filteredRows.length > 0 || addingAsset) && activeCols.length > 0 && (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
+                      <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.1)' }}>
                         {activeCols.map(f => <th key={f.key} style={TH}>{f.label}</th>)}
-                        <th style={{ ...TH, width: '60px' }}></th>
+                        <th style={{ ...TH, width: '72px' }}></th>
                       </tr>
                     </thead>
                     <tbody>
                       {addingAsset && (
-                        <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.08)', background: 'rgba(79,142,247,0.04)' }}>
+                        <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.08)', background: 'rgba(79,142,247,0.05)' }}>
                           {activeCols.map(f => (
                             <td key={f.key} style={TD}>
-                              <input
-                                style={CELL_INPUT}
-                                value={newAssetDraft[f.key] ?? ''}
-                                onChange={e => setNewAssetDraft(d => ({ ...d, [f.key]: e.target.value }))}
-                                placeholder={f.label}
-                              />
+                              <input style={CELL_INPUT} value={newAssetDraft[f.key] ?? ''} onChange={e => setNewAssetDraft(d => ({ ...d, [f.key]: e.target.value }))} placeholder={f.label} />
                             </td>
                           ))}
                           <td style={TD}>
@@ -795,47 +827,59 @@ function InventoryTab() {
                           </td>
                         </tr>
                       )}
-                      {tableRows.map((r, i) => (
-                        <tr key={r.id ?? i} style={{ borderBottom: '1px solid rgba(168,184,200,0.06)' }}>
-                          {editingAssetId === r.id ? (
-                            <>
-                              {activeCols.map(f => (
-                                <td key={f.key} style={TD}>
-                                  {f.key.startsWith('extra.')
-                                    ? <span style={{ color: '#a8b8c8', fontSize: '12px', padding: '4px 8px', display: 'block' }}>{cellValue(r, f.key) || '—'}</span>
-                                    : <input style={CELL_INPUT} value={assetDraft[f.key] ?? ''} onChange={e => setAssetDraft(d => ({ ...d, [f.key]: e.target.value }))} />
-                                  }
+                      {filteredRows.map((r, i) => {
+                        const rowKey = r.id ?? i;
+                        const isHovered = hoveredRow === rowKey;
+                        const isEditing = editingAssetId === r.id;
+                        return (
+                          <tr key={rowKey}
+                            onMouseEnter={() => setHoveredRow(rowKey)}
+                            onMouseLeave={() => setHoveredRow(null)}
+                            style={{ borderBottom: '1px solid rgba(168,184,200,0.05)', background: isHovered && !isEditing ? 'rgba(255,255,255,0.02)' : isEditing ? 'rgba(79,142,247,0.04)' : 'transparent', transition: 'background 0.1s' }}
+                          >
+                            {isEditing ? (
+                              <>
+                                {activeCols.map(f => (
+                                  <td key={f.key} style={TD}>
+                                    {f.key.startsWith('extra.')
+                                      ? <span style={{ color: '#a8b8c8', fontSize: '12px', padding: '4px 8px', display: 'block' }}>{cellValue(r, f.key) || '—'}</span>
+                                      : <input style={CELL_INPUT} value={assetDraft[f.key] ?? ''} onChange={e => setAssetDraft(d => ({ ...d, [f.key]: e.target.value }))} />
+                                    }
+                                  </td>
+                                ))}
+                                <td style={TD}>
+                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                    <button style={BTN_ICON_GREEN} onClick={saveEditedAsset} disabled={assetSaving} title="Save"><Check size={13} /></button>
+                                    <button style={BTN_ICON} onClick={() => { setEditingAssetId(null); setAssetDraft({}); }} title="Cancel"><X size={13} /></button>
+                                  </div>
                                 </td>
-                              ))}
-                              <td style={TD}>
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                  <button style={BTN_ICON_GREEN} onClick={saveEditedAsset} disabled={assetSaving} title="Save"><Check size={13} /></button>
-                                  <button style={BTN_ICON} onClick={() => { setEditingAssetId(null); setAssetDraft({}); }} title="Cancel"><X size={13} /></button>
-                                </div>
-                              </td>
-                            </>
-                          ) : (
-                            <>
-                              {activeCols.map(f => f.key === 'name'
-                                ? <td key={f.key} style={{ ...TD, maxWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
-                                : <td key={f.key} style={{ ...TD, whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
-                              )}
-                              <td style={TD}>
-                                <div style={{ display: 'flex', gap: '4px' }}>
-                                  {r.id && <button style={BTN_ICON} onClick={() => { setEditingAssetId(r.id!); setAssetDraft(Object.fromEntries(editCols.map(f => [f.key, cellValue(r, f.key)]))); }} title="Edit"><Pencil size={11} /></button>}
-                                  {r.id && <button style={{ ...BTN_ICON, color: '#e05c5c' }} onClick={() => deleteAsset(r.id!)} title="Delete"><Trash2 size={11} /></button>}
-                                </div>
-                              </td>
-                            </>
-                          )}
-                        </tr>
-                      ))}
+                              </>
+                            ) : (
+                              <>
+                                {activeCols.map(f => f.key === 'name'
+                                  ? <td key={f.key} style={{ ...TD, maxWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
+                                  : <td key={f.key} style={{ ...TD, whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
+                                )}
+                                <td style={{ ...TD, opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s' }}>
+                                  <div style={{ display: 'flex', gap: '4px' }}>
+                                    {r.id && <button style={BTN_ICON} onClick={() => { setEditingAssetId(r.id!); setAssetDraft(Object.fromEntries(editCols.map(f => [f.key, cellValue(r, f.key)]))); }} title="Edit"><Pencil size={11} /></button>}
+                                    {r.id && <button style={{ ...BTN_ICON, color: '#e05c5c' }} onClick={() => deleteAsset(r.id!)} title="Remove"><Trash2 size={11} /></button>}
+                                  </div>
+                                </td>
+                              </>
+                            )}
+                          </tr>
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
               {!tableLoading && tableRows.length === 0 && !addingAsset && (
-                <p style={{ fontSize: '12px', color: '#4a5a6b', textAlign: 'center', padding: '32px 0' }}>No {tableCategory} records found.</p>
+                <p style={{ fontSize: '12px', color: '#3a4a5c', textAlign: 'center', padding: '40px 0' }}>No {tableCategory} records found.</p>
+              )}
+              {tableRows.length > 0 && filteredRows.length === 0 && (
+                <p style={{ fontSize: '12px', color: '#3a4a5c', textAlign: 'center', padding: '40px 0' }}>No results for &quot;{search}&quot;</p>
               )}
             </>
           )}
@@ -843,11 +887,11 @@ function InventoryTab() {
           {/* ── Employees table ── */}
           {isEmployee && (
             <>
-              {(employeeRows.length > 0 || addingEmployee) && (
+              {(filteredEmployees.length > 0 || addingEmployee) && (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
                     <thead>
-                      <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
+                      <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.1)' }}>
                         {EMPLOYEE_FIELDS.map(f => <th key={f.key} style={TH}>{f.label}</th>)}
                         <th style={{ ...TH, width: '60px' }}></th>
                       </tr>
@@ -878,9 +922,16 @@ function InventoryTab() {
                           </td>
                         </tr>
                       )}
-                      {employeeRows.map(r => (
-                        <tr key={r.id} style={{ borderBottom: '1px solid rgba(168,184,200,0.06)' }}>
-                          {editingEmployeeId === r.id ? (
+                      {filteredEmployees.map(r => {
+                        const isHovered = hoveredRow === r.id;
+                        const isEditing = editingEmployeeId === r.id;
+                        return (
+                        <tr key={r.id}
+                          onMouseEnter={() => setHoveredRow(r.id)}
+                          onMouseLeave={() => setHoveredRow(null)}
+                          style={{ borderBottom: '1px solid rgba(168,184,200,0.05)', background: isHovered && !isEditing ? 'rgba(255,255,255,0.02)' : isEditing ? 'rgba(79,142,247,0.04)' : 'transparent', transition: 'background 0.1s' }}
+                        >
+                          {isEditing ? (
                             <>
                               <td style={TD}><input style={CELL_INPUT} value={employeeDraft.first_name ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, first_name: e.target.value }))} /></td>
                               <td style={TD}><input style={CELL_INPUT} value={employeeDraft.last_name ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, last_name: e.target.value }))} /></td>
@@ -915,37 +966,66 @@ function InventoryTab() {
                               <td style={{ ...TD, color: '#a8b8c8', whiteSpace: 'nowrap', textAlign: 'right' }}>{r.hours_per_week ?? '—'}</td>
                               <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{r.shift || '—'}</td>
                               <td style={{ ...TD, textAlign: 'center', color: r.is_approved_submitter ? '#22cc6e' : '#4a5a6b' }}>{r.is_approved_submitter ? '✓' : '—'}</td>
-                              <td style={TD}>
+                              <td style={{ ...TD, opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s' }}>
                                 <div style={{ display: 'flex', gap: '4px' }}>
                                   <button style={BTN_ICON} onClick={() => { setEditingEmployeeId(r.id); setEmployeeDraft({ first_name: r.first_name, last_name: r.last_name, ee_number: r.ee_number ?? '', email: r.email, site: r.site, position: r.position ?? '', hours_per_week: r.hours_per_week != null ? String(r.hours_per_week) : '', shift: r.shift ?? '', is_approved_submitter: r.is_approved_submitter ? 'true' : 'false' }); }} title="Edit"><Pencil size={11} /></button>
-                                  <button style={{ ...BTN_ICON, color: '#e05c5c' }} onClick={() => deleteEmployee(r.id)} title="Delete"><Trash2 size={11} /></button>
+                                  <button style={{ ...BTN_ICON, color: '#e05c5c' }} onClick={() => deleteEmployee(r.id)} title="Remove"><Trash2 size={11} /></button>
                                 </div>
                               </td>
                             </>
                           )}
                         </tr>
-                      ))}
+                        );
+                      })}
                     </tbody>
                   </table>
                 </div>
               )}
               {!employeeLoading && employeeRows.length === 0 && !addingEmployee && (
-                <p style={{ fontSize: '12px', color: '#4a5a6b', textAlign: 'center', padding: '32px 0' }}>No employees yet. Click &quot;+ Add&quot; to add one.</p>
+                <p style={{ fontSize: '12px', color: '#3a4a5c', textAlign: 'center', padding: '40px 0' }}>No employees yet. Click &quot;+ Add&quot; to add one.</p>
+              )}
+              {employeeRows.length > 0 && filteredEmployees.length === 0 && (
+                <p style={{ fontSize: '12px', color: '#3a4a5c', textAlign: 'center', padding: '40px 0' }}>No results for &quot;{search}&quot;</p>
               )}
             </>
           )}
         </div>
       )}
 
-      {/* ── Ask mode ── */}
+      {/* ── Ask AI mode ── */}
       {mode === 'ask' && (
-        <div style={CARD}>
-          <p style={{ fontSize: '12px', color: '#a8b8c8', marginBottom: '14px' }}>
-            Ask a question in plain English — IT Buddy will query the inventory database and show you the results.
-          </p>
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
+        <div style={{ background: '#091828', borderRadius: '0 0 12px 12px', border: '1px solid rgba(168,184,200,0.1)', borderTop: 'none' }}>
+
+          {/* Hero */}
+          <div style={{ padding: '32px 28px 20px' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', marginBottom: '8px' }}>
+              <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#eef2f7', margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+                Ask your inventory anything
+              </h2>
+              <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#4f8ef7,#7c5cf7)', color: '#fff', padding: '2px 7px', borderRadius: '4px' }}>AI</span>
+            </div>
+            <p style={{ fontSize: '13px', color: '#3a6090', margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
+              Ask in plain English — IT Buddy queries the database and shows the results instantly.
+            </p>
+          </div>
+
+          {/* Suggestion chips */}
+          <div style={{ padding: '0 28px 20px', display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+            {ASK_SUGGESTIONS.map(s => (
+              <button key={s} onClick={() => setQuestion(s)} style={{
+                padding: '6px 14px', background: 'rgba(79,142,247,0.08)', color: '#4f8ef7',
+                border: '1px solid rgba(79,142,247,0.18)', borderRadius: '20px', cursor: 'pointer',
+                fontSize: '12px', fontFamily: "'DM Sans', sans-serif", transition: 'background 0.15s',
+              }}>
+                {s}
+              </button>
+            ))}
+          </div>
+
+          {/* Input */}
+          <div style={{ padding: '0 28px 24px', display: 'flex', gap: '8px' }}>
             <input
-              style={{ ...INPUT, flex: 1 }}
+              style={{ ...INPUT, flex: 1, background: 'rgba(79,142,247,0.05)', border: '1px solid rgba(79,142,247,0.18)', fontSize: '13px', padding: '11px 14px' }}
               placeholder='e.g. "Show me all the people with a ThinkCentre Mini"'
               value={question} onChange={e => setQuestion(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && handleQuery()}
@@ -954,32 +1034,47 @@ function InventoryTab() {
               if (listening) { stopVoice(); return; }
               try { recRef.current = startVoiceRec(t => setQuestion(t), () => setListening(false)); setListening(true); } catch { setListening(false); }
             }} />
-            <button style={{ ...BTN_PRIMARY, opacity: loading ? 0.7 : 1 }} onClick={handleQuery} disabled={loading}>
+            <button style={{ ...BTN_PRIMARY, padding: '10px 22px', opacity: loading ? 0.7 : 1 }} onClick={handleQuery} disabled={loading}>
               {loading ? <span className="spinner spinner-sm" /> : 'Ask'}
             </button>
           </div>
+
+          {/* SQL toggle */}
           {sql && (
-            <div style={{ marginBottom: '10px' }}>
-              <button style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#4a5a6b', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }} onClick={() => setShowSql(v => !v)}>
+            <div style={{ padding: '0 28px 12px' }}>
+              <button style={{ display: 'flex', alignItems: 'center', gap: '4px', fontSize: '11px', color: '#2a4a6b', background: 'none', border: 'none', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif" }} onClick={() => setShowSql(v => !v)}>
                 {showSql ? <ChevronUp size={12} /> : <ChevronDown size={12} />}{showSql ? 'Hide' : 'Show'} generated query
               </button>
-              {showSql && <pre style={{ marginTop: '6px', fontSize: '11px', background: 'rgba(0,0,0,0.2)', borderRadius: '5px', padding: '10px', overflowX: 'auto', color: '#a8b8c8', fontFamily: "'DM Mono', monospace", whiteSpace: 'pre-wrap' }}>{sql}</pre>}
+              {showSql && <pre style={{ marginTop: '6px', fontSize: '11px', background: 'rgba(0,0,0,0.3)', borderRadius: '5px', padding: '10px', overflowX: 'auto', color: '#4a7aaa', fontFamily: "'DM Mono', monospace", whiteSpace: 'pre-wrap' }}>{sql}</pre>}
             </div>
           )}
-          {message && <p style={{ fontSize: '12px', color: '#a8b8c8', textAlign: 'center', padding: '12px 0' }}>{message}</p>}
+
+          {/* Message */}
+          {message && <p style={{ fontSize: '12px', color: '#3a6090', textAlign: 'center', padding: '12px 28px' }}>{message}</p>}
+
+          {/* Results */}
           {results.length > 0 && (
-            <div style={{ overflowX: 'auto' }} data-theme="light">
-              <table className="table table-sm w-full" style={{ fontSize: '12px' }}>
-                <thead><tr><th>Name / Location</th><th>Category</th><th>Make / Model</th><th>OS</th><th>Site</th><th>Purchased</th></tr></thead>
+            <div style={{ padding: '0 28px 28px', overflowX: 'auto' }}>
+              <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
+                <thead>
+                  <tr style={{ borderBottom: '1px solid rgba(79,142,247,0.15)' }}>
+                    {['Name / Location', 'Category', 'Make / Model', 'OS', 'Site', 'Purchased'].map(h => (
+                      <th key={h} style={{ ...TH, color: '#3a6090' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
                 <tbody>
                   {results.map((r, i) => (
-                    <tr key={r.id ?? i} className="hover">
-                      <td><p className="font-medium text-sm">{r.assigned_to ?? r.name ?? '—'}</p>{r.assigned_to && r.name && <p className="text-xs text-base-content/50">{r.name}</p>}</td>
-                      <td className="text-xs text-base-content/50">{r.category ?? '—'}</td>
-                      <td className="text-sm">{[r.make, r.model].filter(Boolean).join(' ')}{r.ram && <span className="text-xs text-base-content/50 ml-1">· {r.ram}</span>}</td>
-                      <td className="text-sm">{r.os ?? '—'}</td>
-                      <td className="text-sm">{r.site ?? '—'}</td>
-                      <td className="text-sm text-base-content/60">{formatDate(r.purchased)}</td>
+                    <tr key={r.id ?? i} style={{ borderBottom: '1px solid rgba(79,142,247,0.06)' }}>
+                      <td style={{ ...TD, color: '#eef2f7' }}>
+                        <div>{r.assigned_to ?? r.name ?? '—'}</div>
+                        {r.assigned_to && r.name && <div style={{ fontSize: '11px', color: '#4a6a8a' }}>{r.name}</div>}
+                      </td>
+                      <td style={{ ...TD, color: '#4a6a8a', whiteSpace: 'nowrap' }}>{r.category ?? '—'}</td>
+                      <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{[r.make, r.model].filter(Boolean).join(' ') || '—'}{r.ram && <span style={{ color: '#4a6a8a', marginLeft: '4px' }}>· {r.ram}</span>}</td>
+                      <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{r.os ?? '—'}</td>
+                      <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{r.site ?? '—'}</td>
+                      <td style={{ ...TD, color: '#4a6a8a', whiteSpace: 'nowrap' }}>{formatDate(r.purchased) ?? '—'}</td>
                     </tr>
                   ))}
                 </tbody>
