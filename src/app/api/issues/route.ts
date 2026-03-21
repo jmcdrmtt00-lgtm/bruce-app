@@ -24,10 +24,18 @@ export async function GET(request: NextRequest) {
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
-  if (source === 'ticket') {
-    query = query.eq('source', 'ticket');
-  } else if (source === 'issue') {
-    query = query.neq('source', 'ticket');
+  if (source === 'dashboard') {
+    // IT's work queue: tasks created by IT or submitted by nurses with adequate info
+    // Include legacy sources (null, 'issue') for backward compatibility
+    query = query.or(
+      "source.eq.submitted by IT,source.eq.submitted by nurse adequate info,source.eq.issue,source.is.null"
+    );
+  } else if (source === 'tickets') {
+    // Nurse-submitted tickets: needs more info (email route) or fixed by nurse
+    // Include legacy sources ('ticket', 'nurse_self_fix') for backward compatibility
+    query = query.or(
+      "source.eq.submitted by nurse needs more info,source.eq.submitted by nurse fixed by nurse,source.eq.ticket,source.eq.nurse_self_fix"
+    );
   }
 
   const { data, error } = await query;
@@ -74,7 +82,7 @@ export async function POST(request: NextRequest) {
       screen: screen || null,
       status: status || 'pending',
       date_due: date_due || null,
-      source: source || 'issue',
+      source: source || 'submitted by IT',
     })
     .select('*')
     .single();

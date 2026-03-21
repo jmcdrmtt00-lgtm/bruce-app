@@ -129,7 +129,7 @@ export default function TicketsPage() {
   }
 
   const loadTickets = useCallback(() => {
-    fetch('/api/issues?source=ticket')
+    fetch('/api/issues?source=tickets')
       .then(r => r.json())
       .then(data => setTickets(data.incidents ?? []))
       .catch(() => {});

@@ -205,7 +205,7 @@ export default function DashboardPage() {
   const newDetailsRecRef = useRef<unknown>(null);
 
   const loadTasks = useCallback(() => {
-    fetch('/api/issues')
+    fetch('/api/issues?source=dashboard')
       .then(r => r.json())
       .then(data => { setTasks((data.incidents ?? []).filter((i: Incident) => i.task_number != null)); setLoading(false); })
       .catch(() => setLoading(false));
@@ -591,7 +591,7 @@ export default function DashboardPage() {
       const res = await fetch('/api/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTaskName.trim(), status: 'pending', reported_by: newTaskRequester.trim() || null, priority: newTaskPriority || null, description: newTaskDetails.trim() || newTaskName.trim(), screen: newTaskType || null }),
+        body: JSON.stringify({ title: newTaskName.trim(), status: 'pending', reported_by: newTaskRequester.trim() || null, priority: newTaskPriority || null, description: newTaskDetails.trim() || newTaskName.trim(), screen: newTaskType || null, source: 'submitted by IT' }),
       });
       if (res.ok) {
         const data = await res.json();

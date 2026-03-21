@@ -217,7 +217,7 @@ export default function MaybeByMyselfPage() {
       if (user) {
         await supabase.from('incidents').insert({
           user_id: user.id, title: subject.trim(), description: problem.trim(),
-          status: 'resolved', screen: 'problem_to_fix', source: 'nurse_self_fix',
+          status: 'resolved', screen: 'problem_to_fix', source: 'submitted by nurse fixed by nurse',
         });
       }
     } catch { /* silent */ }
