@@ -114,7 +114,7 @@ export default function DashboardPage() {
   const [seeding, setSeeding] = useState(false);
 
   // Left panel view
-  const [activeView, setActiveView]   = useState<'open' | 'needs_info' | 'completed'>('open');
+  const [activeView, setActiveView]   = useState<'open' | 'completed'>('open');
   const [filterPriority, setFilterPriority] = useState('');
   const [visibleCols, setVisibleCols] = useState({ requester: true, dateSubmitted: false, targetDate: true });
   const [colsLoaded, setColsLoaded]   = useState(false);
@@ -261,14 +261,9 @@ export default function DashboardPage() {
 
   const openTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'open')
+      .filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'open' || t.status === 'needs_info')
       .sort((a, b) => a.task_number - b.task_number);
   }, [tasks]);
-
-  const needsInfoTasks = useMemo(
-    () => tasks.filter(t => t.status === 'needs_info').sort((a, b) => a.task_number - b.task_number),
-    [tasks]
-  );
 
   const completedTasks = useMemo(() => {
     let filtered = tasks.filter(t => t.status === 'resolved');
@@ -278,9 +273,8 @@ export default function DashboardPage() {
 
   const visibleTasks = useMemo(() => {
     if (activeView === 'open') return openTasks;
-    if (activeView === 'needs_info') return needsInfoTasks;
     return completedTasks;
-  }, [activeView, openTasks, needsInfoTasks, completedTasks]);
+  }, [activeView, openTasks, completedTasks]);
 
   // CSS grid template: task name is content-sized (or fills all space when 0 optional cols);
   // each optional col is preceded by a minmax(4px,1fr) spacer — spacers share remaining space
@@ -317,6 +311,10 @@ export default function DashboardPage() {
     panelDirtyRef.current = false;
     savedInfoReqRef.current = ''; savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
+
+  // Deselect task when the user switches tabs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (selectedTask) resetPanel(); }, [activeView]);
 
   function loadTask(task: Incident) {
     setTaskNumber(String(task.task_number));
@@ -735,7 +733,7 @@ export default function DashboardPage() {
         >
           {/* View tabs */}
           <div style={{ display: 'flex', padding: '10px 16px 0', gap: '2px' }}>
-            {(['open', 'needs_info', 'completed'] as const).map(view => (
+            {(['open', 'completed'] as const).map(view => (
               <button
                 key={view}
                 onClick={() => setActiveView(view)}
@@ -750,7 +748,7 @@ export default function DashboardPage() {
                   transition: 'color 0.15s, border-color 0.15s',
                 }}
               >
-                {view === 'open' ? 'Open' : view === 'needs_info' ? 'Needs info' : 'Completed'}
+                {view === 'open' ? 'Open' : 'Completed'}
               </button>
             ))}
           </div>

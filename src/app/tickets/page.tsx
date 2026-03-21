@@ -243,6 +243,10 @@ export default function TicketsPage() {
     savedInfoDoneRef.current = ''; savedIssuesRef.current = ''; savedDetailsRef.current = '';
   }
 
+  // Deselect task when the user switches tabs
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (selectedTask) resetPanel(); }, [activeView]);
+
   function loadTask(task: Incident) {
     setTaskNumber(String(task.task_number));
     setTaskName(task.title || task.description);
