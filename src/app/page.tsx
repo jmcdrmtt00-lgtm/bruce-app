@@ -93,7 +93,7 @@ function VoiceButton({ listening, onToggle }: { listening: boolean; onToggle: ()
       style={{
         background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
         borderRadius: '4px', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
-        color: listening ? '#22cc6e' : '#3a4a5c',
+        color: listening ? '#22cc6e' : '#a8b8c8',
         filter: listening ? 'drop-shadow(0 0 5px rgba(34,204,110,0.7))' : 'none',
         animation: listening ? 'micPulse 1.4s ease-in-out infinite' : 'none',
       }}
@@ -924,30 +924,30 @@ export default function DashboardPage() {
 
             {/* ── Header strip ─────────────────────────────────────────── */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 20px 10px', borderBottom: '1px solid rgba(168,184,200,0.15)', flexShrink: 0, minHeight: '46px' }}>
-              {/* Task number — only shown when a task is loaded */}
-              {taskNumber && (
-                <span style={{ fontFamily: "'DM Mono', monospace", fontSize: '11px', color: '#7a8fa3', flexShrink: 0 }}>
-                  #{taskNumber}
-                </span>
-              )}
-              {/* Task name — always visible; placeholder when nothing selected */}
-              <input
-                value={taskName}
-                onChange={e => { setTaskName(e.target.value); markDirty(); }}
-                readOnly={!selectedTask}
-                placeholder={selectedTask ? '' : 'Select a task from the list →'}
-                className="rp-task-input"
-                style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
-              />
-              {/* Mic for task name */}
-              <VoiceButton
-                listening={listeningName}
-                onToggle={() => listeningName
-                  ? stopVoice(nameRecRef, setListeningName)
-                  : startVoice(wrapVoiceResult(t => { setTaskName(t); markDirty(); }, () => setTaskName('')), setListeningName, nameRecRef, false)
-                }
-              />
-              {/* Actions — faded when no task selected */}
+              {/* Left group: task number + task name + mic — fills available space */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
+                {taskNumber && (
+                  <span style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
+                    #{taskNumber}
+                  </span>
+                )}
+                <input
+                  value={taskName}
+                  onChange={e => { setTaskName(e.target.value); markDirty(); }}
+                  readOnly={!selectedTask}
+                  placeholder={selectedTask ? '' : 'Select a task from the list →'}
+                  className="rp-task-input"
+                  style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
+                />
+                <VoiceButton
+                  listening={listeningName}
+                  onToggle={() => listeningName
+                    ? stopVoice(nameRecRef, setListeningName)
+                    : startVoice(wrapVoiceResult(t => { setTaskName(t); markDirty(); }, () => setTaskName('')), setListeningName, nameRecRef, false)
+                  }
+                />
+              </div>
+              {/* Right: save indicator + history + deselect — faded when no task */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, opacity: selectedTask ? 1 : 0.25, pointerEvents: selectedTask ? 'auto' : 'none', transition: 'opacity 0.15s' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {saveStatus === 'saving' && <span style={{ fontSize: '10px', color: '#a8b8c8' }}>Saving…</span>}
