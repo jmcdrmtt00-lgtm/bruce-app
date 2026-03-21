@@ -678,7 +678,7 @@ function InventoryTab() {
   );
   const filteredEmployees = employeeRows.filter(r =>
     !search.trim() || EMPLOYEE_FIELDS.some(f => {
-      const v = f.key === 'is_approved_submitter' ? (r.is_approved_submitter ? 'yes approved' : 'no') : String((r as Record<string, unknown>)[f.key] ?? '');
+      const v = f.key === 'is_approved_submitter' ? (r.is_approved_submitter ? 'yes approved' : 'no') : String((r as unknown as Record<string, unknown>)[f.key] ?? '');
       return v.toLowerCase().includes(search.toLowerCase());
     })
   );
