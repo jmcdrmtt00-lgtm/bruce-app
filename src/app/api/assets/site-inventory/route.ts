@@ -12,6 +12,9 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const orgId = request.headers.get('x-org-id');
+  if (!orgId) return NextResponse.json({ assets: [] });
+
   const { searchParams } = new URL(request.url);
   const site     = searchParams.get('site')     || '';
   const category = searchParams.get('category') || '';
@@ -20,7 +23,7 @@ export async function GET(request: NextRequest) {
   const { data, error } = await supabase
     .from('assets')
     .select('id, asset_number, name, make, model, os, ram, site, assigned_to')
-    .eq('user_id', user.id)
+    .eq('org_id', orgId)
     .eq('status', 'active')
     .eq('site', site)
     .eq('category', category);

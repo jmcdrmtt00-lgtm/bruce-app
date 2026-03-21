@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
+import { useOrg } from '@/contexts/OrgContext';
 import { ChevronDown, ChevronUp, Download, Upload, FileSpreadsheet, CheckCircle, Check, Pencil, Trash2, Plus, X, Search, SlidersHorizontal } from 'lucide-react';
 import { formatDate } from '@/lib/formatDate';
 import toast from 'react-hot-toast';
@@ -349,8 +350,8 @@ function parseInventoryFile(file: File): Promise<SheetInfo[]> {
     reader.readAsArrayBuffer(file);
   });
 }
-async function downloadInventory() {
-  const res = await fetch('/api/assets/download');
+async function downloadInventory(orgFetch: typeof fetch) {
+  const res = await orgFetch('/api/assets/download');
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Download failed');
   const assets: AssetRow[] = data.assets;
@@ -439,8 +440,8 @@ function parseTaskFile(file: File): Promise<TaskRow[]> {
     reader.readAsArrayBuffer(file);
   });
 }
-async function downloadTasks() {
-  const res = await fetch('/api/tasks');
+async function downloadTasks(orgFetch: typeof fetch) {
+  const res = await orgFetch('/api/tasks');
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Download failed');
   const tasks: DownloadTask[] = data.tasks;
@@ -462,6 +463,7 @@ async function downloadTasks() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function InventoryTab() {
+  const { orgFetch, activeOrgId } = useOrg();
   const [mode, setMode] = useState<'browse' | 'ask'>('browse');
 
   // Ask mode state
@@ -522,13 +524,13 @@ function InventoryTab() {
   const [showColPicker, setShowColPicker] = useState(false);
   const [hoveredRow, setHoveredRow]       = useState<string | number | null>(null);
 
-  // Auto-load data on browse mode / category change
+  // Auto-load data on browse mode / category change / org change
   useEffect(() => {
-    if (mode !== 'browse') return;
+    if (mode !== 'browse' || !activeOrgId) return;
     if (tableCategory === 'Employees') {
       setEmployeeLoading(true);
       setEmployeeRows([]); setEditingEmployeeId(null); setAddingEmployee(false);
-      fetch('/api/employees')
+      orgFetch('/api/employees')
         .then(r => r.json())
         .then(data => { setEmployeeRows(data.employees ?? []); setEmployeeLoading(false); })
         .catch(() => setEmployeeLoading(false));
@@ -537,7 +539,7 @@ function InventoryTab() {
     let cancelled = false;
     setTableLoading(true);
     setEditingAssetId(null); setAddingAsset(false);
-    fetch('/api/assets/download').then(r => r.json()).then(data => {
+    orgFetch('/api/assets/download').then(r => r.json()).then(data => {
       if (cancelled || !data.assets) { setTableLoading(false); return; }
       const filtered = (data.assets as AssetResult[]).filter((a: AssetResult) => a.category === tableCategory);
       const seen = new Set<string>(); const extras: FieldDef[] = [];
@@ -552,7 +554,7 @@ function InventoryTab() {
     }).catch(() => setTableLoading(false));
     return () => { cancelled = true; };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mode, tableCategory]);
+  }, [mode, tableCategory, activeOrgId]);
 
   function stopVoice() { recRef.current?.stop(); setListening(false); }
 
@@ -560,7 +562,7 @@ function InventoryTab() {
     if (!question.trim()) { toast.error('Enter a question first.'); return; }
     setLoading(true); setResults([]); setSql(''); setMessage('');
     try {
-      const res = await fetch('/api/query/assets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: question.trim() }) });
+      const res = await orgFetch('/api/query/assets', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question: question.trim() }) });
       const data = await res.json();
       if (!res.ok) { setMessage(data.error || 'Query failed.'); if (data.sql) setSql(data.sql); }
       else { setSql(data.sql ?? ''); setResults(data.results ?? []); if ((data.results ?? []).length === 0) setMessage('No matching inventory records found.'); }
@@ -587,7 +589,7 @@ function InventoryTab() {
     if (!editingAssetId) return;
     setAssetSaving(true);
     try {
-      const res = await fetch(`/api/assets/${editingAssetId}`, {
+      const res = await orgFetch(`/api/assets/${editingAssetId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(assetDraft),
       });
@@ -601,7 +603,7 @@ function InventoryTab() {
 
   async function deleteAsset(id: string) {
     if (!confirm('Delete this record?')) return;
-    const res = await fetch(`/api/assets/${id}`, { method: 'DELETE' });
+    const res = await orgFetch(`/api/assets/${id}`, { method: 'DELETE' });
     if (!res.ok) { toast.error('Delete failed'); return; }
     setTableRows(prev => prev.filter(r => r.id !== id));
     if (editingAssetId === id) { setEditingAssetId(null); setAssetDraft({}); }
@@ -610,12 +612,12 @@ function InventoryTab() {
   async function addNewAsset() {
     setAssetSaving(true);
     try {
-      const res = await fetch('/api/assets/upload', {
+      const res = await orgFetch('/api/assets/upload', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assets: [{ ...newAssetDraft, category: tableCategory }] }),
       });
       if (!res.ok) { toast.error('Add failed'); setAssetSaving(false); return; }
-      const r2 = await fetch('/api/assets/download');
+      const r2 = await orgFetch('/api/assets/download');
       const d2 = await r2.json();
       setTableRows((d2.assets as AssetResult[]).filter((a: AssetResult) => a.category === tableCategory));
       setAddingAsset(false); setNewAssetDraft({});
@@ -628,7 +630,7 @@ function InventoryTab() {
     if (!editingEmployeeId) return;
     setEmployeeSaving(true);
     try {
-      const res = await fetch(`/api/employees/${editingEmployeeId}`, {
+      const res = await orgFetch(`/api/employees/${editingEmployeeId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(employeeDraft),
       });
@@ -642,7 +644,7 @@ function InventoryTab() {
 
   async function deleteEmployee(id: string) {
     if (!confirm('Remove this employee?')) return;
-    const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
+    const res = await orgFetch(`/api/employees/${id}`, { method: 'DELETE' });
     if (!res.ok) { toast.error('Delete failed'); return; }
     setEmployeeRows(prev => prev.filter(r => r.id !== id));
     if (editingEmployeeId === id) { setEditingEmployeeId(null); setEmployeeDraft({}); }
@@ -651,7 +653,7 @@ function InventoryTab() {
   async function addNewEmployee() {
     setEmployeeSaving(true);
     try {
-      const res = await fetch('/api/employees', {
+      const res = await orgFetch('/api/employees', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newEmployeeDraft),
       });
@@ -1092,6 +1094,7 @@ function InventoryTab() {
 // ─────────────────────────────────────────────────────────────────────────────
 
 function DataToolsTab() {
+  const { orgFetch } = useOrg();
   // Inventory state
   const [invDownloading, setInvDownloading] = useState(false);
   const invFileRef = useRef<HTMLInputElement>(null);
@@ -1112,7 +1115,7 @@ function DataToolsTab() {
 
   async function handleInvDownload() {
     setInvDownloading(true);
-    try { const n = await downloadInventory(); toast.success(`Downloaded ${n} assets.`); }
+    try { const n = await downloadInventory(orgFetch); toast.success(`Downloaded ${n} assets.`); }
     catch (err) { toast.error(err instanceof Error ? err.message : 'Download failed.'); }
     setInvDownloading(false);
   }
@@ -1131,7 +1134,7 @@ function DataToolsTab() {
     if (selected.length === 0) { toast.error('No sheets selected.'); return; }
     setUploading(true); setInvError(null); setUploadResult(null);
     try {
-      const res = await fetch('/api/assets/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assets: selected.flatMap(s => s.rows) }) });
+      const res = await orgFetch('/api/assets/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assets: selected.flatMap(s => s.rows) }) });
       const data = await res.json();
       if (!res.ok) setInvError(data.error || 'Upload failed.');
       else { setUploadResult(data); toast.success(`${data.inserted} added, ${data.updated} updated.`); }
@@ -1142,7 +1145,7 @@ function DataToolsTab() {
 
   async function handleTaskDownload() {
     setTaskDownloading(true);
-    try { const n = await downloadTasks(); toast.success(`Downloaded ${n} tasks.`); }
+    try { const n = await downloadTasks(orgFetch); toast.success(`Downloaded ${n} tasks.`); }
     catch (err) { toast.error(err instanceof Error ? err.message : 'Download failed.'); }
     setTaskDownloading(false);
   }
@@ -1156,7 +1159,7 @@ function DataToolsTab() {
     if (taskRows.length === 0) { toast.error('No rows to upload.'); return; }
     setTaskUploading(true); setTaskError(null); setTaskUploadResult(null);
     try {
-      const res = await fetch('/api/tasks/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tasks: taskRows }) });
+      const res = await orgFetch('/api/tasks/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ tasks: taskRows }) });
       const data = await res.json();
       if (!res.ok) setTaskError(data.error || 'Upload failed.');
       else { setTaskUploadResult(data); toast.success(`${data.inserted} tasks loaded.`); }

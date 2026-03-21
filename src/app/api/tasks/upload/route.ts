@@ -82,16 +82,19 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const orgId = request.headers.get('x-org-id');
+  if (!orgId) return NextResponse.json({ error: 'org required' }, { status: 400 });
+
   const { tasks } = await request.json() as { tasks: TaskRow[] };
   if (!Array.isArray(tasks) || tasks.length === 0) {
     return NextResponse.json({ error: 'No tasks provided' }, { status: 400 });
   }
 
-  // Get all existing incident IDs for this user so we can delete their updates first
+  // Get all existing incident IDs for this org so we can delete their updates first
   const { data: existing, error: fetchErr } = await supabase
     .from('incidents')
     .select('id')
-    .eq('user_id', user.id);
+    .eq('org_id', orgId);
   if (fetchErr) return NextResponse.json({ error: fetchErr.message }, { status: 500 });
 
   const existingIds = (existing ?? []).map(i => i.id);
@@ -105,15 +108,14 @@ export async function POST(request: NextRequest) {
     if (delUpdErr) return NextResponse.json({ error: delUpdErr.message }, { status: 500 });
   }
 
-  // Delete all existing incidents for this user
+  // Delete all existing incidents for this org
   const { error: delErr } = await supabase
     .from('incidents')
     .delete()
-    .eq('user_id', user.id);
+    .eq('org_id', orgId);
   if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
 
-  // Insert new incidents — source is preserved from the uploaded data;
-  // defaults to 'issue' if not provided.
+  // Insert new incidents
   const VALID_SOURCES = new Set(['ticket', 'issue', 'nurse', 'nurse_self_fix']);
   const incidentRows = tasks.map(t => {
     const screen = normalizeTaskType(t.task_type);
@@ -121,6 +123,7 @@ export async function POST(request: NextRequest) {
     const source = t.source && VALID_SOURCES.has(t.source) ? t.source : 'issue';
     return {
       user_id:        user.id,
+      org_id:         orgId,
       task_number:    hasTaskNumber ? Number(t.task_number) : null,
       title:          t.task_name ?? null,
       description:    t.task_name ?? '',
@@ -160,11 +163,9 @@ export async function POST(request: NextRequest) {
     const incidentId = (taskNum !== null ? idByTaskNumber.get(taskNum) : null) ?? inserted?.[i]?.id;
     if (!incidentId) continue;
 
-    // Information needed (onboarding) → 'details' update
     if (t.information_needed?.trim()) {
       updates.push({ incident_id: incidentId, user_id: user.id, type: 'details', note: t.information_needed.trim() });
     }
-    // Main content field → 'progress' update (what gets sent to the AI)
     const mainContent = t.problem_to_fix?.trim() || t.decision_to_make?.trim() || t.project_to_manage?.trim() || '';
     if (mainContent) {
       updates.push({ incident_id: incidentId, user_id: user.id, type: 'progress', note: mainContent });

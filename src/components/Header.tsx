@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { MonitorCheck } from 'lucide-react';
 import UserMenu from '@/components/UserMenu';
+import OrgSwitcher from '@/components/OrgSwitcher';
 import { supabase } from '@/libs/supabase';
 import { useDemoUser } from '@/libs/useDemoUser';
 import { useAdminUser } from '@/libs/useAdminUser';
@@ -110,7 +111,10 @@ export default function Header() {
         </div>
       )}
 
-      <UserMenu user={user} />
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <OrgSwitcher />
+        <UserMenu user={user} />
+      </div>
     </header>
   );
 }

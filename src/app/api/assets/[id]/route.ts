@@ -16,6 +16,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const orgId = request.headers.get('x-org-id');
+  if (!orgId) return NextResponse.json({ error: 'org required' }, { status: 400 });
+
   const { id } = await params;
   const body = await request.json();
   const update: Record<string, unknown> = {};
@@ -24,12 +27,13 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   }
   delete update.id;
   delete update.user_id;
+  delete update.org_id;
 
   const { data, error } = await supabase
     .from('assets')
     .update(update)
     .eq('id', id)
-    .eq('user_id', user.id)
+    .eq('org_id', orgId)
     .select('*')
     .single();
 
@@ -37,17 +41,20 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   return NextResponse.json({ asset: data });
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+export async function DELETE(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const supabase = await getClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+
+  const orgId = request.headers.get('x-org-id');
+  if (!orgId) return NextResponse.json({ error: 'org required' }, { status: 400 });
 
   const { id } = await params;
   const { error } = await supabase
     .from('assets')
     .delete()
     .eq('id', id)
-    .eq('user_id', user.id);
+    .eq('org_id', orgId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });

@@ -16,6 +16,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const orgId = request.headers.get('x-org-id');
+  if (!orgId) return NextResponse.json({ error: 'org required' }, { status: 400 });
+
   const { id } = await params;
   const { assigned_to } = await request.json();
   if (!assigned_to) return NextResponse.json({ error: 'assigned_to required' }, { status: 400 });
@@ -24,7 +27,7 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
     .from('assets')
     .update({ assigned_to })
     .eq('id', id)
-    .eq('user_id', user.id);
+    .eq('org_id', orgId);
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });

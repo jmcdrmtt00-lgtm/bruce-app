@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useOrg } from '@/contexts/OrgContext';
 import { AlertCircle, Clock } from 'lucide-react';
 import { formatDate } from '@/lib/formatDate';
 
@@ -77,16 +78,20 @@ function TaskCard({ task }: { task: DemoTask }) {
 }
 
 export default function TasksPage() {
+  const { orgFetch, activeOrgId } = useOrg();
   const [tasks, setTasks] = useState<DemoTask[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/tasks')
+    if (!activeOrgId) return;
+    setLoading(true);
+    orgFetch('/api/tasks')
       .then(r => r.json())
       .then(data => setTasks(data.tasks ?? []))
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, []);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeOrgId]);
 
   const inQueue     = tasks.filter(t => t.status === 'In Queue');
   const inProcess   = tasks.filter(t => t.status === 'In Process');

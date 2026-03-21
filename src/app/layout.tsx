@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import Header from "@/components/Header";
 import { DemoProvider } from "@/contexts/DemoContext";
+import { OrgProvider } from "@/contexts/OrgContext";
 import DemoController from "@/components/DemoController";
 import "./globals.css";
 
@@ -25,12 +26,14 @@ export default function RootLayout({
         />
       </head>
       <body>
+        <OrgProvider>
         <DemoProvider>
           <Header />
           <Toaster position="top-center" toastOptions={{ duration: 8000 }} />
           {children}
           <DemoController />
         </DemoProvider>
+        </OrgProvider>
       </body>
     </html>
   );

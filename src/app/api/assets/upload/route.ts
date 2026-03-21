@@ -31,6 +31,9 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const orgId = request.headers.get('x-org-id');
+  if (!orgId) return NextResponse.json({ error: 'org required' }, { status: 400 });
+
   const { assets } = await request.json();
   if (!Array.isArray(assets) || assets.length === 0) {
     return NextResponse.json({ error: 'No assets provided' }, { status: 400 });
@@ -40,7 +43,7 @@ export async function POST(request: NextRequest) {
   const { data: existing } = await supabase
     .from('assets')
     .select('id, serial_number')
-    .eq('user_id', user.id)
+    .eq('org_id', orgId)
     .not('serial_number', 'is', null);
 
   const serialToId = new Map<string, string>(
@@ -51,9 +54,8 @@ export async function POST(request: NextRequest) {
   const toUpdate: Record<string, unknown>[] = [];
 
   for (const asset of assets) {
-    const cleaned = cleanDates({ ...asset, user_id: user.id });
+    const cleaned = cleanDates({ ...asset, user_id: user.id, org_id: orgId });
     if (asset.serial_number && serialToId.has(asset.serial_number)) {
-      // Existing record — carry its id so upsert knows which row to overwrite
       toUpdate.push({ ...cleaned, id: serialToId.get(asset.serial_number) });
     } else {
       toInsert.push(cleaned);
@@ -66,8 +68,6 @@ export async function POST(request: NextRequest) {
   }
 
   if (toUpdate.length > 0) {
-    // Deduplicate by id — duplicate serial numbers in the Excel would otherwise cause
-    // "ON CONFLICT DO UPDATE command cannot affect row a second time"
     const dedupedUpdate = Array.from(
       new Map(toUpdate.map(r => [r.id as string, r])).values()
     );
