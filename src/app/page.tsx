@@ -953,7 +953,13 @@ export default function DashboardPage() {
             {/* ── Scrollable body ───────────────────────────────────────── */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-              <>
+              {!selectedTask && (
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#3a4a5c', fontSize: '12px', fontFamily: "'DM Sans', sans-serif" }}>
+                  Select a task to view details
+                </div>
+              )}
+
+              {selectedTask && <>
 
                 {/* ── Admin fields — compact, muted (supporting context) ── */}
                 <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(168,184,200,0.07)', borderRadius: '6px', padding: '10px 12px' }}>
@@ -1294,7 +1300,7 @@ export default function DashboardPage() {
                   </button>
                 </div>
 
-              </>
+              </>}
 
             </div>
           </div>
