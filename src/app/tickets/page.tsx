@@ -74,7 +74,7 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true);
 
   // Left panel view
-  const [activeView, setActiveView] = useState<'open' | 'needs_info' | 'completed'>('open');
+  const [activeView, setActiveView] = useState<'open' | 'needs_info' | 'completed'>('needs_info');
   const [filterPriority, setFilterPriority] = useState('');
   const [visibleCols, setVisibleCols] = useState({ requester: true, dateSubmitted: false, targetDate: true });
   const [colsLoaded, setColsLoaded] = useState(false);
@@ -140,7 +140,7 @@ export default function TicketsPage() {
   const loadTasks = useCallback(() => {
     fetch('/api/issues?source=tickets')
       .then(r => r.json())
-      .then(data => { setTasks((data.incidents ?? []).filter((i: Incident) => i.task_number != null)); setLoading(false); })
+      .then(data => { setTasks(data.incidents ?? []); setLoading(false); })
       .catch(() => setLoading(false));
   }, []);
 
