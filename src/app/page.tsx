@@ -966,23 +966,6 @@ export default function DashboardPage() {
                   <option value="high" style={{ background: '#1a2535', color: '#ffffff' }}>High</option>
                   <option value="low" style={{ background: '#1a2535', color: '#ffffff' }}>Low</option>
                 </select>
-                {/* Status badge-select */}
-                <select
-                  value={status}
-                  onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }}
-                  style={{
-                    padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600,
-                    cursor: 'pointer', flexShrink: 0, appearance: 'none', colorScheme: 'normal',
-                    fontFamily: "'DM Sans', sans-serif",
-                    border: status === 'resolved' ? '2px solid #4db88c' : status === 'needs_info' ? '2px solid #f0a040' : '2px solid #8ba8c8',
-                    background: status === 'resolved' ? '#1a3328' : status === 'needs_info' ? '#3a2a10' : '#223044',
-                    color: '#ffffff',
-                  }}
-                >
-                  <option value="open" style={{ background: '#1a2535', color: '#ffffff' }}>Open</option>
-                  <option value="needs_info" style={{ background: '#1a2535', color: '#ffffff' }}>Needs info</option>
-                  <option value="resolved" style={{ background: '#1a2535', color: '#ffffff' }}>Completed</option>
-                </select>
                 {/* Right-side actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {saveStatus === 'saving' && <span style={{ fontSize: '10px', color: '#a8b8c8' }}>Saving…</span>}
@@ -1022,7 +1005,15 @@ export default function DashboardPage() {
 
                 {/* ── Admin fields — compact, muted (supporting context) ── */}
                 <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(168,184,200,0.07)', borderRadius: '6px', padding: '10px 12px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: '10px' }}>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={dpAdminLabel}>Status</label>
+                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }} style={dpAdminSelect}>
+                        <option value="open">Open</option>
+                        <option value="needs_info">Needs info</option>
+                        <option value="resolved">Completed</option>
+                      </select>
+                    </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Requester</label>
                       <div style={{ display: 'flex', alignItems: 'center', gap: '2px' }}>
