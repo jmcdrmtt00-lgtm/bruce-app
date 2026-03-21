@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { ChevronDown, ChevronUp, Download, Upload, FileSpreadsheet, CheckCircle } from 'lucide-react';
+import { ChevronDown, ChevronUp, Download, Upload, FileSpreadsheet, CheckCircle, Check, Pencil, Trash2, Plus, X } from 'lucide-react';
 import { formatDate } from '@/lib/formatDate';
 import toast from 'react-hot-toast';
 import * as XLSX from 'xlsx';
@@ -45,6 +45,22 @@ const BTN_SUCCESS: React.CSSProperties = {
   ...BTN_GHOST, background: 'rgba(34,204,110,0.1)', color: '#22cc6e',
   border: '1px solid rgba(34,204,110,0.25)',
 };
+const TH: React.CSSProperties = {
+  whiteSpace: 'nowrap', padding: '6px 14px', textAlign: 'left',
+  fontWeight: 600, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase',
+  letterSpacing: '0.07em',
+};
+const TD: React.CSSProperties = { padding: '5px 10px', verticalAlign: 'middle' };
+const CELL_INPUT: React.CSSProperties = {
+  fontSize: '12px', color: '#eef2f7', background: 'rgba(255,255,255,0.06)',
+  border: '1px solid rgba(168,184,200,0.2)', borderRadius: '4px',
+  padding: '4px 8px', fontFamily: "'DM Sans', sans-serif", outline: 'none', width: '100%',
+};
+const BTN_ICON: React.CSSProperties = {
+  background: 'none', border: 'none', cursor: 'pointer', padding: '4px',
+  borderRadius: '4px', color: '#a8b8c8', display: 'inline-flex', alignItems: 'center',
+};
+const BTN_ICON_GREEN: React.CSSProperties = { ...BTN_ICON, color: '#22cc6e' };
 const SELECT: React.CSSProperties = {
   fontSize: '12px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)',
   border: '1px solid rgba(168,184,200,0.18)', borderRadius: '5px',
@@ -107,8 +123,11 @@ interface AssetResult {
 }
 
 const ASSET_CATEGORIES = ['Computer', 'iPad', 'Phone', 'Printer', 'Network', 'Camera', 'Other'];
+const SITES = ['Holden', 'Oakdale', 'Business Office'];
+const PRIORITIES = [{ value: '', label: '—' }, { value: 'high', label: 'High' }, { value: 'low', label: 'Low' }];
 
 interface FieldDef { key: string; label: string }
+interface NurseProfile { id: string; email: string; full_name: string; site: string; default_priority: string; }
 
 const ALL_FIELDS: FieldDef[] = [
   { key: 'assigned_to', label: 'Assigned To' }, { key: 'name', label: 'Name' },
@@ -119,6 +138,10 @@ const ALL_FIELDS: FieldDef[] = [
   { key: 'purchased', label: 'Purchased' }, { key: 'price', label: 'Price' },
   { key: 'install_date', label: 'Install Date' }, { key: 'warranty_expires', label: 'Warranty Expires' },
   { key: 'notes', label: 'Notes' },
+];
+const NURSE_FIELDS: FieldDef[] = [
+  { key: 'email', label: 'Email' }, { key: 'full_name', label: 'Full Name' },
+  { key: 'site', label: 'Site' }, { key: 'default_priority', label: 'Default Priority' },
 ];
 const DATE_KEYS = new Set(['purchased', 'install_date', 'warranty_expires']);
 const DEFAULT_COLS = new Set(['assigned_to', 'name', 'site', 'make', 'model', 'os', 'serial_number', 'asset_number', 'purchased']);
@@ -457,16 +480,45 @@ function InventoryTab() {
     if (!colsLoaded) return;
     try { localStorage.setItem('inventory-cols', JSON.stringify([...selectedCols])); } catch { /* ignore */ }
   }, [selectedCols, colsLoaded]);
-  const [tableRows, setTableRows]           = useState<AssetResult[]>([]);
-  const [tableLoading, setTableLoading]     = useState(false);
-  const [extraFields, setExtraFields]       = useState<FieldDef[]>([]);
-  const [showMoreCols, setShowMoreCols]     = useState(false);
 
-  // Auto-load assets on browse mode mount
+  const [tableRows, setTableRows]       = useState<AssetResult[]>([]);
+  const [tableLoading, setTableLoading] = useState(false);
+  const [extraFields, setExtraFields]   = useState<FieldDef[]>([]);
+  const [showMoreCols, setShowMoreCols] = useState(false);
+
+  // Asset CRUD state
+  const [editingAssetId, setEditingAssetId] = useState<string | null>(null);
+  const [assetDraft, setAssetDraft]         = useState<Record<string, string>>({});
+  const [addingAsset, setAddingAsset]       = useState(false);
+  const [newAssetDraft, setNewAssetDraft]   = useState<Record<string, string>>({});
+  const [assetSaving, setAssetSaving]       = useState(false);
+
+  // Nurse profiles state
+  const [nurseRows, setNurseRows]           = useState<NurseProfile[]>([]);
+  const [nurseLoading, setNurseLoading]     = useState(false);
+  const [editingNurseId, setEditingNurseId] = useState<string | null>(null);
+  const [nurseDraft, setNurseDraft]         = useState<Record<string, string>>({});
+  const [addingNurse, setAddingNurse]       = useState(false);
+  const [newNurseDraft, setNewNurseDraft]   = useState<Record<string, string>>({});
+  const [nurseSaving, setNurseSaving]       = useState(false);
+
+  const isNurse = tableCategory === 'Approved Submitters';
+
+  // Auto-load data on browse mode / category change
   useEffect(() => {
     if (mode !== 'browse') return;
+    if (tableCategory === 'Approved Submitters') {
+      setNurseLoading(true);
+      setNurseRows([]); setEditingNurseId(null); setAddingNurse(false);
+      fetch('/api/nurse/profiles')
+        .then(r => r.json())
+        .then(data => { setNurseRows(data.profiles ?? []); setNurseLoading(false); })
+        .catch(() => setNurseLoading(false));
+      return;
+    }
     let cancelled = false;
     setTableLoading(true);
+    setEditingAssetId(null); setAddingAsset(false);
     fetch('/api/assets/download').then(r => r.json()).then(data => {
       if (cancelled || !data.assets) { setTableLoading(false); return; }
       const filtered = (data.assets as AssetResult[]).filter((a: AssetResult) => a.category === tableCategory);
@@ -481,6 +533,7 @@ function InventoryTab() {
       setExtraFields(extras); setTableRows(filtered); setTableLoading(false);
     }).catch(() => setTableLoading(false));
     return () => { cancelled = true; };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [mode, tableCategory]);
 
   function stopVoice() { recRef.current?.stop(); setListening(false); }
@@ -511,11 +564,96 @@ function InventoryTab() {
     XLSX.writeFile(wb, `${tableCategory}_${new Date().toISOString().split('T')[0]}.xlsx`);
   }
 
+  // Asset CRUD
+  async function saveEditedAsset() {
+    if (!editingAssetId) return;
+    setAssetSaving(true);
+    try {
+      const res = await fetch(`/api/assets/${editingAssetId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(assetDraft),
+      });
+      if (!res.ok) { toast.error('Save failed'); setAssetSaving(false); return; }
+      const data = await res.json();
+      setTableRows(prev => prev.map(r => r.id === editingAssetId ? { ...r, ...data.asset } : r));
+      setEditingAssetId(null); setAssetDraft({});
+    } catch { toast.error('Save failed'); }
+    setAssetSaving(false);
+  }
+
+  async function deleteAsset(id: string) {
+    if (!confirm('Delete this record?')) return;
+    const res = await fetch(`/api/assets/${id}`, { method: 'DELETE' });
+    if (!res.ok) { toast.error('Delete failed'); return; }
+    setTableRows(prev => prev.filter(r => r.id !== id));
+    if (editingAssetId === id) { setEditingAssetId(null); setAssetDraft({}); }
+  }
+
+  async function addNewAsset() {
+    setAssetSaving(true);
+    try {
+      const res = await fetch('/api/assets/upload', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ assets: [{ ...newAssetDraft, category: tableCategory }] }),
+      });
+      if (!res.ok) { toast.error('Add failed'); setAssetSaving(false); return; }
+      const r2 = await fetch('/api/assets/download');
+      const d2 = await r2.json();
+      setTableRows((d2.assets as AssetResult[]).filter((a: AssetResult) => a.category === tableCategory));
+      setAddingAsset(false); setNewAssetDraft({});
+    } catch { toast.error('Add failed'); }
+    setAssetSaving(false);
+  }
+
+  // Nurse profile CRUD
+  async function saveEditedNurse() {
+    if (!editingNurseId) return;
+    setNurseSaving(true);
+    try {
+      const res = await fetch(`/api/nurse/profiles/${editingNurseId}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(nurseDraft),
+      });
+      if (!res.ok) { toast.error('Save failed'); setNurseSaving(false); return; }
+      const data = await res.json();
+      setNurseRows(prev => prev.map(r => r.id === editingNurseId ? data.profile : r));
+      setEditingNurseId(null); setNurseDraft({});
+    } catch { toast.error('Save failed'); }
+    setNurseSaving(false);
+  }
+
+  async function deleteNurse(id: string) {
+    if (!confirm('Remove this approved submitter?')) return;
+    const res = await fetch(`/api/nurse/profiles/${id}`, { method: 'DELETE' });
+    if (!res.ok) { toast.error('Delete failed'); return; }
+    setNurseRows(prev => prev.filter(r => r.id !== id));
+    if (editingNurseId === id) { setEditingNurseId(null); setNurseDraft({}); }
+  }
+
+  async function addNewNurse() {
+    setNurseSaving(true);
+    try {
+      const res = await fetch('/api/nurse/profiles', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newNurseDraft),
+      });
+      if (!res.ok) {
+        const d = await res.json();
+        toast.error(d.error || 'Add failed'); setNurseSaving(false); return;
+      }
+      const data = await res.json();
+      setNurseRows(prev => [...prev, data.profile]);
+      setAddingNurse(false); setNewNurseDraft({});
+    } catch { toast.error('Add failed'); }
+    setNurseSaving(false);
+  }
+
   const allAvailableFields = [...ALL_FIELDS, ...extraFields];
   const needsMore = allAvailableFields.length > 15;
   const primaryFields = needsMore ? allAvailableFields.slice(0, 14) : allAvailableFields;
   const moreFields = needsMore ? allAvailableFields.slice(14) : [];
   const activeCols = allAvailableFields.filter(f => selectedCols.has(f.key));
+  const editCols = ALL_FIELDS.filter(f => selectedCols.has(f.key)); // no extra.* in edit
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -523,7 +661,7 @@ function InventoryTab() {
       {/* Mode switcher */}
       <div style={{ display: 'flex', gap: '8px' }}>
         {([
-          { id: 'browse' as const, label: 'Browse / Edit', sub: 'View and filter the database' },
+          { id: 'browse' as const, label: 'Browse / Edit', sub: 'View and manage the database' },
           { id: 'ask'    as const, label: 'Ask a Question', sub: 'Natural language query' },
         ]).map(opt => (
           <button
@@ -546,80 +684,238 @@ function InventoryTab() {
       {/* ── Browse mode ── */}
       {mode === 'browse' && (
         <div style={CARD}>
+          {/* Header: table selector + action buttons */}
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px', marginBottom: '16px', flexWrap: 'wrap' }}>
             <div>
-              <div style={SECTION_LABEL}>Asset type</div>
-              <select style={SELECT} value={tableCategory} onChange={e => { setTableCategory(e.target.value); setTableRows([]); setExtraFields([]); setShowMoreCols(false); }}>
+              <div style={SECTION_LABEL}>Table</div>
+              <select style={SELECT} value={tableCategory} onChange={e => {
+                setTableCategory(e.target.value); setTableRows([]); setExtraFields([]);
+                setShowMoreCols(false); setNurseRows([]); setEditingAssetId(null);
+                setAddingAsset(false); setEditingNurseId(null); setAddingNurse(false);
+              }}>
                 {ASSET_CATEGORIES.map(c => <option key={c} style={{ background: '#1a2535' }}>{c}</option>)}
+                <option value="Approved Submitters" style={{ background: '#1a2535' }}>Approved Submitters</option>
               </select>
             </div>
-            {tableRows.length > 0 && (
+
+            {!isNurse && (
+              <button style={{ ...BTN_PRIMARY, marginTop: '16px' }} onClick={() => { setAddingAsset(true); setNewAssetDraft({}); }}>
+                <Plus size={13} /> Add Row
+              </button>
+            )}
+            {isNurse && (
+              <button style={{ ...BTN_PRIMARY, marginTop: '16px' }} onClick={() => { setAddingNurse(true); setNewNurseDraft({ site: 'Holden', default_priority: '' }); }}>
+                <Plus size={13} /> Add
+              </button>
+            )}
+            {!isNurse && tableRows.length > 0 && (
               <button style={{ ...BTN_GHOST, marginTop: '16px' }} onClick={downloadExcel}>
                 <Download size={13} /> Download Excel
               </button>
             )}
-            {tableRows.length > 0 && (
+            {!isNurse && tableRows.length > 0 && (
               <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8', fontFamily: "'DM Mono', monospace" }}>
                 {tableRows.length} record{tableRows.length !== 1 ? 's' : ''}
               </span>
             )}
-            {tableLoading && <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8' }}>Loading…</span>}
+            {isNurse && nurseRows.length > 0 && (
+              <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8', fontFamily: "'DM Mono', monospace" }}>
+                {nurseRows.length} record{nurseRows.length !== 1 ? 's' : ''}
+              </span>
+            )}
+            {(tableLoading || nurseLoading) && <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8' }}>Loading…</span>}
           </div>
 
-          {/* Column picker */}
-          <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '6px', padding: '12px', marginBottom: '14px', border: '1px solid rgba(168,184,200,0.08)' }}>
-            <p style={{ ...SECTION_LABEL, marginBottom: '10px' }}>Columns</p>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, max-content)', rowGap: '6px', columnGap: '60px' }}>
-              {primaryFields.map(f => (
-                <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
-                  <input type="checkbox" checked={selectedCols.has(f.key)} onChange={e => toggleCol(f.key, e.target.checked)} style={{ cursor: 'pointer', accentColor: '#4f8ef7' }} />
-                  {f.label}
-                </label>
-              ))}
-              {needsMore && (
-                <button onClick={() => setShowMoreCols(v => !v)} style={{ ...BTN_GHOST, fontSize: '11px', padding: '3px 10px' }}>
-                  {showMoreCols ? '− Less' : '+ More'}
-                </button>
-              )}
-            </div>
-            {showMoreCols && moreFields.length > 0 && (
-              <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(168,184,200,0.08)', display: 'grid', gridTemplateColumns: 'repeat(4, max-content)', rowGap: '6px', columnGap: '60px' }}>
-                {moreFields.map(f => (
+          {/* Column picker — asset categories only */}
+          {!isNurse && (
+            <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '6px', padding: '12px', marginBottom: '14px', border: '1px solid rgba(168,184,200,0.08)' }}>
+              <p style={{ ...SECTION_LABEL, marginBottom: '10px' }}>Columns</p>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, max-content)', rowGap: '6px', columnGap: '60px' }}>
+                {primaryFields.map(f => (
                   <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
                     <input type="checkbox" checked={selectedCols.has(f.key)} onChange={e => toggleCol(f.key, e.target.checked)} style={{ cursor: 'pointer', accentColor: '#4f8ef7' }} />
                     {f.label}
                   </label>
                 ))}
+                {needsMore && (
+                  <button onClick={() => setShowMoreCols(v => !v)} style={{ ...BTN_GHOST, fontSize: '11px', padding: '3px 10px' }}>
+                    {showMoreCols ? '− Less' : '+ More'}
+                  </button>
+                )}
               </div>
-            )}
-          </div>
-
-          {/* Table */}
-          {tableRows.length > 0 && activeCols.length > 0 && (
-            <div style={{ overflowX: 'auto' }} data-theme="light">
-              <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
-                <thead>
-                  <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
-                    {activeCols.map(f => (
-                      <th key={f.key} style={{ whiteSpace: 'nowrap', padding: '6px 14px', textAlign: 'left', fontWeight: 600, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{f.label}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {tableRows.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid rgba(168,184,200,0.06)' }}>
-                      {activeCols.map(f => f.key === 'name'
-                        ? <td key={f.key} style={{ padding: '6px 14px', maxWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
-                        : <td key={f.key} style={{ padding: '6px 14px', whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
-                      )}
-                    </tr>
+              {showMoreCols && moreFields.length > 0 && (
+                <div style={{ marginTop: '10px', paddingTop: '10px', borderTop: '1px solid rgba(168,184,200,0.08)', display: 'grid', gridTemplateColumns: 'repeat(4, max-content)', rowGap: '6px', columnGap: '60px' }}>
+                  {moreFields.map(f => (
+                    <label key={f.key} style={{ display: 'flex', alignItems: 'center', gap: '7px', cursor: 'pointer', fontSize: '12px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
+                      <input type="checkbox" checked={selectedCols.has(f.key)} onChange={e => toggleCol(f.key, e.target.checked)} style={{ cursor: 'pointer', accentColor: '#4f8ef7' }} />
+                      {f.label}
+                    </label>
                   ))}
-                </tbody>
-              </table>
+                </div>
+              )}
             </div>
           )}
-          {!tableLoading && tableRows.length === 0 && (
-            <p style={{ fontSize: '12px', color: '#4a5a6b', textAlign: 'center', padding: '32px 0' }}>No {tableCategory} records found.</p>
+
+          {/* ── Asset table ── */}
+          {!isNurse && (
+            <>
+              {(tableRows.length > 0 || addingAsset) && activeCols.length > 0 && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
+                        {activeCols.map(f => <th key={f.key} style={TH}>{f.label}</th>)}
+                        <th style={{ ...TH, width: '60px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {addingAsset && (
+                        <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.08)', background: 'rgba(79,142,247,0.04)' }}>
+                          {activeCols.map(f => (
+                            <td key={f.key} style={TD}>
+                              <input
+                                style={CELL_INPUT}
+                                value={newAssetDraft[f.key] ?? ''}
+                                onChange={e => setNewAssetDraft(d => ({ ...d, [f.key]: e.target.value }))}
+                                placeholder={f.label}
+                              />
+                            </td>
+                          ))}
+                          <td style={TD}>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <button style={BTN_ICON_GREEN} onClick={addNewAsset} disabled={assetSaving} title="Save"><Check size={13} /></button>
+                              <button style={BTN_ICON} onClick={() => { setAddingAsset(false); setNewAssetDraft({}); }} title="Cancel"><X size={13} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {tableRows.map((r, i) => (
+                        <tr key={r.id ?? i} style={{ borderBottom: '1px solid rgba(168,184,200,0.06)' }}>
+                          {editingAssetId === r.id ? (
+                            <>
+                              {activeCols.map(f => (
+                                <td key={f.key} style={TD}>
+                                  {f.key.startsWith('extra.')
+                                    ? <span style={{ color: '#a8b8c8', fontSize: '12px', padding: '4px 8px', display: 'block' }}>{cellValue(r, f.key) || '—'}</span>
+                                    : <input style={CELL_INPUT} value={assetDraft[f.key] ?? ''} onChange={e => setAssetDraft(d => ({ ...d, [f.key]: e.target.value }))} />
+                                  }
+                                </td>
+                              ))}
+                              <td style={TD}>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button style={BTN_ICON_GREEN} onClick={saveEditedAsset} disabled={assetSaving} title="Save"><Check size={13} /></button>
+                                  <button style={BTN_ICON} onClick={() => { setEditingAssetId(null); setAssetDraft({}); }} title="Cancel"><X size={13} /></button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              {activeCols.map(f => f.key === 'name'
+                                ? <td key={f.key} style={{ ...TD, maxWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
+                                : <td key={f.key} style={{ ...TD, whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
+                              )}
+                              <td style={TD}>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  {r.id && <button style={BTN_ICON} onClick={() => { setEditingAssetId(r.id!); setAssetDraft(Object.fromEntries(editCols.map(f => [f.key, cellValue(r, f.key)]))); }} title="Edit"><Pencil size={11} /></button>}
+                                  {r.id && <button style={{ ...BTN_ICON, color: '#e05c5c' }} onClick={() => deleteAsset(r.id!)} title="Delete"><Trash2 size={11} /></button>}
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {!tableLoading && tableRows.length === 0 && !addingAsset && (
+                <p style={{ fontSize: '12px', color: '#4a5a6b', textAlign: 'center', padding: '32px 0' }}>No {tableCategory} records found.</p>
+              )}
+            </>
+          )}
+
+          {/* ── Nurse profiles table ── */}
+          {isNurse && (
+            <>
+              {(nurseRows.length > 0 || addingNurse) && (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
+                    <thead>
+                      <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
+                        {NURSE_FIELDS.map(f => <th key={f.key} style={TH}>{f.label}</th>)}
+                        <th style={{ ...TH, width: '60px' }}></th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {addingNurse && (
+                        <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.08)', background: 'rgba(79,142,247,0.04)' }}>
+                          <td style={TD}><input style={CELL_INPUT} value={newNurseDraft.email ?? ''} onChange={e => setNewNurseDraft(d => ({ ...d, email: e.target.value }))} placeholder="email@example.com" /></td>
+                          <td style={TD}><input style={CELL_INPUT} value={newNurseDraft.full_name ?? ''} onChange={e => setNewNurseDraft(d => ({ ...d, full_name: e.target.value }))} placeholder="Full Name" /></td>
+                          <td style={TD}>
+                            <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={newNurseDraft.site ?? 'Holden'} onChange={e => setNewNurseDraft(d => ({ ...d, site: e.target.value }))}>
+                              {SITES.map(s => <option key={s} value={s} style={{ background: '#1a2535' }}>{s}</option>)}
+                            </select>
+                          </td>
+                          <td style={TD}>
+                            <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={newNurseDraft.default_priority ?? ''} onChange={e => setNewNurseDraft(d => ({ ...d, default_priority: e.target.value }))}>
+                              {PRIORITIES.map(p => <option key={p.value} value={p.value} style={{ background: '#1a2535' }}>{p.label}</option>)}
+                            </select>
+                          </td>
+                          <td style={TD}>
+                            <div style={{ display: 'flex', gap: '4px' }}>
+                              <button style={BTN_ICON_GREEN} onClick={addNewNurse} disabled={nurseSaving} title="Save"><Check size={13} /></button>
+                              <button style={BTN_ICON} onClick={() => { setAddingNurse(false); setNewNurseDraft({}); }} title="Cancel"><X size={13} /></button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                      {nurseRows.map(r => (
+                        <tr key={r.id} style={{ borderBottom: '1px solid rgba(168,184,200,0.06)' }}>
+                          {editingNurseId === r.id ? (
+                            <>
+                              <td style={TD}><input style={CELL_INPUT} value={nurseDraft.email ?? ''} onChange={e => setNurseDraft(d => ({ ...d, email: e.target.value }))} /></td>
+                              <td style={TD}><input style={CELL_INPUT} value={nurseDraft.full_name ?? ''} onChange={e => setNurseDraft(d => ({ ...d, full_name: e.target.value }))} /></td>
+                              <td style={TD}>
+                                <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={nurseDraft.site ?? ''} onChange={e => setNurseDraft(d => ({ ...d, site: e.target.value }))}>
+                                  {SITES.map(s => <option key={s} value={s} style={{ background: '#1a2535' }}>{s}</option>)}
+                                </select>
+                              </td>
+                              <td style={TD}>
+                                <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={nurseDraft.default_priority ?? ''} onChange={e => setNurseDraft(d => ({ ...d, default_priority: e.target.value }))}>
+                                  {PRIORITIES.map(p => <option key={p.value} value={p.value} style={{ background: '#1a2535' }}>{p.label}</option>)}
+                                </select>
+                              </td>
+                              <td style={TD}>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button style={BTN_ICON_GREEN} onClick={saveEditedNurse} disabled={nurseSaving} title="Save"><Check size={13} /></button>
+                                  <button style={BTN_ICON} onClick={() => { setEditingNurseId(null); setNurseDraft({}); }} title="Cancel"><X size={13} /></button>
+                                </div>
+                              </td>
+                            </>
+                          ) : (
+                            <>
+                              <td style={{ ...TD, color: '#eef2f7' }}>{r.email}</td>
+                              <td style={{ ...TD, color: '#eef2f7' }}>{r.full_name}</td>
+                              <td style={{ ...TD, color: '#eef2f7' }}>{r.site}</td>
+                              <td style={{ ...TD, color: '#eef2f7' }}>{r.default_priority || '—'}</td>
+                              <td style={TD}>
+                                <div style={{ display: 'flex', gap: '4px' }}>
+                                  <button style={BTN_ICON} onClick={() => { setEditingNurseId(r.id); setNurseDraft({ email: r.email, full_name: r.full_name, site: r.site, default_priority: r.default_priority }); }} title="Edit"><Pencil size={11} /></button>
+                                  <button style={{ ...BTN_ICON, color: '#e05c5c' }} onClick={() => deleteNurse(r.id)} title="Delete"><Trash2 size={11} /></button>
+                                </div>
+                              </td>
+                            </>
+                          )}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+              {!nurseLoading && nurseRows.length === 0 && !addingNurse && (
+                <p style={{ fontSize: '12px', color: '#4a5a6b', textAlign: 'center', padding: '32px 0' }}>No approved submitters yet. Click &quot;+ Add&quot; to add one.</p>
+              )}
+            </>
           )}
         </div>
       )}
