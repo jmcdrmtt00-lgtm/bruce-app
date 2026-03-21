@@ -291,8 +291,8 @@ export default function DashboardPage() {
     if (visibleCols.targetDate)    parts.push('minmax(4px,1fr) minmax(0,max-content)');
     if (visibleCols.dateSubmitted) parts.push('minmax(4px,1fr) minmax(0,max-content)');
     return parts.length === 0
-      ? '18px 5px 1fr'
-      : `18px 5px minmax(0,max-content) ${parts.join(' ')}`;
+      ? 'auto auto 1fr'
+      : `auto auto minmax(0,max-content) ${parts.join(' ')}`;
   }, [visibleCols]);
 
   function resetPanel() {
