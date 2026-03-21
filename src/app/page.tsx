@@ -260,11 +260,9 @@ export default function DashboardPage() {
   function markDirty() { panelDirtyRef.current = true; }
 
   const openTasks = useMemo(() => {
-    const priorityOrder = (t: Incident) => t.priority === 'high' ? 0 : t.priority === null ? 1 : 2;
-    const byDue = (t: Incident) => t.date_due ? new Date(t.date_due).getTime() : Infinity;
     return tasks
       .filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'open')
-      .sort((a, b) => priorityOrder(a) - priorityOrder(b) || byDue(a) - byDue(b));
+      .sort((a, b) => a.task_number - b.task_number);
   }, [tasks]);
 
   const needsInfoTasks = useMemo(
@@ -275,7 +273,7 @@ export default function DashboardPage() {
   const completedTasks = useMemo(() => {
     let filtered = tasks.filter(t => t.status === 'resolved');
     if (filterPriority) filtered = filtered.filter(t => t.priority === filterPriority);
-    return filtered.sort((a, b) => b.task_number - a.task_number);
+    return filtered.sort((a, b) => a.task_number - b.task_number);
   }, [tasks, filterPriority]);
 
   const visibleTasks = useMemo(() => {
