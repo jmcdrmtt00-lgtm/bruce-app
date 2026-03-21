@@ -124,10 +124,13 @@ interface AssetResult {
 
 const ASSET_CATEGORIES = ['Computer', 'iPad', 'Phone', 'Printer', 'Network', 'Camera', 'Other'];
 const SITES = ['Holden', 'Oakdale', 'Business Office'];
-const PRIORITIES = [{ value: '', label: '—' }, { value: 'high', label: 'High' }, { value: 'low', label: 'Low' }];
 
 interface FieldDef { key: string; label: string }
-interface NurseProfile { id: string; email: string; full_name: string; site: string; default_priority: string; }
+interface Employee {
+  id: string; email: string; first_name: string; last_name: string;
+  ee_number: string | null; site: string; position: string | null;
+  hours_per_week: number | null; shift: string | null; is_approved_submitter: boolean;
+}
 
 const ALL_FIELDS: FieldDef[] = [
   { key: 'assigned_to', label: 'Assigned To' }, { key: 'name', label: 'Name' },
@@ -139,9 +142,12 @@ const ALL_FIELDS: FieldDef[] = [
   { key: 'install_date', label: 'Install Date' }, { key: 'warranty_expires', label: 'Warranty Expires' },
   { key: 'notes', label: 'Notes' },
 ];
-const NURSE_FIELDS: FieldDef[] = [
-  { key: 'email', label: 'Email' }, { key: 'full_name', label: 'Full Name' },
-  { key: 'site', label: 'Site' }, { key: 'default_priority', label: 'Default Priority' },
+const EMPLOYEE_FIELDS: FieldDef[] = [
+  { key: 'first_name', label: 'First Name' }, { key: 'last_name', label: 'Last Name' },
+  { key: 'ee_number', label: 'EE #' }, { key: 'email', label: 'Email' },
+  { key: 'site', label: 'Site' }, { key: 'position', label: 'Position' },
+  { key: 'hours_per_week', label: 'Hrs/Wk' }, { key: 'shift', label: 'Shift' },
+  { key: 'is_approved_submitter', label: 'Approved' },
 ];
 const DATE_KEYS = new Set(['purchased', 'install_date', 'warranty_expires']);
 const DEFAULT_COLS = new Set(['assigned_to', 'name', 'site', 'make', 'model', 'os', 'serial_number', 'asset_number', 'purchased']);
@@ -493,27 +499,27 @@ function InventoryTab() {
   const [newAssetDraft, setNewAssetDraft]   = useState<Record<string, string>>({});
   const [assetSaving, setAssetSaving]       = useState(false);
 
-  // Nurse profiles state
-  const [nurseRows, setNurseRows]           = useState<NurseProfile[]>([]);
-  const [nurseLoading, setNurseLoading]     = useState(false);
-  const [editingNurseId, setEditingNurseId] = useState<string | null>(null);
-  const [nurseDraft, setNurseDraft]         = useState<Record<string, string>>({});
-  const [addingNurse, setAddingNurse]       = useState(false);
-  const [newNurseDraft, setNewNurseDraft]   = useState<Record<string, string>>({});
-  const [nurseSaving, setNurseSaving]       = useState(false);
+  // Employees state
+  const [employeeRows, setEmployeeRows]         = useState<Employee[]>([]);
+  const [employeeLoading, setEmployeeLoading]   = useState(false);
+  const [editingEmployeeId, setEditingEmployeeId] = useState<string | null>(null);
+  const [employeeDraft, setEmployeeDraft]       = useState<Record<string, string>>({});
+  const [addingEmployee, setAddingEmployee]     = useState(false);
+  const [newEmployeeDraft, setNewEmployeeDraft] = useState<Record<string, string>>({});
+  const [employeeSaving, setEmployeeSaving]     = useState(false);
 
-  const isNurse = tableCategory === 'Approved Submitters';
+  const isEmployee = tableCategory === 'Employees';
 
   // Auto-load data on browse mode / category change
   useEffect(() => {
     if (mode !== 'browse') return;
-    if (tableCategory === 'Approved Submitters') {
-      setNurseLoading(true);
-      setNurseRows([]); setEditingNurseId(null); setAddingNurse(false);
-      fetch('/api/nurse/profiles')
+    if (tableCategory === 'Employees') {
+      setEmployeeLoading(true);
+      setEmployeeRows([]); setEditingEmployeeId(null); setAddingEmployee(false);
+      fetch('/api/employees')
         .then(r => r.json())
-        .then(data => { setNurseRows(data.profiles ?? []); setNurseLoading(false); })
-        .catch(() => setNurseLoading(false));
+        .then(data => { setEmployeeRows(data.employees ?? []); setEmployeeLoading(false); })
+        .catch(() => setEmployeeLoading(false));
       return;
     }
     let cancelled = false;
@@ -605,47 +611,47 @@ function InventoryTab() {
     setAssetSaving(false);
   }
 
-  // Nurse profile CRUD
-  async function saveEditedNurse() {
-    if (!editingNurseId) return;
-    setNurseSaving(true);
+  // Employee CRUD
+  async function saveEditedEmployee() {
+    if (!editingEmployeeId) return;
+    setEmployeeSaving(true);
     try {
-      const res = await fetch(`/api/nurse/profiles/${editingNurseId}`, {
+      const res = await fetch(`/api/employees/${editingEmployeeId}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(nurseDraft),
+        body: JSON.stringify(employeeDraft),
       });
-      if (!res.ok) { toast.error('Save failed'); setNurseSaving(false); return; }
+      if (!res.ok) { toast.error('Save failed'); setEmployeeSaving(false); return; }
       const data = await res.json();
-      setNurseRows(prev => prev.map(r => r.id === editingNurseId ? data.profile : r));
-      setEditingNurseId(null); setNurseDraft({});
+      setEmployeeRows(prev => prev.map(r => r.id === editingEmployeeId ? data.employee : r));
+      setEditingEmployeeId(null); setEmployeeDraft({});
     } catch { toast.error('Save failed'); }
-    setNurseSaving(false);
+    setEmployeeSaving(false);
   }
 
-  async function deleteNurse(id: string) {
-    if (!confirm('Remove this approved submitter?')) return;
-    const res = await fetch(`/api/nurse/profiles/${id}`, { method: 'DELETE' });
+  async function deleteEmployee(id: string) {
+    if (!confirm('Remove this employee?')) return;
+    const res = await fetch(`/api/employees/${id}`, { method: 'DELETE' });
     if (!res.ok) { toast.error('Delete failed'); return; }
-    setNurseRows(prev => prev.filter(r => r.id !== id));
-    if (editingNurseId === id) { setEditingNurseId(null); setNurseDraft({}); }
+    setEmployeeRows(prev => prev.filter(r => r.id !== id));
+    if (editingEmployeeId === id) { setEditingEmployeeId(null); setEmployeeDraft({}); }
   }
 
-  async function addNewNurse() {
-    setNurseSaving(true);
+  async function addNewEmployee() {
+    setEmployeeSaving(true);
     try {
-      const res = await fetch('/api/nurse/profiles', {
+      const res = await fetch('/api/employees', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newNurseDraft),
+        body: JSON.stringify(newEmployeeDraft),
       });
       if (!res.ok) {
         const d = await res.json();
-        toast.error(d.error || 'Add failed'); setNurseSaving(false); return;
+        toast.error(d.error || 'Add failed'); setEmployeeSaving(false); return;
       }
       const data = await res.json();
-      setNurseRows(prev => [...prev, data.profile]);
-      setAddingNurse(false); setNewNurseDraft({});
+      setEmployeeRows(prev => [...prev, data.employee]);
+      setAddingEmployee(false); setNewEmployeeDraft({});
     } catch { toast.error('Add failed'); }
-    setNurseSaving(false);
+    setEmployeeSaving(false);
   }
 
   const allAvailableFields = [...ALL_FIELDS, ...extraFields];
@@ -690,44 +696,44 @@ function InventoryTab() {
               <div style={SECTION_LABEL}>Table</div>
               <select style={SELECT} value={tableCategory} onChange={e => {
                 setTableCategory(e.target.value); setTableRows([]); setExtraFields([]);
-                setShowMoreCols(false); setNurseRows([]); setEditingAssetId(null);
-                setAddingAsset(false); setEditingNurseId(null); setAddingNurse(false);
+                setShowMoreCols(false); setEmployeeRows([]); setEditingAssetId(null);
+                setAddingAsset(false); setEditingEmployeeId(null); setAddingEmployee(false);
               }}>
                 {ASSET_CATEGORIES.map(c => <option key={c} style={{ background: '#1a2535' }}>{c}</option>)}
-                <option value="Approved Submitters" style={{ background: '#1a2535' }}>Approved Submitters</option>
+                <option value="Employees" style={{ background: '#1a2535' }}>Employees</option>
               </select>
             </div>
 
-            {!isNurse && (
+            {!isEmployee && (
               <button style={{ ...BTN_PRIMARY, marginTop: '16px' }} onClick={() => { setAddingAsset(true); setNewAssetDraft({}); }}>
                 <Plus size={13} /> Add Row
               </button>
             )}
-            {isNurse && (
-              <button style={{ ...BTN_PRIMARY, marginTop: '16px' }} onClick={() => { setAddingNurse(true); setNewNurseDraft({ site: 'Holden', default_priority: '' }); }}>
+            {isEmployee && (
+              <button style={{ ...BTN_PRIMARY, marginTop: '16px' }} onClick={() => { setAddingEmployee(true); setNewEmployeeDraft({ site: 'Holden', is_approved_submitter: 'false' }); }}>
                 <Plus size={13} /> Add
               </button>
             )}
-            {!isNurse && tableRows.length > 0 && (
+            {!isEmployee && tableRows.length > 0 && (
               <button style={{ ...BTN_GHOST, marginTop: '16px' }} onClick={downloadExcel}>
                 <Download size={13} /> Download Excel
               </button>
             )}
-            {!isNurse && tableRows.length > 0 && (
+            {!isEmployee && tableRows.length > 0 && (
               <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8', fontFamily: "'DM Mono', monospace" }}>
                 {tableRows.length} record{tableRows.length !== 1 ? 's' : ''}
               </span>
             )}
-            {isNurse && nurseRows.length > 0 && (
+            {isEmployee && employeeRows.length > 0 && (
               <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8', fontFamily: "'DM Mono', monospace" }}>
-                {nurseRows.length} record{nurseRows.length !== 1 ? 's' : ''}
+                {employeeRows.length} record{employeeRows.length !== 1 ? 's' : ''}
               </span>
             )}
-            {(tableLoading || nurseLoading) && <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8' }}>Loading…</span>}
+            {(tableLoading || employeeLoading) && <span style={{ marginTop: '16px', fontSize: '11px', color: '#a8b8c8' }}>Loading…</span>}
           </div>
 
           {/* Column picker — asset categories only */}
-          {!isNurse && (
+          {!isEmployee && (
             <div style={{ background: 'rgba(0,0,0,0.15)', borderRadius: '6px', padding: '12px', marginBottom: '14px', border: '1px solid rgba(168,184,200,0.08)' }}>
               <p style={{ ...SECTION_LABEL, marginBottom: '10px' }}>Columns</p>
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, max-content)', rowGap: '6px', columnGap: '60px' }}>
@@ -757,7 +763,7 @@ function InventoryTab() {
           )}
 
           {/* ── Asset table ── */}
-          {!isNurse && (
+          {!isEmployee && (
             <>
               {(tableRows.length > 0 || addingAsset) && activeCols.length > 0 && (
                 <div style={{ overflowX: 'auto' }}>
@@ -834,74 +840,85 @@ function InventoryTab() {
             </>
           )}
 
-          {/* ── Nurse profiles table ── */}
-          {isNurse && (
+          {/* ── Employees table ── */}
+          {isEmployee && (
             <>
-              {(nurseRows.length > 0 || addingNurse) && (
+              {(employeeRows.length > 0 || addingEmployee) && (
                 <div style={{ overflowX: 'auto' }}>
                   <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
-                        {NURSE_FIELDS.map(f => <th key={f.key} style={TH}>{f.label}</th>)}
+                        {EMPLOYEE_FIELDS.map(f => <th key={f.key} style={TH}>{f.label}</th>)}
                         <th style={{ ...TH, width: '60px' }}></th>
                       </tr>
                     </thead>
                     <tbody>
-                      {addingNurse && (
+                      {addingEmployee && (
                         <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.08)', background: 'rgba(79,142,247,0.04)' }}>
-                          <td style={TD}><input style={CELL_INPUT} value={newNurseDraft.email ?? ''} onChange={e => setNewNurseDraft(d => ({ ...d, email: e.target.value }))} placeholder="email@example.com" /></td>
-                          <td style={TD}><input style={CELL_INPUT} value={newNurseDraft.full_name ?? ''} onChange={e => setNewNurseDraft(d => ({ ...d, full_name: e.target.value }))} placeholder="Full Name" /></td>
+                          <td style={TD}><input style={CELL_INPUT} value={newEmployeeDraft.first_name ?? ''} onChange={e => setNewEmployeeDraft(d => ({ ...d, first_name: e.target.value }))} placeholder="First" /></td>
+                          <td style={TD}><input style={CELL_INPUT} value={newEmployeeDraft.last_name ?? ''} onChange={e => setNewEmployeeDraft(d => ({ ...d, last_name: e.target.value }))} placeholder="Last" /></td>
+                          <td style={TD}><input style={CELL_INPUT} value={newEmployeeDraft.ee_number ?? ''} onChange={e => setNewEmployeeDraft(d => ({ ...d, ee_number: e.target.value }))} placeholder="EE #" /></td>
+                          <td style={TD}><input style={CELL_INPUT} value={newEmployeeDraft.email ?? ''} onChange={e => setNewEmployeeDraft(d => ({ ...d, email: e.target.value }))} placeholder="email@oriol.com" /></td>
                           <td style={TD}>
-                            <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={newNurseDraft.site ?? 'Holden'} onChange={e => setNewNurseDraft(d => ({ ...d, site: e.target.value }))}>
+                            <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={newEmployeeDraft.site ?? 'Holden'} onChange={e => setNewEmployeeDraft(d => ({ ...d, site: e.target.value }))}>
                               {SITES.map(s => <option key={s} value={s} style={{ background: '#1a2535' }}>{s}</option>)}
                             </select>
                           </td>
-                          <td style={TD}>
-                            <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={newNurseDraft.default_priority ?? ''} onChange={e => setNewNurseDraft(d => ({ ...d, default_priority: e.target.value }))}>
-                              {PRIORITIES.map(p => <option key={p.value} value={p.value} style={{ background: '#1a2535' }}>{p.label}</option>)}
-                            </select>
+                          <td style={TD}><input style={CELL_INPUT} value={newEmployeeDraft.position ?? ''} onChange={e => setNewEmployeeDraft(d => ({ ...d, position: e.target.value }))} placeholder="Position" /></td>
+                          <td style={TD}><input style={{ ...CELL_INPUT, width: '60px' }} type="number" value={newEmployeeDraft.hours_per_week ?? ''} onChange={e => setNewEmployeeDraft(d => ({ ...d, hours_per_week: e.target.value }))} placeholder="40" /></td>
+                          <td style={TD}><input style={CELL_INPUT} value={newEmployeeDraft.shift ?? ''} onChange={e => setNewEmployeeDraft(d => ({ ...d, shift: e.target.value }))} placeholder="Day" /></td>
+                          <td style={{ ...TD, textAlign: 'center' }}>
+                            <input type="checkbox" checked={newEmployeeDraft.is_approved_submitter === 'true'} onChange={e => setNewEmployeeDraft(d => ({ ...d, is_approved_submitter: e.target.checked ? 'true' : 'false' }))} style={{ cursor: 'pointer', accentColor: '#4f8ef7', width: '14px', height: '14px' }} />
                           </td>
                           <td style={TD}>
                             <div style={{ display: 'flex', gap: '4px' }}>
-                              <button style={BTN_ICON_GREEN} onClick={addNewNurse} disabled={nurseSaving} title="Save"><Check size={13} /></button>
-                              <button style={BTN_ICON} onClick={() => { setAddingNurse(false); setNewNurseDraft({}); }} title="Cancel"><X size={13} /></button>
+                              <button style={BTN_ICON_GREEN} onClick={addNewEmployee} disabled={employeeSaving} title="Save"><Check size={13} /></button>
+                              <button style={BTN_ICON} onClick={() => { setAddingEmployee(false); setNewEmployeeDraft({}); }} title="Cancel"><X size={13} /></button>
                             </div>
                           </td>
                         </tr>
                       )}
-                      {nurseRows.map(r => (
+                      {employeeRows.map(r => (
                         <tr key={r.id} style={{ borderBottom: '1px solid rgba(168,184,200,0.06)' }}>
-                          {editingNurseId === r.id ? (
+                          {editingEmployeeId === r.id ? (
                             <>
-                              <td style={TD}><input style={CELL_INPUT} value={nurseDraft.email ?? ''} onChange={e => setNurseDraft(d => ({ ...d, email: e.target.value }))} /></td>
-                              <td style={TD}><input style={CELL_INPUT} value={nurseDraft.full_name ?? ''} onChange={e => setNurseDraft(d => ({ ...d, full_name: e.target.value }))} /></td>
+                              <td style={TD}><input style={CELL_INPUT} value={employeeDraft.first_name ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, first_name: e.target.value }))} /></td>
+                              <td style={TD}><input style={CELL_INPUT} value={employeeDraft.last_name ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, last_name: e.target.value }))} /></td>
+                              <td style={TD}><input style={CELL_INPUT} value={employeeDraft.ee_number ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, ee_number: e.target.value }))} /></td>
+                              <td style={TD}><input style={CELL_INPUT} value={employeeDraft.email ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, email: e.target.value }))} /></td>
                               <td style={TD}>
-                                <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={nurseDraft.site ?? ''} onChange={e => setNurseDraft(d => ({ ...d, site: e.target.value }))}>
+                                <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={employeeDraft.site ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, site: e.target.value }))}>
                                   {SITES.map(s => <option key={s} value={s} style={{ background: '#1a2535' }}>{s}</option>)}
                                 </select>
                               </td>
-                              <td style={TD}>
-                                <select style={{ ...CELL_INPUT, cursor: 'pointer' }} value={nurseDraft.default_priority ?? ''} onChange={e => setNurseDraft(d => ({ ...d, default_priority: e.target.value }))}>
-                                  {PRIORITIES.map(p => <option key={p.value} value={p.value} style={{ background: '#1a2535' }}>{p.label}</option>)}
-                                </select>
+                              <td style={TD}><input style={CELL_INPUT} value={employeeDraft.position ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, position: e.target.value }))} /></td>
+                              <td style={TD}><input style={{ ...CELL_INPUT, width: '60px' }} type="number" value={employeeDraft.hours_per_week ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, hours_per_week: e.target.value }))} /></td>
+                              <td style={TD}><input style={CELL_INPUT} value={employeeDraft.shift ?? ''} onChange={e => setEmployeeDraft(d => ({ ...d, shift: e.target.value }))} /></td>
+                              <td style={{ ...TD, textAlign: 'center' }}>
+                                <input type="checkbox" checked={employeeDraft.is_approved_submitter === 'true'} onChange={e => setEmployeeDraft(d => ({ ...d, is_approved_submitter: e.target.checked ? 'true' : 'false' }))} style={{ cursor: 'pointer', accentColor: '#4f8ef7', width: '14px', height: '14px' }} />
                               </td>
                               <td style={TD}>
                                 <div style={{ display: 'flex', gap: '4px' }}>
-                                  <button style={BTN_ICON_GREEN} onClick={saveEditedNurse} disabled={nurseSaving} title="Save"><Check size={13} /></button>
-                                  <button style={BTN_ICON} onClick={() => { setEditingNurseId(null); setNurseDraft({}); }} title="Cancel"><X size={13} /></button>
+                                  <button style={BTN_ICON_GREEN} onClick={saveEditedEmployee} disabled={employeeSaving} title="Save"><Check size={13} /></button>
+                                  <button style={BTN_ICON} onClick={() => { setEditingEmployeeId(null); setEmployeeDraft({}); }} title="Cancel"><X size={13} /></button>
                                 </div>
                               </td>
                             </>
                           ) : (
                             <>
-                              <td style={{ ...TD, color: '#eef2f7' }}>{r.email}</td>
-                              <td style={{ ...TD, color: '#eef2f7' }}>{r.full_name}</td>
-                              <td style={{ ...TD, color: '#eef2f7' }}>{r.site}</td>
-                              <td style={{ ...TD, color: '#eef2f7' }}>{r.default_priority || '—'}</td>
+                              <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{r.first_name}</td>
+                              <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{r.last_name}</td>
+                              <td style={{ ...TD, color: '#a8b8c8', whiteSpace: 'nowrap' }}>{r.ee_number || '—'}</td>
+                              <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{r.email}</td>
+                              <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{r.site}</td>
+                              <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{r.position || '—'}</td>
+                              <td style={{ ...TD, color: '#a8b8c8', whiteSpace: 'nowrap', textAlign: 'right' }}>{r.hours_per_week ?? '—'}</td>
+                              <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{r.shift || '—'}</td>
+                              <td style={{ ...TD, textAlign: 'center', color: r.is_approved_submitter ? '#22cc6e' : '#4a5a6b' }}>{r.is_approved_submitter ? '✓' : '—'}</td>
                               <td style={TD}>
                                 <div style={{ display: 'flex', gap: '4px' }}>
-                                  <button style={BTN_ICON} onClick={() => { setEditingNurseId(r.id); setNurseDraft({ email: r.email, full_name: r.full_name, site: r.site, default_priority: r.default_priority }); }} title="Edit"><Pencil size={11} /></button>
-                                  <button style={{ ...BTN_ICON, color: '#e05c5c' }} onClick={() => deleteNurse(r.id)} title="Delete"><Trash2 size={11} /></button>
+                                  <button style={BTN_ICON} onClick={() => { setEditingEmployeeId(r.id); setEmployeeDraft({ first_name: r.first_name, last_name: r.last_name, ee_number: r.ee_number ?? '', email: r.email, site: r.site, position: r.position ?? '', hours_per_week: r.hours_per_week != null ? String(r.hours_per_week) : '', shift: r.shift ?? '', is_approved_submitter: r.is_approved_submitter ? 'true' : 'false' }); }} title="Edit"><Pencil size={11} /></button>
+                                  <button style={{ ...BTN_ICON, color: '#e05c5c' }} onClick={() => deleteEmployee(r.id)} title="Delete"><Trash2 size={11} /></button>
                                 </div>
                               </td>
                             </>
@@ -912,8 +929,8 @@ function InventoryTab() {
                   </table>
                 </div>
               )}
-              {!nurseLoading && nurseRows.length === 0 && !addingNurse && (
-                <p style={{ fontSize: '12px', color: '#4a5a6b', textAlign: 'center', padding: '32px 0' }}>No approved submitters yet. Click &quot;+ Add&quot; to add one.</p>
+              {!employeeLoading && employeeRows.length === 0 && !addingEmployee && (
+                <p style={{ fontSize: '12px', color: '#4a5a6b', textAlign: 'center', padding: '32px 0' }}>No employees yet. Click &quot;+ Add&quot; to add one.</p>
               )}
             </>
           )}

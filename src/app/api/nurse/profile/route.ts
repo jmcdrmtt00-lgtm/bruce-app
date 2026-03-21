@@ -17,11 +17,17 @@ export async function GET(request: NextRequest) {
   if (!email?.trim()) return NextResponse.json({ error: 'email required' }, { status: 400 });
 
   const { data, error } = await supabase
-    .from('nurse_profiles')
-    .select('full_name, site, default_priority')
+    .from('employees')
+    .select('first_name, last_name, site')
     .eq('email', email.trim().toLowerCase())
+    .eq('is_approved_submitter', true)
     .single();
 
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
-  return NextResponse.json(data);
+
+  return NextResponse.json({
+    full_name: `${data.first_name} ${data.last_name}`.trim(),
+    site: data.site,
+    default_priority: '',
+  });
 }
