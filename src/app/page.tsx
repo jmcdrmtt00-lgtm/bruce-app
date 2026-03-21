@@ -923,62 +923,34 @@ export default function DashboardPage() {
           >
 
             {/* ── Header strip ─────────────────────────────────────────── */}
-            <div style={{ display: 'flex', alignItems: 'center', gap: '10px', padding: '11px 20px 10px', borderBottom: '1px solid rgba(168,184,200,0.15)', flexShrink: 0, minHeight: '46px' }}>
-              {/* Left group: task number + task name + mic — fills available space */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flex: 1, minWidth: 0 }}>
-                {taskNumber && (
-                  <span style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
-                    #{taskNumber}
-                  </span>
-                )}
+            <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '11px 20px 10px', borderBottom: '1px solid rgba(168,184,200,0.15)', flexShrink: 0, minHeight: '46px' }}>
+              {taskNumber && (
+                <span style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
+                  #{taskNumber}
+                </span>
+              )}
+              {/* Auto-sizing input: hidden mirror span sets the width; input overlays it */}
+              <div style={{ position: 'relative', minWidth: '12ch', maxWidth: '100%' }}>
+                <span aria-hidden style={{ display: 'block', visibility: 'hidden', fontSize: '15px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: 'pre', padding: 0, lineHeight: '1.4' }}>
+                  {taskName || (selectedTask ? '\u00a0' : 'Select a task from the list \u2192')}
+                </span>
                 <input
                   value={taskName}
                   onChange={e => { setTaskName(e.target.value); markDirty(); }}
                   readOnly={!selectedTask}
                   placeholder={selectedTask ? '' : 'Select a task from the list →'}
                   className="rp-task-input"
-                  style={{ flex: 1, fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", minWidth: 0 }}
-                />
-                <VoiceButton
-                  listening={listeningName}
-                  onToggle={() => listeningName
-                    ? stopVoice(nameRecRef, setListeningName)
-                    : startVoice(wrapVoiceResult(t => { setTaskName(t); markDirty(); }, () => setTaskName('')), setListeningName, nameRecRef, false)
-                  }
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", padding: 0 }}
                 />
               </div>
-              {/* Right: save indicator + history + deselect — faded when no task */}
-              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, opacity: selectedTask ? 1 : 0.25, pointerEvents: selectedTask ? 'auto' : 'none', transition: 'opacity 0.15s' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  {saveStatus === 'saving' && <span style={{ fontSize: '10px', color: '#a8b8c8' }}>Saving…</span>}
-                  {saveStatus === 'saved'  && <span style={{ fontSize: '10px', color: '#4db88c' }}>Saved ✓</span>}
-                  {allUpdates.length > 0 && (
-                    <button
-                      onClick={() => setHistoryOpen(o => !o)}
-                      style={{ padding: '4px 8px', borderRadius: '5px', fontSize: '11px', cursor: 'pointer', fontFamily: "'DM Sans', sans-serif", border: '1px solid rgba(168,184,200,0.28)', background: historyOpen ? 'rgba(255,255,255,0.07)' : 'rgba(255,255,255,0.03)', color: historyOpen ? '#eef2f7' : '#a8b8c8' }}
-                    >
-                      History
-                    </button>
-                  )}
-                  <button onClick={resetPanel} title="Deselect" style={{ padding: '4px 6px', borderRadius: '5px', cursor: 'pointer', border: '1px solid rgba(168,184,200,0.3)', background: 'transparent', color: '#6b8aaa', fontSize: '13px', lineHeight: 1 }}>×</button>
-                </div>
-              </div>
+              <VoiceButton
+                listening={listeningName}
+                onToggle={() => listeningName
+                  ? stopVoice(nameRecRef, setListeningName)
+                  : startVoice(wrapVoiceResult(t => { setTaskName(t); markDirty(); }, () => setTaskName('')), setListeningName, nameRecRef, false)
+                }
+              />
             </div>
-
-            {/* ── History drawer ────────────────────────────────────────── */}
-            {historyOpen && allUpdates.length > 0 && (
-              <div style={{ padding: '12px 20px', borderBottom: '1px solid rgba(168,184,200,0.15)', maxHeight: '180px', overflowY: 'auto' }}>
-                {allUpdates.map((u, i) => (
-                  <div key={i} style={{ fontSize: '11px', borderBottom: i < allUpdates.length - 1 ? '1px solid rgba(168,184,200,0.08)' : 'none', paddingBottom: '6px', marginBottom: '6px' }}>
-                    <span style={{ fontWeight: 500, color: '#a8b8c8', marginRight: '6px' }}>
-                      {u.type === 'details' ? 'Task details' : u.type === 'progress' ? 'Progress' : u.type === 'ai_response' ? 'IT Buddy' : u.type === 'user_reply' ? 'Reply' : u.type}
-                    </span>
-                    <span style={{ color: '#3a4a5c' }}>{u.created_at ? new Date(u.created_at).toLocaleString() : ''}</span>
-                    <p style={{ color: '#a8b8c8', whiteSpace: 'pre-wrap', marginTop: '2px' }}>{u.note}</p>
-                  </div>
-                ))}
-              </div>
-            )}
 
             {/* ── Scrollable body ───────────────────────────────────────── */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
