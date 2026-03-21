@@ -930,13 +930,13 @@ export default function DashboardPage() {
               {/* Auto-sizing input: hidden mirror span sets the width; input overlays it */}
               <div style={{ position: 'relative', minWidth: '12ch', maxWidth: '100%' }}>
                 <span aria-hidden style={{ display: 'block', visibility: 'hidden', fontSize: '15px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: 'pre', padding: 0, lineHeight: '1.4' }}>
-                  {taskName || (selectedTask ? '\u00a0' : 'Select a task from the list \u2192')}
+                  {taskName || '\u00a0'}
                 </span>
                 <input
                   value={taskName}
                   onChange={e => { setTaskName(e.target.value); markDirty(); }}
                   readOnly={!selectedTask}
-                  placeholder={selectedTask ? '' : 'Select a task from the list →'}
+                  placeholder=""
                   className="rp-task-input"
                   style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", padding: 0 }}
                 />
