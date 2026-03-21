@@ -35,7 +35,7 @@ function TicketTable({ tickets, onRowClick, selectedId }: {
             <th className="w-8">#</th>
             <th className="text-left">Task Name</th>
             <th className="w-24">Requester</th>
-            <th className="w-36 text-center">Date of Request</th>
+            <th className="w-36 text-center">Date</th>
           </tr>
         </thead>
         <tbody>

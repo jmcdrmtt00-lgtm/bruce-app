@@ -688,10 +688,10 @@ export default function DashboardPage() {
     outline: 'none', width: '100%',
   };
   const dpAdminSelect: React.CSSProperties = {
-    fontSize: '11px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)',
+    fontSize: '11px', color: '#eef2f7', background: '#1a2840',
     border: '1px solid rgba(168,184,200,0.15)', borderRadius: '4px',
     padding: '5px 8px', fontFamily: "'DM Sans', sans-serif",
-    outline: 'none', width: '100%', cursor: 'pointer',
+    outline: 'none', width: '100%', cursor: 'pointer', colorScheme: 'dark',
   };
   // Work fields — prominent (primary content)
   const dpWorkLabel: React.CSSProperties = {
@@ -780,7 +780,7 @@ export default function DashboardPage() {
                     <div style={{ position: 'absolute', top: 'calc(100% + 4px)', right: 0, background: '#1a2535', border: '1px solid rgba(168,184,200,0.2)', borderRadius: '6px', padding: '8px 10px', zIndex: 100, minWidth: '150px', boxShadow: '0 4px 16px rgba(0,0,0,0.4)' }}>
                       {([
                         { key: 'requester',     label: 'Requester' },
-                        { key: 'targetDate',    label: 'Target date' },
+                        { key: 'targetDate',    label: 'Date' },
                         { key: 'dateSubmitted', label: 'Date submitted' },
                       ] as const).map(col => (
                         <label key={col.key} style={{ display: 'flex', alignItems: 'center', gap: '8px', padding: '5px 0', cursor: 'pointer', fontSize: '11px', color: '#a8b8c8', fontFamily: "'DM Sans', sans-serif" }}>
@@ -947,26 +947,8 @@ export default function DashboardPage() {
                   : startVoice(wrapVoiceResult(t => { setTaskName(t); markDirty(); }, () => setTaskName('')), setListeningName, nameRecRef, false)
                 }
               />
-              {/* Urgency, status, actions — faded when no task selected */}
+              {/* Actions — faded when no task selected */}
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexShrink: 0, opacity: selectedTask ? 1 : 0.25, pointerEvents: selectedTask ? 'auto' : 'none', transition: 'opacity 0.15s' }}>
-                {/* Urgency badge-select */}
-                <select
-                  value={priority}
-                  onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }}
-                  style={{
-                    padding: '3px 8px', borderRadius: '4px', fontSize: '10px', fontWeight: 600,
-                    cursor: 'pointer', flexShrink: 0, appearance: 'none', colorScheme: 'normal',
-                    fontFamily: "'DM Sans', sans-serif",
-                    border: priority === 'high' ? '2px solid #ff4444' : priority === 'low' ? '2px solid #22cc6e' : '2px solid #8ba8c8',
-                    background: priority === 'high' ? '#3a1a1a' : priority === 'low' ? '#1a3328' : '#223044',
-                    color: '#ffffff',
-                  }}
-                >
-                  <option value="" style={{ background: '#1a2535', color: '#ffffff' }}>— urgency</option>
-                  <option value="high" style={{ background: '#1a2535', color: '#ffffff' }}>High</option>
-                  <option value="low" style={{ background: '#1a2535', color: '#ffffff' }}>Low</option>
-                </select>
-                {/* Right-side actions */}
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
                   {saveStatus === 'saving' && <span style={{ fontSize: '10px', color: '#a8b8c8' }}>Saving…</span>}
                   {saveStatus === 'saved'  && <span style={{ fontSize: '10px', color: '#4db88c' }}>Saved ✓</span>}
@@ -1005,13 +987,37 @@ export default function DashboardPage() {
 
                 {/* ── Admin fields — compact, muted (supporting context) ── */}
                 <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(168,184,200,0.07)', borderRadius: '6px', padding: '10px 12px' }}>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, minmax(0,1fr))', gap: '10px' }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0,1fr))', gap: '10px' }}>
+                    {/* Row 1: Status, Priority, Task Type */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Status</label>
                       <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }} style={dpAdminSelect}>
                         <option value="open">Open</option>
                         <option value="needs_info">Needs info</option>
                         <option value="resolved">Completed</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={dpAdminLabel}>Priority</label>
+                      <select value={priority} onChange={e => { setPriority(e.target.value as 'high' | 'low' | ''); markDirty(); }} style={dpAdminSelect}>
+                        <option value="">—</option>
+                        <option value="high">High</option>
+                        <option value="low">Low</option>
+                      </select>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={dpAdminLabel}>Task type</label>
+                      <select value={selectedType} onChange={e => selectProblemType(e.target.value)} style={dpAdminSelect}>
+                        {QUICK_TASK_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
+                      </select>
+                    </div>
+                    {/* Row 2: Assigned To, Requester, Date */}
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                      <label style={dpAdminLabel}>Assigned to</label>
+                      <select value={assignedTo} onChange={e => { setAssignedTo(e.target.value); markDirty(); }} style={dpAdminSelect}>
+                        <option value="">Unassigned</option>
+                        <option value="Bruce">Bruce</option>
+                        <option value="John">John</option>
                       </select>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
@@ -1028,21 +1034,7 @@ export default function DashboardPage() {
                       </div>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={dpAdminLabel}>Assigned to</label>
-                      <select value={assignedTo} onChange={e => { setAssignedTo(e.target.value); markDirty(); }} style={dpAdminSelect}>
-                        <option value="">Unassigned</option>
-                        <option value="Bruce">Bruce</option>
-                        <option value="John">John</option>
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={dpAdminLabel}>Task type</label>
-                      <select value={selectedType} onChange={e => selectProblemType(e.target.value)} style={dpAdminSelect}>
-                        {QUICK_TASK_TYPES.map(t => <option key={t.id} value={t.id}>{t.label}</option>)}
-                      </select>
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
-                      <label style={dpAdminLabel}>Target date</label>
+                      <label style={dpAdminLabel}>Date</label>
                       <input type="date" value={dateDue} onChange={e => { setDateDue(e.target.value); markDirty(); }} style={dpAdminInput} />
                     </div>
                   </div>
