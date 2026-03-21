@@ -741,7 +741,7 @@ function InventoryTab() {
 
             {/* Add */}
             <button style={BTN_PRIMARY} onClick={isEmployee
-              ? () => { setAddingEmployee(true); setNewEmployeeDraft({ site: 'Holden', is_approved_submitter: 'false' }); }
+              ? () => { setAddingEmployee(true); setNewEmployeeDraft({ site: 'Holden', is_approved_submitter: 'false', hours_per_week: '40' }); }
               : () => { setAddingAsset(true); setNewAssetDraft({}); }
             }>
               <Plus size={13} /> Add
