@@ -599,9 +599,9 @@ function InventoryTab() {
             <div style={{ overflowX: 'auto' }} data-theme="light">
               <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
                 <thead>
-                  <tr style={{ background: '#4f8ef7' }}>
+                  <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.15)' }}>
                     {activeCols.map(f => (
-                      <th key={f.key} style={{ whiteSpace: 'nowrap', padding: '6px 14px', textAlign: 'left', fontWeight: 700, fontSize: '11px', color: '#ffffff', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{f.label}</th>
+                      <th key={f.key} style={{ whiteSpace: 'nowrap', padding: '6px 14px', textAlign: 'left', fontWeight: 600, fontSize: '9px', color: '#a8b8c8', textTransform: 'uppercase', letterSpacing: '0.07em' }}>{f.label}</th>
                     ))}
                   </tr>
                 </thead>
