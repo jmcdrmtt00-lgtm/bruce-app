@@ -882,8 +882,8 @@ export default function DashboardPage() {
                       <div style={{ ...cell, padding: '5px 8px 5px 4px' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
                         <span style={{ width: '5px', height: '5px', borderRadius: '50%', display: 'inline-block', background: task.priority === 'high' ? '#ff4444' : task.priority === 'low' ? '#22cc6e' : '#3a4a5c' }} />
                       </div>
-                      {/* task name */}
-                      <div style={{ ...cell, padding: '5px 8px', fontSize: '12px', color: '#eef2f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
+                      {/* task name — must be display:block (not flex) for text-overflow:ellipsis */}
+                      <div style={{ background: rowBg, cursor: 'pointer', transition: 'background 0.1s', padding: '5px 8px', fontSize: '12px', color: '#eef2f7', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
                         {task.title || task.description}
                       </div>
                       {/* optional: requester */}
