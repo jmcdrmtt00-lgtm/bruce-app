@@ -350,7 +350,7 @@ function parseInventoryFile(file: File): Promise<SheetInfo[]> {
     reader.readAsArrayBuffer(file);
   });
 }
-async function downloadInventory(orgFetch: typeof fetch) {
+async function downloadInventory(orgFetch: (url: string, opts?: RequestInit) => Promise<Response>) {
   const res = await orgFetch('/api/assets/download');
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Download failed');
@@ -440,7 +440,7 @@ function parseTaskFile(file: File): Promise<TaskRow[]> {
     reader.readAsArrayBuffer(file);
   });
 }
-async function downloadTasks(orgFetch: typeof fetch) {
+async function downloadTasks(orgFetch: (url: string, opts?: RequestInit) => Promise<Response>) {
   const res = await orgFetch('/api/tasks');
   const data = await res.json();
   if (!res.ok) throw new Error(data.error || 'Download failed');
