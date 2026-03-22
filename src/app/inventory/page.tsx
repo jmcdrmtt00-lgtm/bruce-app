@@ -309,7 +309,7 @@ function mapAssetRow(row: Record<string, unknown>, category: string, site: strin
   };
 }
 function hasData(r: AssetRow): boolean {
-  return !!(r.name || r.serial_number || r.make || r.model || r.os || r.ram || r.asset_number || r.price || r.purchased || r.install_date || r.warranty_expires || r.notes || (r.extra && Object.keys(r.extra).length > 0));
+  return !!(r.serial_number || r.make || r.model || r.os || r.ram || r.asset_number || r.price || r.purchased || r.install_date || r.warranty_expires || r.notes || (r.extra && Object.keys(r.extra).length > 0));
 }
 function parseInventoryFile(file: File): Promise<SheetInfo[]> {
   return new Promise((resolve, reject) => {
