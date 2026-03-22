@@ -61,6 +61,10 @@ def _sb_post(path: str, body: dict) -> dict:
     data = r.json()
     return data[0] if isinstance(data, list) else data
 
+def _sb_patch(path: str, body: dict) -> None:
+    r = httpx.patch(_sb_url(path), headers=_sb_headers(), json=body, timeout=10)
+    r.raise_for_status()
+
 
 # ── Gmail service ─────────────────────────────────────────────────────────────
 
@@ -117,6 +121,32 @@ def _send_reply(service, to: str, original_subject: str, ticket_number: int,
         f"  Org:      {org_name}\n\n"
         f"IT Buddy will follow up with you shortly. "
         f"You can reply to this email with any additional details.\n\n"
+        f"— IT Buddy"
+    )
+    msg = MIMEText(body)
+    msg["To"]      = to
+    msg["From"]    = GMAIL_ADDRESS
+    msg["Subject"] = subject
+
+    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
+    service.users().messages().send(
+        userId="me", body={"raw": raw}
+    ).execute()
+
+
+def _send_more_info_reply(service, to: str, original_subject: str,
+                          sender_name: str, missing: str) -> None:
+    subject = (
+        original_subject
+        if original_subject.startswith("Re:")
+        else f"Re: {original_subject}"
+    )
+    body = (
+        f"Hi {sender_name},\n\n"
+        f"Thanks for reaching out to IT. To help you as quickly as possible, "
+        f"could you provide a bit more information?\n\n"
+        f"  {missing}\n\n"
+        f"Just reply to this email with the details and we'll get right on it.\n\n"
         f"— IT Buddy"
     )
     msg = MIMEText(body)
@@ -192,14 +222,34 @@ def _process_message(service, msg_id: str) -> None:
         "source":      "email",
     })
     ticket_number = incident.get("task_number", 0)
+    incident_id   = incident.get("id")
     print(f"Email poll: created ticket #{ticket_number} for org '{org_slug}' from {reply_to}", flush=True)
 
-    # Send confirmation reply
-    try:
-        _send_reply(service, reply_to, subject, ticket_number, sender_name, org_name)
-        print(f"Email poll: reply sent to {reply_to}", flush=True)
-    except Exception as exc:
-        print(f"Email poll: failed to send reply to {reply_to}: {exc}", flush=True)
+    # Triage: does this email have enough info to act on?
+    from services.ai_service import triage_email_ticket
+    triage = triage_email_ticket(subject, body)
+    adequate = triage.get("adequate", True)
+    print(f"Email poll: triage result — adequate={adequate}", flush=True)
+
+    if adequate:
+        # Promote to IT dashboard
+        _sb_patch(f"incidents?id=eq.{incident_id}",
+                  {"source": "submitted by nurse adequate info"})
+        try:
+            _send_reply(service, reply_to, subject, ticket_number, sender_name, org_name)
+            print(f"Email poll: confirmation reply sent to {reply_to}", flush=True)
+        except Exception as exc:
+            print(f"Email poll: failed to send reply to {reply_to}: {exc}", flush=True)
+    else:
+        missing = triage.get("missing", "Please describe the problem in more detail.")
+        # Keep in Tickets tab, ask for more info
+        _sb_patch(f"incidents?id=eq.{incident_id}",
+                  {"source": "submitted by nurse needs more info"})
+        try:
+            _send_more_info_reply(service, reply_to, subject, sender_name, missing)
+            print(f"Email poll: more-info reply sent to {reply_to} — missing: {missing}", flush=True)
+        except Exception as exc:
+            print(f"Email poll: failed to send more-info reply to {reply_to}: {exc}", flush=True)
 
     # Mark as read
     service.users().messages().modify(

@@ -31,13 +31,13 @@ export async function GET(request: NextRequest) {
     // IT's work queue: tasks created by IT, email tickets, or nurse-submitted with adequate info
     // Include legacy sources (null, 'issue') for backward compatibility
     query = query.or(
-      "source.eq.submitted by IT,source.eq.submitted by nurse adequate info,source.eq.issue,source.eq.email,source.is.null"
+      "source.eq.submitted by IT,source.eq.submitted by nurse adequate info,source.eq.issue,source.is.null"
     );
   } else if (source === 'tickets') {
     // Nurse-submitted tickets: needs more info (email route) or fixed by nurse
     // Include legacy sources ('ticket', 'nurse_self_fix') for backward compatibility
     query = query.or(
-      "source.eq.submitted by nurse needs more info,source.eq.submitted by nurse fixed by nurse,source.eq.ticket,source.eq.nurse_self_fix"
+      "source.eq.submitted by nurse needs more info,source.eq.submitted by nurse fixed by nurse,source.eq.ticket,source.eq.nurse_self_fix,source.eq.email"
     );
   }
 

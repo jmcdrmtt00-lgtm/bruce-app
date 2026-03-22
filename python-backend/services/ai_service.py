@@ -540,6 +540,41 @@ async def diagnose(
         return {"cause": None, "detail": None, "questions": [text]}
 
 
+def triage_email_ticket(subject: str, body: str) -> dict:
+    """Evaluate whether an email IT ticket has enough info to act on.
+    Returns {"adequate": True} or {"adequate": False, "missing": "what to ask for"}.
+    Synchronous — safe to call from a background thread.
+    """
+    import json as _json
+
+    system = (
+        "You are an IT help desk triage assistant. Read an email from a staff member "
+        "and decide if it contains enough information for IT to take action.\n\n"
+        "ADEQUATE: the problem is clearly described and IT knows what to look into "
+        "(e.g. 'I can\\'t log into PCC', 'the printer in the dining room is jammed', "
+        "'my computer won\\'t turn on').\n\n"
+        "NEEDS MORE INFO: the description is too vague to act on "
+        "(e.g. 'help', 'it\\'s not working', 'broken', 'please fix').\n\n"
+        "Respond with JSON only — no other text:\n"
+        '{"adequate": true}\n'
+        'or\n'
+        '{"adequate": false, "missing": "one short sentence describing what info is needed"}'
+    )
+
+    content = f"Subject: {subject}\n\nBody: {body or '(no body)'}"
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=100,
+        system=system,
+        messages=[{"role": "user", "content": content}],
+    )
+    text = message.content[0].text.strip()
+    try:
+        return _json.loads(text)
+    except Exception:
+        return {"adequate": True}  # default to adequate if parsing fails
+
+
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:
     """Scan completed task notes for time-based suggestions and return new tasks to propose."""
     if not completed_tasks:
