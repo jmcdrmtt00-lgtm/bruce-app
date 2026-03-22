@@ -7,6 +7,7 @@ import { Incident, IncidentUpdate } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
 import AiDiagnoseSection from '@/components/AiDiagnoseSection';
+import { useOrg } from '@/contexts/OrgContext';
 
 interface UnassignedAsset {
   id: string;
@@ -109,6 +110,7 @@ function VoiceButton({ listening, onToggle }: { listening: boolean; onToggle: ()
 
 export default function DashboardPage() {
   const router = useRouter();
+  const { orgFetch } = useOrg();
   const [tasks, setTasks]   = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
   const [seeding, setSeeding] = useState(false);
@@ -205,11 +207,11 @@ export default function DashboardPage() {
   const newDetailsRecRef = useRef<unknown>(null);
 
   const loadTasks = useCallback(() => {
-    fetch('/api/issues?source=dashboard')
+    orgFetch('/api/issues?source=dashboard')
       .then(r => r.json())
       .then(data => { setTasks((data.incidents ?? []).filter((i: Incident) => i.task_number != null)); setLoading(false); })
       .catch(() => setLoading(false));
-  }, []);
+  }, [orgFetch]);
 
   useEffect(() => { fetch('/api/track-click', { method: 'POST' }).catch(() => {}); }, []);
 
@@ -586,7 +588,7 @@ export default function DashboardPage() {
   async function handleAddTask() {
     if (!newTaskName.trim()) return;
     try {
-      const res = await fetch('/api/issues', {
+      const res = await orgFetch('/api/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title: newTaskName.trim(), status: 'pending', reported_by: newTaskRequester.trim() || null, priority: newTaskPriority || null, description: newTaskDetails.trim() || newTaskName.trim(), screen: newTaskType || null, source: 'submitted by IT' }),

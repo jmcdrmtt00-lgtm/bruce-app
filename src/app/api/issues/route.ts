@@ -16,19 +16,26 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const orgId  = request.headers.get('x-org-id');
   const source = request.nextUrl.searchParams.get('source');
 
   let query = supabase
     .from('incidents')
     .select('*')
-    .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
+  // Filter by org if provided, otherwise fall back to user_id (legacy)
+  if (orgId) {
+    query = query.eq('org_id', orgId);
+  } else {
+    query = query.eq('user_id', user.id);
+  }
+
   if (source === 'dashboard') {
-    // IT's work queue: tasks created by IT or submitted by nurses with adequate info
+    // IT's work queue: tasks created by IT, email tickets, or nurse-submitted with adequate info
     // Include legacy sources (null, 'issue') for backward compatibility
     query = query.or(
-      "source.eq.submitted by IT,source.eq.submitted by nurse adequate info,source.eq.issue,source.is.null"
+      "source.eq.submitted by IT,source.eq.submitted by nurse adequate info,source.eq.issue,source.eq.email,source.is.null"
     );
   } else if (source === 'tickets') {
     // Nurse-submitted tickets: needs more info (email route) or fixed by nurse
