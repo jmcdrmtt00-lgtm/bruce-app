@@ -20,10 +20,11 @@ import os
 import re
 from email.mime.text import MIMEText
 
+import httpx
+
 from google.auth.transport.requests import Request
 from google.oauth2.credentials import Credentials
 from googleapiclient.discovery import build
-from supabase import create_client, Client
 
 logger = logging.getLogger(__name__)
 
@@ -32,14 +33,33 @@ ADDR_PATTERN    = re.compile(
     r"admin\+([a-z0-9-]+)-([^@\s]+)@lm-intel\.ai", re.IGNORECASE
 )
 
-# ── Supabase client ───────────────────────────────────────────────────────────
+# ── Supabase REST helpers ─────────────────────────────────────────────────────
 
-def _supabase() -> Client:
-    url = os.getenv("ITBUDDY_SUPABASE_URL", "")
+def _sb_headers() -> dict:
     key = os.getenv("ITBUDDY_SUPABASE_SERVICE_ROLE_KEY", "")
-    if not url or not key:
+    return {
+        "apikey":        key,
+        "Authorization": f"Bearer {key}",
+        "Content-Type":  "application/json",
+        "Prefer":        "return=representation",
+    }
+
+def _sb_url(path: str) -> str:
+    base = os.getenv("ITBUDDY_SUPABASE_URL", "").rstrip("/")
+    if not base:
         raise RuntimeError("ITBUDDY_SUPABASE_URL / ITBUDDY_SUPABASE_SERVICE_ROLE_KEY not set")
-    return create_client(url, key)
+    return f"{base}/rest/v1/{path}"
+
+def _sb_get(path: str, params: dict) -> list:
+    r = httpx.get(_sb_url(path), headers=_sb_headers(), params=params, timeout=10)
+    r.raise_for_status()
+    return r.json()
+
+def _sb_post(path: str, body: dict) -> dict:
+    r = httpx.post(_sb_url(path), headers=_sb_headers(), json=body, timeout=10)
+    r.raise_for_status()
+    data = r.json()
+    return data[0] if isinstance(data, list) else data
 
 
 # ── Gmail service ─────────────────────────────────────────────────────────────
@@ -112,7 +132,7 @@ def _send_reply(service, to: str, original_subject: str, ticket_number: int,
 
 # ── Core processing ───────────────────────────────────────────────────────────
 
-def _process_message(service, sb: Client, msg_id: str) -> None:
+def _process_message(service, msg_id: str) -> None:
     """Process a single Gmail message: create ticket + reply + mark read."""
     full = service.users().messages().get(
         userId="me", id=msg_id, format="full"
@@ -134,60 +154,39 @@ def _process_message(service, sb: Client, msg_id: str) -> None:
     sender_name = match.group(2)
 
     # Extract reply-to address from From: header
-    # From: can be "Alice Smith <alice@example.com>" or just "alice@example.com"
     from_email_match = re.search(r"<([^>]+)>", from_hdr)
     reply_to = from_email_match.group(1) if from_email_match else from_hdr.strip()
 
     # Look up org
-    org_resp = sb.table("orgs").select("id, name").eq("slug", org_slug).maybe_single().execute()
-    if not org_resp.data:
+    orgs = _sb_get("orgs", {"slug": f"eq.{org_slug}", "select": "id,name", "limit": "1"})
+    if not orgs:
         logger.warning("Unknown org slug '%s' in email %s — skipping", org_slug, msg_id)
         return
-
-    org_id   = org_resp.data["id"]
-    org_name = org_resp.data["name"]
+    org_id   = orgs[0]["id"]
+    org_name = orgs[0]["name"]
 
     # Find a user_id to attach the incident to (first admin of this org)
-    member_resp = (
-        sb.table("user_orgs")
-        .select("user_id")
-        .eq("org_id", org_id)
-        .eq("role", "admin")
-        .limit(1)
-        .execute()
-    )
-    if not member_resp.data:
-        # Fall back to any member
-        member_resp = (
-            sb.table("user_orgs")
-            .select("user_id")
-            .eq("org_id", org_id)
-            .limit(1)
-            .execute()
-        )
-    if not member_resp.data:
+    members = _sb_get("user_orgs", {"org_id": f"eq.{org_id}", "role": "eq.admin",
+                                     "select": "user_id", "limit": "1"})
+    if not members:
+        members = _sb_get("user_orgs", {"org_id": f"eq.{org_id}",
+                                         "select": "user_id", "limit": "1"})
+    if not members:
         logger.warning("No users found for org '%s' — skipping email %s", org_slug, msg_id)
         return
-
-    user_id = member_resp.data[0]["user_id"]
+    user_id = members[0]["user_id"]
 
     # Insert incident
-    incident_resp = (
-        sb.table("incidents")
-        .insert({
-            "org_id":      org_id,
-            "user_id":     user_id,
-            "title":       subject[:200],
-            "description": body or f"(Email from {reply_to} — no body text)",
-            "reported_by": f"{sender_name} <{reply_to}>",
-            "status":      "open",
-            "source":      "email",
-        })
-        .select("task_number")
-        .single()
-        .execute()
-    )
-    ticket_number = incident_resp.data.get("task_number", 0)
+    incident = _sb_post("incidents", {
+        "org_id":      org_id,
+        "user_id":     user_id,
+        "title":       subject[:200],
+        "description": body or f"(Email from {reply_to} — no body text)",
+        "reported_by": f"{sender_name} <{reply_to}>",
+        "status":      "open",
+        "source":      "email",
+    })
+    ticket_number = incident.get("task_number", 0)
     logger.info("Created ticket #%s for org '%s' from %s", ticket_number, org_slug, reply_to)
 
     # Send confirmation reply
@@ -219,9 +218,13 @@ def poll_once() -> None:
 
     try:
         service = _gmail_service()
-        sb      = _supabase()
     except Exception as exc:
-        logger.error("Gmail/Supabase init failed: %s", exc)
+        logger.error("Gmail init failed: %s", exc)
+        return
+
+    # Verify Supabase env vars are present before processing
+    if not os.getenv("ITBUDDY_SUPABASE_URL") or not os.getenv("ITBUDDY_SUPABASE_SERVICE_ROLE_KEY"):
+        logger.error("ITBUDDY_SUPABASE_URL / ITBUDDY_SUPABASE_SERVICE_ROLE_KEY not set")
         return
 
     # Fetch unread messages in inbox
@@ -237,6 +240,6 @@ def poll_once() -> None:
 
     for msg in messages:
         try:
-            _process_message(service, sb, msg["id"])
+            _process_message(service, msg["id"])
         except Exception as exc:
             logger.error("Error processing message %s: %s", msg["id"], exc)
