@@ -1,5 +1,9 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+from contextlib import asynccontextmanager
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -8,7 +12,28 @@ from services import ai_service
 
 load_dotenv()
 
-app = FastAPI(title="Bruce IT Backend")
+logger = logging.getLogger(__name__)
+
+
+async def _email_poll_loop() -> None:
+    """Background task: poll Gmail for new IT ticket emails every 2 minutes."""
+    from services.gmail_poller import poll_once
+    while True:
+        try:
+            await asyncio.to_thread(poll_once)
+        except Exception as exc:
+            logger.error("Email poll error: %s", exc)
+        await asyncio.sleep(120)
+
+
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    task = asyncio.create_task(_email_poll_loop())
+    yield
+    task.cancel()
+
+
+app = FastAPI(title="Bruce IT Backend", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
