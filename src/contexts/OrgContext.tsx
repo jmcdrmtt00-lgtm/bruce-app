@@ -54,7 +54,7 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
         const fetched: Org[] = data.orgs ?? [];
         setOrgs(fetched);
         if (fetched.length === 0) return;
-        const stored = localStorage.getItem('activeOrgId');
+        const stored = sessionStorage.getItem('activeOrgId');
         const valid = stored && fetched.find(o => o.id === stored);
         setActiveOrgId(valid ? stored : fetched[0].id);
       })
@@ -63,7 +63,7 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
 
   function switchOrg(orgId: string) {
     setActiveOrgId(orgId);
-    localStorage.setItem('activeOrgId', orgId);
+    sessionStorage.setItem('activeOrgId', orgId);
   }
 
   const orgFetch = useCallback((url: string, opts?: RequestInit): Promise<Response> => {

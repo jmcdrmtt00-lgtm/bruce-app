@@ -16,7 +16,7 @@ export async function GET() {
   const { data, error } = await supabase
     .from('orgs')
     .select('id, name, slug')
-    .order('created_at');
+    .order('name');
 
   if (error) return NextResponse.json({ orgs: [] });
   return NextResponse.json({ orgs: data ?? [] });
