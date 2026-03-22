@@ -926,19 +926,24 @@ export default function DashboardPage() {
                 </span>
               )}
               {/* Auto-sizing input: hidden mirror span sets the width; input overlays it */}
-              <div style={{ position: 'relative', minWidth: '12ch', maxWidth: '100%' }}>
-                <span aria-hidden style={{ display: 'block', visibility: 'hidden', fontSize: '15px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: 'pre', padding: 0, lineHeight: '1.4' }}>
-                  {taskName || '\u00a0'}
+              {!selectedTask ? (
+                <span style={{ fontSize: '15px', fontWeight: 600, color: '#3a4a5c', fontFamily: "'DM Sans', sans-serif" }}>
+                  Select a task to view details
                 </span>
-                <input
-                  value={taskName}
-                  onChange={e => { setTaskName(e.target.value); markDirty(); }}
-                  readOnly={!selectedTask}
-                  placeholder=""
-                  className="rp-task-input"
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", padding: 0 }}
-                />
-              </div>
+              ) : (
+                <div style={{ position: 'relative', minWidth: '12ch', maxWidth: '100%' }}>
+                  <span aria-hidden style={{ display: 'block', visibility: 'hidden', fontSize: '15px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: 'pre', padding: 0, lineHeight: '1.4' }}>
+                    {taskName || '\u00a0'}
+                  </span>
+                  <input
+                    value={taskName}
+                    onChange={e => { setTaskName(e.target.value); markDirty(); }}
+                    placeholder=""
+                    className="rp-task-input"
+                    style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", padding: 0 }}
+                  />
+                </div>
+              )}
               <VoiceButton
                 listening={listeningName}
                 onToggle={() => listeningName
@@ -951,13 +956,7 @@ export default function DashboardPage() {
             {/* ── Scrollable body ───────────────────────────────────────── */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: '14px' }}>
 
-              {!selectedTask && (
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', flex: 1, color: '#3a4a5c', fontSize: '12px', fontFamily: "'DM Sans', sans-serif" }}>
-                  Select a task to view details
-                </div>
-              )}
-
-              {selectedTask && <>
+              {<>
 
                 {/* ── Admin fields — compact, muted (supporting context) ── */}
                 <div style={{ background: 'rgba(255,255,255,0.015)', border: '1px solid rgba(168,184,200,0.07)', borderRadius: '6px', padding: '10px 12px' }}>
@@ -1299,7 +1298,6 @@ export default function DashboardPage() {
                 </div>
 
               </>}
-
             </div>
           </div>
         </div>
