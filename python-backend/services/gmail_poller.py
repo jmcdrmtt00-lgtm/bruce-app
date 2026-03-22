@@ -160,12 +160,14 @@ def _process_message(service, msg_id: str) -> None:
     reply_to = from_email_match.group(1) if from_email_match else from_hdr.strip()
 
     # Look up org
+    print(f"Email poll: looking up org slug '{org_slug}'", flush=True)
     orgs = _sb_get("orgs", {"slug": f"eq.{org_slug}", "select": "id,name", "limit": "1"})
     if not orgs:
-        logger.warning("Unknown org slug '%s' in email %s — skipping", org_slug, msg_id)
+        print(f"Email poll: unknown org slug '{org_slug}' — skipping", flush=True)
         return
     org_id   = orgs[0]["id"]
     org_name = orgs[0]["name"]
+    print(f"Email poll: org found: {org_name}", flush=True)
 
     # Find a user_id to attach the incident to (first admin of this org)
     members = _sb_get("user_orgs", {"org_id": f"eq.{org_id}", "role": "eq.admin",
@@ -174,11 +176,12 @@ def _process_message(service, msg_id: str) -> None:
         members = _sb_get("user_orgs", {"org_id": f"eq.{org_id}",
                                          "select": "user_id", "limit": "1"})
     if not members:
-        logger.warning("No users found for org '%s' — skipping email %s", org_slug, msg_id)
+        print(f"Email poll: no users for org '{org_slug}' — skipping", flush=True)
         return
     user_id = members[0]["user_id"]
 
     # Insert incident
+    print(f"Email poll: inserting incident for org '{org_slug}'", flush=True)
     incident = _sb_post("incidents", {
         "org_id":      org_id,
         "user_id":     user_id,
@@ -189,13 +192,14 @@ def _process_message(service, msg_id: str) -> None:
         "source":      "email",
     })
     ticket_number = incident.get("task_number", 0)
-    logger.info("Created ticket #%s for org '%s' from %s", ticket_number, org_slug, reply_to)
+    print(f"Email poll: created ticket #{ticket_number} for org '{org_slug}' from {reply_to}", flush=True)
 
     # Send confirmation reply
     try:
         _send_reply(service, reply_to, subject, ticket_number, sender_name, org_name)
+        print(f"Email poll: reply sent to {reply_to}", flush=True)
     except Exception as exc:
-        logger.error("Failed to send reply to %s: %s", reply_to, exc)
+        print(f"Email poll: failed to send reply to {reply_to}: {exc}", flush=True)
 
     # Mark as read
     service.users().messages().modify(
@@ -247,4 +251,4 @@ def poll_once() -> None:
         try:
             _process_message(service, msg["id"])
         except Exception as exc:
-            logger.error("Error processing message %s: %s", msg["id"], exc)
+            print(f"Email poll: ERROR processing message {msg['id']}: {exc}", flush=True)
