@@ -147,7 +147,7 @@ def _process_message(service, msg_id: str) -> None:
     # Parse org slug and sender name from the To: address
     match = ADDR_PATTERN.search(to_hdr)
     if not match:
-        logger.debug("Skipping message %s — no valid IT Buddy address in To: %s", msg_id, to_hdr)
+        logger.info("Skipping message %s — no valid IT Buddy address in To: %s", msg_id, to_hdr)
         return
 
     org_slug    = match.group(1).lower()
@@ -216,8 +216,10 @@ def poll_once() -> None:
         logger.debug("Gmail env vars not configured — skipping poll")
         return
 
+    logger.info("Email poll: starting")
     try:
         service = _gmail_service()
+        logger.info("Email poll: Gmail auth OK")
     except Exception as exc:
         logger.error("Gmail init failed: %s", exc)
         return
@@ -235,6 +237,7 @@ def poll_once() -> None:
     ).execute()
 
     messages = result.get("messages", [])
+    logger.info("Email poll: found %d unread message(s)", len(messages))
     if not messages:
         return
 
