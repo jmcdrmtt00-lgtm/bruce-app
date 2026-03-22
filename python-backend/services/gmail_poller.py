@@ -144,10 +144,12 @@ def _process_message(service, msg_id: str) -> None:
     subject  = _get_header(headers, "Subject") or "(no subject)"
     body     = _get_body(full.get("payload", {})).strip()
 
-    # Parse org slug and sender name from the To: address
-    match = ADDR_PATTERN.search(to_hdr)
+    # Parse org slug and sender name — check To: and Delivered-To: headers
+    # (Google Workspace strips the +tag from To: so we need Delivered-To:)
+    delivered_to = _get_header(headers, "Delivered-To")
+    match = ADDR_PATTERN.search(to_hdr) or ADDR_PATTERN.search(delivered_to)
     if not match:
-        print(f"Email poll: skipping msg {msg_id} — To: {to_hdr}", flush=True)
+        print(f"Email poll: skipping msg {msg_id} — To: {to_hdr} / Delivered-To: {delivered_to}", flush=True)
         return
 
     org_slug    = match.group(1).lower()
