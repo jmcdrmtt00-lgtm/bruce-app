@@ -116,7 +116,7 @@ function MicIcon({ listening, onToggle }: { listening: boolean; onToggle: () => 
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface AssetResult {
-  id?: string; category?: string; assigned_to?: string; name?: string; notes?: string;
+  id?: string; category?: string; assigned_to?: string; notes?: string;
   make?: string; model?: string; os?: string; serial_number?: string; asset_number?: string;
   ram?: string; purchased?: string; install_date?: string; warranty_expires?: string;
   price?: number; site?: string; status?: string; extra?: Record<string, unknown> | null;
@@ -134,7 +134,7 @@ interface Employee {
 }
 
 const ALL_FIELDS: FieldDef[] = [
-  { key: 'assigned_to', label: 'Assigned To' }, { key: 'name', label: 'Name' },
+  { key: 'assigned_to', label: 'Assigned To' },
   { key: 'site', label: 'Site' }, { key: 'status', label: 'Status' },
   { key: 'make', label: 'Make' }, { key: 'model', label: 'Model' },
   { key: 'os', label: 'OS' }, { key: 'ram', label: 'RAM' },
@@ -158,7 +158,7 @@ const EMPLOYEE_FIELDS: FieldDef[] = [
   { key: 'is_approved_submitter', label: 'Approved' },
 ];
 const DATE_KEYS = new Set(['purchased', 'install_date', 'warranty_expires']);
-const DEFAULT_COLS = new Set(['assigned_to', 'name', 'site', 'make', 'model', 'os', 'serial_number', 'asset_number', 'purchased']);
+const DEFAULT_COLS = new Set(['assigned_to', 'site', 'make', 'model', 'os', 'serial_number', 'asset_number', 'purchased']);
 
 function toLabel(key: string) { return key.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()); }
 
@@ -178,7 +178,7 @@ function cellValue(row: AssetResult, key: string): string {
 // ─────────────────────────────────────────────────────────────────────────────
 
 interface AssetRow {
-  category: string; assigned_to: string | null; name: string | null; site: string | null;
+  category: string; assigned_to: string | null; site: string | null;
   status: 'active' | 'retired'; make: string | null; model: string | null;
   os: string | null; ram: string | null; serial_number: string | null; asset_number: string | null;
   purchased: string | null; price: number | null; install_date: string | null;
@@ -187,7 +187,7 @@ interface AssetRow {
 interface SheetInfo { name: string; category: string; site: string | null; rows: AssetRow[]; selected: boolean; }
 
 const STANDARD_FIELDS: { key: keyof AssetRow; label: string }[] = [
-  { key: 'assigned_to', label: 'Assigned To' }, { key: 'name', label: 'Name' },
+  { key: 'assigned_to', label: 'Assigned To' },
   { key: 'site', label: 'Site' }, { key: 'status', label: 'Status' },
   { key: 'make', label: 'Make' }, { key: 'model', label: 'Model' },
   { key: 'os', label: 'OS' }, { key: 'ram', label: 'RAM' },
@@ -203,7 +203,7 @@ const KNOWN_COLUMNS = [
   'purchased', 'price', 'install date', 'warranty expires', 'computer name',
 ];
 const HEADER_CLUES = [
-  'notes', 'user', 'previous owner', 'location', 'name',
+  'notes', 'user', 'previous owner', 'location',
   'machine brand', 'brand', 'make', 'type', 'machine type', 'model',
   'os', 'ram', 'serial number', 'serial', 'asset number',
   'purchased', 'price', 'install date', 'warranty expires',
@@ -296,7 +296,6 @@ function mapAssetRow(row: Record<string, unknown>, category: string, site: strin
   return {
     category, site, status,
     assigned_to: getString(row, '__EMPTY', 'Assigned To'),
-    name: getString(row, 'User', 'Location', 'Notes', 'Previous Owner'),
     make: getString(row, 'Machine Brand', 'Brand', 'Make'),
     model: getString(row, 'Type', 'Machine Type', 'Model'),
     os: getString(row, 'OS'), ram: getString(row, 'RAM'),
@@ -858,9 +857,8 @@ function InventoryTab() {
                               </>
                             ) : (
                               <>
-                                {activeCols.map(f => f.key === 'name'
-                                  ? <td key={f.key} style={{ ...TD, maxWidth: '0', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
-                                  : <td key={f.key} style={{ ...TD, whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
+                                {activeCols.map(f =>
+                                  <td key={f.key} style={{ ...TD, whiteSpace: 'nowrap', color: '#eef2f7' }}>{cellValue(r, f.key) || '—'}</td>
                                 )}
                                 <td style={{ ...TD, opacity: isHovered ? 1 : 0, transition: 'opacity 0.15s' }}>
                                   <div style={{ display: 'flex', gap: '4px' }}>
@@ -1069,8 +1067,7 @@ function InventoryTab() {
                   {results.map((r, i) => (
                     <tr key={r.id ?? i} style={{ borderBottom: '1px solid rgba(79,142,247,0.06)' }}>
                       <td style={{ ...TD, color: '#eef2f7' }}>
-                        <div>{r.assigned_to ?? r.name ?? '—'}</div>
-                        {r.assigned_to && r.name && <div style={{ fontSize: '11px', color: '#4a6a8a' }}>{r.name}</div>}
+                        <div>{r.assigned_to ?? '—'}</div>
                       </td>
                       <td style={{ ...TD, color: '#4a6a8a', whiteSpace: 'nowrap' }}>{r.category ?? '—'}</td>
                       <td style={{ ...TD, color: '#eef2f7', whiteSpace: 'nowrap' }}>{[r.make, r.model].filter(Boolean).join(' ') || '—'}{r.ram && <span style={{ color: '#4a6a8a', marginLeft: '4px' }}>· {r.ram}</span>}</td>

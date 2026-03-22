@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
     .eq('org_id', orgId)
     .order('category')
     .order('site')
-    .order('name');
+    .order('assigned_to');
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
 
