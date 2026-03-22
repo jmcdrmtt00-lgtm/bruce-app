@@ -24,13 +24,8 @@ export async function GET(request: NextRequest) {
     .select('*')
     .order('created_at', { ascending: false });
 
-  // Filter by org if provided, otherwise fall back to user_id (legacy)
-  if (orgId) {
-    // Include org-tagged incidents AND legacy incidents (no org_id) owned by this user
-    query = query.or(`org_id.eq.${orgId},and(org_id.is.null,user_id.eq.${user.id})`);
-  } else {
-    query = query.eq('user_id', user.id);
-  }
+  // Always filter by user_id — email-polled tickets also use the org admin's user_id
+  query = query.eq('user_id', user.id);
 
   if (source === 'dashboard') {
     // IT's work queue: tasks created by IT, email tickets, or nurse-submitted with adequate info
