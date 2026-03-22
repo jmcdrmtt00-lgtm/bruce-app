@@ -26,7 +26,8 @@ export async function GET(request: NextRequest) {
 
   // Filter by org if provided, otherwise fall back to user_id (legacy)
   if (orgId) {
-    query = query.eq('org_id', orgId);
+    // Include org-tagged incidents AND legacy incidents (no org_id) owned by this user
+    query = query.or(`org_id.eq.${orgId},and(org_id.is.null,user_id.eq.${user.id})`);
   } else {
     query = query.eq('user_id', user.id);
   }
@@ -55,6 +56,7 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const orgId = request.headers.get('x-org-id');
   const { title: providedTitle, description, reported_by, priority, screen, status, date_due, source } = await request.json();
 
   let title: string | null = providedTitle ?? null;
@@ -82,6 +84,7 @@ export async function POST(request: NextRequest) {
     .from('incidents')
     .insert({
       user_id: user.id,
+      org_id: orgId || null,
       title,
       description: desc,
       reported_by: reported_by || null,
