@@ -6,6 +6,7 @@ import { Incident, IncidentUpdate } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
 import AiDiagnoseSection from '@/components/AiDiagnoseSection';
+import { useOrg } from '@/contexts/OrgContext';
 
 function normalizeScreenToTypeId(screen: string): string {
   if (!screen) return '';
@@ -70,8 +71,10 @@ function VoiceButton({ listening, onToggle }: { listening: boolean; onToggle: ()
 }
 
 export default function TicketsPage() {
+  const { orgFetch } = useOrg();
   const [tasks, setTasks] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
+  const [employeeMap, setEmployeeMap] = useState<Map<string, string>>(new Map());
 
   // Left panel view
   const [activeView, setActiveView] = useState<'open' | 'completed'>('open');
@@ -138,13 +141,26 @@ export default function TicketsPage() {
   const clearLastVoiceFieldRef = useRef<() => void>(() => {});
 
   const loadTasks = useCallback(() => {
-    fetch('/api/issues?source=tickets')
+    orgFetch('/api/issues?source=tickets')
       .then(r => r.json())
       .then(data => { setTasks(data.incidents ?? []); setLoading(false); })
       .catch(() => setLoading(false));
-  }, []);
+  }, [orgFetch]);
 
   useEffect(() => { loadTasks(); }, [loadTasks]);
+
+  useEffect(() => {
+    orgFetch('/api/employees')
+      .then(r => r.json())
+      .then(data => {
+        const map = new Map<string, string>();
+        for (const e of (data.employees ?? [])) {
+          if (e.email) map.set(e.email.toLowerCase(), `${e.first_name[0]}. ${e.last_name}`);
+        }
+        setEmployeeMap(map);
+      })
+      .catch(() => {});
+  }, [orgFetch]);
 
   // ── Autosave main fields ──────────────────────────────────────────────────
   useEffect(() => {
@@ -390,6 +406,13 @@ export default function TicketsPage() {
 
   const hideInfoDone = aiStage === 'fix' || aiStage === 'recommendation';
 
+  function formatRequester(reportedBy: string | null | undefined): string {
+    if (!reportedBy) return '—';
+    const emailMatch = reportedBy.match(/<([^>]+)>/);
+    const email = (emailMatch ? emailMatch[1] : reportedBy).toLowerCase();
+    return employeeMap.get(email) ?? reportedBy;
+  }
+
   // ── Dark panel style constants ──────────────────────────────────────────
   const dpLabel: React.CSSProperties = {
     fontSize: '10px', fontWeight: 500, textTransform: 'uppercase',
@@ -593,7 +616,7 @@ export default function TicketsPage() {
                       {visibleCols.requester && <>
                         <div style={cell} onClick={click} onMouseEnter={enter} onMouseLeave={leave} />
                         <div style={{ ...cell, padding: '5px 16px', fontSize: '10px', color: task.reported_by ? '#eef2f7' : '#3a4a5c', justifyContent: 'flex-end', whiteSpace: 'nowrap' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
-                          {task.reported_by ?? '—'}
+                          {formatRequester(task.reported_by)}
                         </div>
                       </>}
                       {/* optional: due */}
