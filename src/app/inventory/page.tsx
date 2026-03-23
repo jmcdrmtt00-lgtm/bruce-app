@@ -663,6 +663,7 @@ function InventoryTab() {
       const data = await res.json();
       setEmployeeRows(prev => [...prev, data.employee]);
       setAddingEmployee(false); setNewEmployeeDraft({});
+      toast.success('Employee added');
     } catch { toast.error('Add failed'); }
     setEmployeeSaving(false);
   }
