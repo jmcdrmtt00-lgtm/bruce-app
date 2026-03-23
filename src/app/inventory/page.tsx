@@ -707,7 +707,6 @@ function InventoryTab() {
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
             <span style={{ fontSize: '15px', fontWeight: 700, color: mode === 'ask' ? '#eef2f7' : '#4a5a6b' }}>Ask the AI</span>
-            <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#4f8ef7,#7c5cf7)', color: '#fff', padding: '2px 7px', borderRadius: '4px' }}>AI</span>
           </div>
           <div style={{ fontSize: '11px', color: mode === 'ask' ? '#3a6090' : '#2e3e50' }}>Natural language inventory search</div>
         </button>
@@ -1003,7 +1002,6 @@ function InventoryTab() {
               <h2 style={{ fontSize: '20px', fontWeight: 700, color: '#eef2f7', margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
                 Ask your inventory anything
               </h2>
-              <span style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '0.07em', textTransform: 'uppercase', background: 'linear-gradient(135deg,#4f8ef7,#7c5cf7)', color: '#fff', padding: '2px 7px', borderRadius: '4px' }}>AI</span>
             </div>
             <p style={{ fontSize: '13px', color: '#3a6090', margin: 0, fontFamily: "'DM Sans', sans-serif" }}>
               Ask in plain English — IT Buddy queries the database and shows the results instantly.
