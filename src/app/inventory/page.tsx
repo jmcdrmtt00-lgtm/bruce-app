@@ -654,7 +654,7 @@ function InventoryTab() {
     try {
       const res = await orgFetch('/api/employees', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(newEmployeeDraft),
+        body: JSON.stringify({ ...newEmployeeDraft, site: newEmployeeDraft.site ?? 'Holden' }),
       });
       if (!res.ok) {
         const d = await res.json();
