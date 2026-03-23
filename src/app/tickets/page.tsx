@@ -99,7 +99,6 @@ export default function TicketsPage() {
   }, [visibleCols, colsLoaded]);
 
   // Panel state
-  const [taskNumber, setTaskNumber] = useState('');
   const [taskName, setTaskName]     = useState('');
   const [priority, setPriority]     = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]       = useState('');
@@ -258,7 +257,6 @@ export default function TicketsPage() {
   useEffect(() => { if (selectedTask) resetPanel(); }, [activeView]);
 
   function loadTask(task: Incident) {
-    setTaskNumber(String(task.task_number));
     setTaskName(task.title || task.description);
     setPriority(task.priority || '');
     setDateDue(task.date_due || '');
@@ -292,7 +290,8 @@ export default function TicketsPage() {
         const latest = (t: string) => updates.filter(u => u.type === t).at(-1)?.note ?? '';
 
         const progress = latest('progress');
-        setInfoDone(progress);
+        // Pre-fill with email body if no progress note has been saved yet
+        setInfoDone(progress || task.description || '');
         savedInfoDoneRef.current = progress;
 
         const details = latest('details');
@@ -656,9 +655,6 @@ export default function TicketsPage() {
                 </span>
               ) : (
                 <>
-                  <span style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
-                    #{taskNumber}
-                  </span>
                   {/* Auto-sizing input: hidden mirror span sets the width; input overlays it */}
                   <div style={{ position: 'relative', minWidth: '12ch', maxWidth: '100%' }}>
                     <span aria-hidden style={{ display: 'block', visibility: 'hidden', fontSize: '15px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: 'pre', padding: 0, lineHeight: '1.4' }}>
