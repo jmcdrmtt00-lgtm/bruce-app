@@ -234,7 +234,6 @@ export default function TicketsPage() {
   }, [visibleCols]);
 
   function resetPanel() {
-    setTaskNumber('');
     setTaskName('');
     setPriority('');
     setDateDue('');
