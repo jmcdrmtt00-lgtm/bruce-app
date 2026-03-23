@@ -1,13 +1,14 @@
 """
 gmail_poller.py — polls admin@lm-intel.ai for inbound IT tickets.
 
-Email format:  admin+{org_slug}-{sender_name}@lm-intel.ai
-Example:       admin+oriol-nurseAlice@lm-intel.ai
+Email format:  admin+{org_slug}@lm-intel.ai
+Example:       admin+oriol@lm-intel.ai
 
+The sender's name and reply address come from the From: header.
 For each valid unread email the poller:
   1. Looks up the org in Supabase by slug
   2. Creates an incident (ticket) in that org
-  3. Sends a confirmation reply to the sender
+  3. Runs AI triage and stores the result
   4. Marks the email as read so it isn't processed again
 """
 
@@ -30,7 +31,7 @@ logger = logging.getLogger(__name__)
 
 GMAIL_ADDRESS   = "admin@lm-intel.ai"
 ADDR_PATTERN    = re.compile(
-    r"admin\+([a-z0-9-]+)-([^@\s]+)@lm-intel\.ai", re.IGNORECASE
+    r"admin\+([a-z0-9-]+)(?:-[^@\s]*)?@lm-intel\.ai", re.IGNORECASE
 )
 
 # ── Supabase REST helpers ─────────────────────────────────────────────────────
@@ -186,12 +187,13 @@ def _process_message(service, msg_id: str) -> None:
         ).execute()
         return
 
-    org_slug    = match.group(1).lower()
-    sender_name = match.group(2)
+    org_slug = match.group(1).lower()
 
-    # Extract reply-to address from From: header
+    # Extract sender name and reply address from the From: header
     from_email_match = re.search(r"<([^>]+)>", from_hdr)
     reply_to = from_email_match.group(1) if from_email_match else from_hdr.strip()
+    display_name = from_hdr[:from_hdr.index('<')].strip().strip('"') if '<' in from_hdr else ''
+    sender_name = display_name or reply_to.split('@')[0]
 
     # Always mark as read — even if later steps fail — so we never reprocess
     # the same email.  The gmail_message_id unique constraint is a second guard.
