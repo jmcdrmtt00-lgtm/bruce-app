@@ -74,7 +74,7 @@ export default function TicketsPage() {
   const [loading, setLoading] = useState(true);
 
   // Left panel view
-  const [activeView, setActiveView] = useState<'open' | 'needs_info' | 'completed'>('needs_info');
+  const [activeView, setActiveView] = useState<'open' | 'completed'>('open');
   const [filterPriority, setFilterPriority] = useState('');
   const [visibleCols, setVisibleCols] = useState({ requester: true, dateSubmitted: false, targetDate: true });
   const [colsLoaded, setColsLoaded] = useState(false);
@@ -100,7 +100,7 @@ export default function TicketsPage() {
   const [taskName, setTaskName]     = useState('');
   const [priority, setPriority]     = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]       = useState('');
-  const [status, setStatus]         = useState<'open' | 'needs_info' | 'resolved'>('open');
+  const [status, setStatus]         = useState<'open' | 'resolved'>('open');
   const [requester, setRequester]   = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [allUpdates, setAllUpdates] = useState<IncidentUpdate[]>([]);
@@ -193,11 +193,6 @@ export default function TicketsPage() {
       .sort((a, b) => a.task_number - b.task_number);
   }, [tasks]);
 
-  const needsInfoTasks = useMemo(
-    () => tasks.filter(t => t.status === 'needs_info').sort((a, b) => a.task_number - b.task_number),
-    [tasks]
-  );
-
   const completedTasks = useMemo(() => {
     let filtered = tasks.filter(t => t.status === 'resolved');
     if (filterPriority) filtered = filtered.filter(t => t.priority === filterPriority);
@@ -206,9 +201,8 @@ export default function TicketsPage() {
 
   const visibleTasks = useMemo(() => {
     if (activeView === 'open') return openTasks;
-    if (activeView === 'needs_info') return needsInfoTasks;
     return completedTasks;
-  }, [activeView, openTasks, needsInfoTasks, completedTasks]);
+  }, [activeView, openTasks, completedTasks]);
 
   // CSS grid template: task name is content-sized (or fills all space when 0 optional cols);
   // each optional col is preceded by a minmax(4px,1fr) spacer — spacers share remaining space
@@ -253,9 +247,7 @@ export default function TicketsPage() {
     setPriority(task.priority || '');
     setDateDue(task.date_due || '');
     const raw = task.status;
-    const s = (raw === 'pending' || raw === 'in_progress' || raw === 'open') ? 'open'
-            : raw === 'needs_info' ? 'needs_info'
-            : 'resolved';
+    const s = (raw === 'pending' || raw === 'in_progress' || raw === 'open' || raw === 'needs_info') ? 'open' : 'resolved';
     setStatus(s);
     setRequester(task.reported_by || '');
     setAssignedTo(task.assigned_to || '');
@@ -464,7 +456,7 @@ export default function TicketsPage() {
         >
           {/* View tabs */}
           <div style={{ display: 'flex', padding: '10px 16px 0', gap: '2px' }}>
-            {(['open', 'needs_info', 'completed'] as const).map(view => (
+            {(['open', 'completed'] as const).map(view => (
               <button
                 key={view}
                 onClick={() => setActiveView(view)}
@@ -479,7 +471,7 @@ export default function TicketsPage() {
                   transition: 'color 0.15s, border-color 0.15s',
                 }}
               >
-                {view === 'open' ? 'Open' : view === 'needs_info' ? 'Needs info' : 'Completed'}
+                {view === 'open' ? 'Open' : 'Completed'}
               </button>
             ))}
           </div>
@@ -635,25 +627,30 @@ export default function TicketsPage() {
 
             {/* ── Header strip ─────────────────────────────────────────── */}
             <div style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '11px 20px 10px', borderBottom: '1px solid rgba(168,184,200,0.15)', flexShrink: 0, minHeight: '46px' }}>
-              {taskNumber && (
-                <span style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
-                  #{taskNumber}
+              {!selectedTask ? (
+                <span style={{ fontSize: '15px', fontWeight: 600, color: '#3a4a5c', fontFamily: "'DM Sans', sans-serif" }}>
+                  Select a task to view details
                 </span>
+              ) : (
+                <>
+                  <span style={{ fontSize: '15px', fontWeight: 600, color: '#ffffff', fontFamily: "'DM Sans', sans-serif", flexShrink: 0 }}>
+                    #{taskNumber}
+                  </span>
+                  {/* Auto-sizing input: hidden mirror span sets the width; input overlays it */}
+                  <div style={{ position: 'relative', minWidth: '12ch', maxWidth: '100%' }}>
+                    <span aria-hidden style={{ display: 'block', visibility: 'hidden', fontSize: '15px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: 'pre', padding: 0, lineHeight: '1.4' }}>
+                      {taskName || '\u00a0'}
+                    </span>
+                    <input
+                      value={taskName}
+                      onChange={e => { setTaskName(e.target.value); markDirty(); }}
+                      placeholder=""
+                      className="rp-task-input"
+                      style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", padding: 0 }}
+                    />
+                  </div>
+                </>
               )}
-              {/* Auto-sizing input: hidden mirror span sets the width; input overlays it */}
-              <div style={{ position: 'relative', minWidth: '12ch', maxWidth: '100%' }}>
-                <span aria-hidden style={{ display: 'block', visibility: 'hidden', fontSize: '15px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", whiteSpace: 'pre', padding: 0, lineHeight: '1.4' }}>
-                  {taskName || '\u00a0'}
-                </span>
-                <input
-                  value={taskName}
-                  onChange={e => { setTaskName(e.target.value); markDirty(); }}
-                  readOnly={!selectedTask}
-                  placeholder=""
-                  className="rp-task-input"
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', fontSize: '15px', fontWeight: 600, color: '#ffffff', background: 'none', border: 'none', outline: 'none', fontFamily: "'DM Sans', sans-serif", padding: 0 }}
-                />
-              </div>
               <VoiceButton
                 listening={listeningName}
                 onToggle={() => listeningName
@@ -674,9 +671,8 @@ export default function TicketsPage() {
                     {/* Row 1: Status, Priority, Task Type */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Status</label>
-                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }} style={dpAdminSelect}>
+                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'resolved'); markDirty(); }} style={dpAdminSelect}>
                         <option value="open">Open</option>
-                        <option value="needs_info">Needs info</option>
                         <option value="resolved">Completed</option>
                       </select>
                     </div>
