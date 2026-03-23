@@ -760,11 +760,11 @@ export default function TicketsPage() {
                   </div>
                 )}
                 {selectedTask?.triage_result === 'adequate' && (
-                  <div style={{ border: '1px solid rgba(232,92,92,0.35)', borderRadius: '8px', background: 'rgba(232,92,92,0.06)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#e85c5c', textTransform: 'uppercase', letterSpacing: '0.07em' }}>IT Buddy — Ready to work</div>
+                  <div style={{ border: '1px solid rgba(34,204,110,0.3)', borderRadius: '8px', background: 'rgba(34,204,110,0.06)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#22cc6e', textTransform: 'uppercase', letterSpacing: '0.07em' }}>IT Buddy — Ready to work</div>
                     <p style={{ fontSize: '12px', color: '#a8b8c8', margin: 0 }}>IT Buddy has enough information to act on this ticket. Move it to the Dashboard to assign it a task number and start working it.</p>
                     <button
-                      style={{ alignSelf: 'flex-start', padding: '7px 18px', borderRadius: '6px', background: '#e85c5c', color: '#fff', border: 'none', cursor: 'not-allowed', fontSize: '12px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", opacity: 0.6 }}
+                      style={{ alignSelf: 'flex-start', padding: '7px 18px', borderRadius: '6px', background: '#22cc6e', color: '#000', border: 'none', cursor: 'not-allowed', fontSize: '12px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", opacity: 0.6 }}
                       title="Move to Dashboard — coming soon"
                     >
                       Move to Dashboard
