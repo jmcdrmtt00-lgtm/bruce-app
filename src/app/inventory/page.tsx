@@ -350,10 +350,14 @@ function parseInventoryFile(file: File): Promise<SheetInfo[]> {
   });
 }
 async function downloadInventory(orgFetch: (url: string, opts?: RequestInit) => Promise<Response>) {
-  const res = await orgFetch('/api/assets/download');
-  const data = await res.json();
-  if (!res.ok) throw new Error(data.error || 'Download failed');
-  const assets: AssetRow[] = data.assets;
+  const [assetsRes, empRes] = await Promise.all([
+    orgFetch('/api/assets/download'),
+    orgFetch('/api/employees'),
+  ]);
+  const assetsData = await assetsRes.json();
+  const empData = await empRes.json();
+  if (!assetsRes.ok) throw new Error(assetsData.error || 'Download failed');
+  const assets: AssetRow[] = assetsData.assets;
   if (assets.length === 0) throw new Error('No assets in database yet.');
   const byCategory = new Map<string, AssetRow[]>();
   for (const asset of assets) {
@@ -375,6 +379,17 @@ async function downloadInventory(orgFetch: (url: string, opts?: RequestInit) => 
     }
     XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(sheetData), category.slice(0, 31));
   }
+  // Employees tab
+  const employees: Employee[] = empData.employees ?? [];
+  const empSheet: unknown[][] = [
+    ['First Name', 'Last Name', 'EE #', 'Email', 'Site', 'Position', 'Hrs/Wk', 'Shift', 'Approved Submitter'],
+    ...employees.map(e => [
+      e.first_name, e.last_name, e.ee_number ?? '', e.email,
+      e.site, e.position ?? '', e.hours_per_week ?? '', e.shift ?? '',
+      e.is_approved_submitter ? 'Yes' : 'No',
+    ]),
+  ];
+  XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet(empSheet), 'Employees');
   XLSX.writeFile(wb, `IT_Buddy_Inventory_${new Date().toISOString().split('T')[0]}.xlsx`);
   return assets.length;
 }
