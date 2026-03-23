@@ -163,7 +163,7 @@ def _send_more_info_reply(service, to: str, original_subject: str,
 # ── Core processing ───────────────────────────────────────────────────────────
 
 def _process_message(service, msg_id: str) -> None:
-    """Process a single Gmail message: create ticket + reply + mark read."""
+    """Process a single Gmail message: create ticket + triage + mark read."""
     full = service.users().messages().get(
         userId="me", id=msg_id, format="full"
     ).execute()
@@ -180,6 +180,10 @@ def _process_message(service, msg_id: str) -> None:
     match = ADDR_PATTERN.search(to_hdr) or ADDR_PATTERN.search(delivered_to)
     if not match:
         print(f"Email poll: skipping msg {msg_id} — To: {to_hdr} / Delivered-To: {delivered_to}", flush=True)
+        # Mark as read so we don't keep seeing this unrecognised message
+        service.users().messages().modify(
+            userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
+        ).execute()
         return
 
     org_slug    = match.group(1).lower()
@@ -188,6 +192,16 @@ def _process_message(service, msg_id: str) -> None:
     # Extract reply-to address from From: header
     from_email_match = re.search(r"<([^>]+)>", from_hdr)
     reply_to = from_email_match.group(1) if from_email_match else from_hdr.strip()
+
+    # Always mark as read — even if later steps fail — so we never reprocess
+    # the same email.  The gmail_message_id unique constraint is a second guard.
+    try:
+        service.users().messages().modify(
+            userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
+        ).execute()
+        print(f"Email poll: marked msg {msg_id} as read", flush=True)
+    except Exception as exc:
+        print(f"Email poll: WARNING — could not mark msg {msg_id} as read: {exc}", flush=True)
 
     # Look up org
     print(f"Email poll: looking up org slug '{org_slug}'", flush=True)
@@ -210,53 +224,48 @@ def _process_message(service, msg_id: str) -> None:
         return
     user_id = members[0]["user_id"]
 
-    # Insert incident
+    # Insert incident — gmail_message_id unique constraint prevents duplicates
+    # if this message was somehow already processed on a previous run.
     print(f"Email poll: inserting incident for org '{org_slug}'", flush=True)
-    incident = _sb_post("incidents", {
-        "org_id":      org_id,
-        "user_id":     user_id,
-        "title":       subject[:200],
-        "description": body or f"(Email from {reply_to} — no body text)",
-        "reported_by": f"{sender_name} <{reply_to}>",
-        "status":      "open",
-        "source":      "email",
-    })
-    ticket_number = incident.get("task_number", 0)
-    incident_id   = incident.get("id")
-    print(f"Email poll: created ticket #{ticket_number} for org '{org_slug}' from {reply_to}", flush=True)
+    try:
+        incident = _sb_post("incidents", {
+            "org_id":           org_id,
+            "user_id":          user_id,
+            "title":            subject[:200],
+            "description":      body or f"(Email from {reply_to} — no body text)",
+            "reported_by":      f"{sender_name} <{reply_to}>",
+            "status":           "open",
+            "source":           "email",
+            "gmail_message_id": msg_id,
+        })
+    except Exception as exc:
+        print(f"Email poll: incident insert failed (already processed?): {exc}", flush=True)
+        return
+    incident_id = incident.get("id")
+    print(f"Email poll: created ticket for org '{org_slug}' from {reply_to}", flush=True)
 
     # Triage: does this email have enough info to act on?
     from services.ai_service import triage_email_ticket
-    triage = triage_email_ticket(subject, body)
+    try:
+        triage = triage_email_ticket(subject, body)
+    except Exception as exc:
+        print(f"Email poll: triage failed: {exc}", flush=True)
+        return
     adequate = triage.get("adequate", True)
+    missing  = triage.get("missing", "Please describe the problem in more detail.")
     print(f"Email poll: triage result — adequate={adequate}", flush=True)
 
     if adequate:
-        # Promote to IT dashboard
+        # Enough info — flag for Bruce to promote to Dashboard
         _sb_patch(f"incidents?id=eq.{incident_id}",
-                  {"source": "submitted by nurse adequate info"})
-        try:
-            _send_reply(service, reply_to, subject, ticket_number, sender_name, org_name)
-            print(f"Email poll: confirmation reply sent to {reply_to}", flush=True)
-        except Exception as exc:
-            print(f"Email poll: failed to send reply to {reply_to}: {exc}", flush=True)
+                  {"source": "email_adequate"})
+        print(f"Email poll: ticket flagged as adequate — awaiting Bruce's review", flush=True)
     else:
-        missing = triage.get("missing", "Please describe the problem in more detail.")
-        # Keep in Tickets tab, ask for more info
+        # Needs more info — store the draft question for Bruce to review before sending
         _sb_patch(f"incidents?id=eq.{incident_id}",
-                  {"source": "submitted by nurse needs more info"})
-        try:
-            _send_more_info_reply(service, reply_to, subject, sender_name, missing)
-            print(f"Email poll: more-info reply sent to {reply_to} — missing: {missing}", flush=True)
-        except Exception as exc:
-            print(f"Email poll: failed to send more-info reply to {reply_to}: {exc}", flush=True)
-
-    # Mark as read
-    service.users().messages().modify(
-        userId="me",
-        id=msg_id,
-        body={"removeLabelIds": ["UNREAD"]},
-    ).execute()
+                  {"source": "email_needs_info", "description":
+                   f"{body or ''}\n\n---\n[IT Buddy draft reply — review and send]\n\n{missing}".strip()})
+        print(f"Email poll: ticket flagged needs-info — draft stored for Bruce's review", flush=True)
 
 
 # ── Public entry point ────────────────────────────────────────────────────────
