@@ -16,13 +16,16 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const orgId = request.headers.get('x-org-id');
+  if (!orgId) return NextResponse.json({ assets: [] });
+
   const site     = request.nextUrl.searchParams.get('site');
   const category = request.nextUrl.searchParams.get('category') ?? 'Computer';
 
   let query = supabase
     .from('assets')
     .select('id, asset_number, name, make, model, os, ram, site')
-    .eq('user_id', user.id)
+    .eq('org_id', orgId)
     .eq('status', 'active')
     .eq('category', category)
     .is('assigned_to', null);

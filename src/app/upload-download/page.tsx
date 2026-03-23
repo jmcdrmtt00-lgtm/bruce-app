@@ -433,7 +433,7 @@ function InventorySection() {
           <h2 className="text-lg font-bold">Download Inventory</h2>
           <p className="text-base-content/60 text-sm">Export everything in the database to Excel — one sheet per asset category.</p>
           <button className="btn btn-success btn-sm w-fit" onClick={handleDownload} disabled={downloading}>
-            {downloading ? <span className="loading loading-spinner loading-sm" /> : <><Download className="w-4 h-4" /> Download to Excel</>}
+            {downloading ? <span className="spinner spinner-sm" /> : <><Download className="w-4 h-4" /> Download to Excel</>}
           </button>
         </div>
       </div>
@@ -484,7 +484,7 @@ function InventorySection() {
             <div className="flex items-center justify-between pt-2">
               <p className="text-sm text-base-content/60">{selectedCount} assets selected</p>
               <button className="btn btn-primary btn-sm" onClick={handleUpload} disabled={uploading || selectedCount === 0}>
-                {uploading ? <span className="loading loading-spinner loading-sm" /> : <><Upload className="w-4 h-4" /> Upload</>}
+                {uploading ? <span className="spinner spinner-sm" /> : <><Upload className="w-4 h-4" /> Upload</>}
               </button>
             </div>
           </div>
@@ -563,7 +563,7 @@ function TasksSection() {
           <h2 className="text-lg font-bold">Download Tasks</h2>
           <p className="text-base-content/60 text-sm">Export your current task list to Excel.</p>
           <button className="btn btn-success btn-sm w-fit" onClick={handleDownload} disabled={downloading}>
-            {downloading ? <span className="loading loading-spinner loading-sm" /> : <><Download className="w-4 h-4" /> Download to Excel</>}
+            {downloading ? <span className="spinner spinner-sm" /> : <><Download className="w-4 h-4" /> Download to Excel</>}
           </button>
         </div>
       </div>
@@ -592,7 +592,7 @@ function TasksSection() {
           <input ref={fileRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileChange} />
           {rows.length > 0 && (
             <button className="btn btn-primary btn-sm" onClick={handleUpload} disabled={uploading}>
-              {uploading ? <span className="loading loading-spinner loading-sm" /> : <><Upload className="w-4 h-4" /> Upload {rows.length} tasks</>}
+              {uploading ? <span className="spinner spinner-sm" /> : <><Upload className="w-4 h-4" /> Upload {rows.length} tasks</>}
             </button>
           )}
         </div>

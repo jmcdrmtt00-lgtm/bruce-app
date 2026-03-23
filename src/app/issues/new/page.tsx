@@ -91,7 +91,7 @@ export default function NewIssuePage() {
                 onClick={handleSave}
                 disabled={saving || !description.trim()}
               >
-                {saving ? <span className="loading loading-spinner loading-sm" /> : 'Save Issue'}
+                {saving ? <span className="spinner spinner-sm" /> : 'Save Issue'}
               </button>
             </div>
           </div>

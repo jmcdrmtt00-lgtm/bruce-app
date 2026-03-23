@@ -57,8 +57,7 @@ Table: assets (IT asset inventory — computers, printers, phones, tablets, came
 - id: UUID
 - user_id: UUID  <-- always filter: WHERE user_id = '{user_id}'
 - category: TEXT (e.g. 'Computer', 'Printer', 'Phone', 'iPad', 'Camera', 'Network')
-- assigned_to: TEXT (primary identifier — person's name, department, or location label from the first column of the Excel sheet, nullable)
-- name: TEXT (secondary description — role, desk label, or notes, nullable)
+- assigned_to: TEXT (person's name, department, or location label — who or where the asset is assigned, nullable)
 - site: TEXT ('Holden', 'Oakdale', 'Business Office', 'IT Office', 'Shared')
 - status: TEXT ('active', 'retired')
 - make: TEXT (brand, e.g. ThinkCentre, Lenovo, HP, Polycom, nullable)
@@ -318,10 +317,11 @@ async def diagnose(
                     pass
         if parsed:
             return {
+                "alternatives":   parsed.get("alternatives") or None,
                 "recommendation": parsed.get("recommendation") or None,
                 "questions":      parsed.get("questions") or None,
             }
-        return {"recommendation": text or None, "questions": None}
+        return {"alternatives": None, "recommendation": text or None, "questions": None}
 
     elif problem_type == "nurse_assess":
         # Nurse self-service: questions loop → {assessment, reason} or {questions}
@@ -537,6 +537,53 @@ async def diagnose(
                 "questions": parsed.get("questions") or None,
             }
         return {"cause": None, "detail": None, "questions": [text]}
+
+
+def triage_email_ticket(subject: str, body: str) -> dict:
+    """Evaluate whether an email IT ticket has enough info to act on.
+    Returns {"adequate": True} or {"adequate": False, "missing": "what to ask for"}.
+    Synchronous — safe to call from a background thread.
+    """
+    import json as _json
+
+    system = (
+        "You are an IT help desk triage assistant. Read an email from a staff member "
+        "and decide if it contains enough information for IT to act on.\n\n"
+        "ADEQUATE means ALL of these are true:\n"
+        "  1. A specific device, system, or location is identified "
+        "(e.g. 'the dining room printer', 'my computer', 'PCC', 'the network in room 12').\n"
+        "  2. A specific symptom or error is described "
+        "(e.g. 'is jammed', 'won\\'t turn on', 'shows error code 503', 'can\\'t log in').\n\n"
+        "NEEDS MORE INFO if any of these apply:\n"
+        "  - No specific device or location is mentioned.\n"
+        "  - No specific symptom or problem is described.\n"
+        "  - The message only expresses urgency without describing the actual problem "
+        "(e.g. 'I need to print something soon', 'please help', 'it\\'s not working', 'broken').\n\n"
+        "Examples:\n"
+        "  ADEQUATE: 'I can\\'t log into PCC on my computer in room 4'\n"
+        "  ADEQUATE: 'The printer in the dining room is jammed and showing a paper error'\n"
+        "  ADEQUATE: 'My computer at the nurses station won\\'t turn on'\n"
+        "  NEEDS MORE INFO: 'I really need to print something soon'\n"
+        "  NEEDS MORE INFO: 'The printer isn\\'t working'\n"
+        "  NEEDS MORE INFO: 'help', 'broken', 'please fix'\n\n"
+        "Respond with JSON only — no other text:\n"
+        '{"adequate": true}\n'
+        'or\n'
+        '{"adequate": false, "missing": "one short sentence describing what specific information is needed"}'
+    )
+
+    content = f"Subject: {subject}\n\nBody: {body or '(no body)'}"
+    message = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=100,
+        system=system,
+        messages=[{"role": "user", "content": content}],
+    )
+    text = message.content[0].text.strip()
+    try:
+        return _json.loads(text)
+    except Exception:
+        return {"adequate": True}  # default to adequate if parsing fails
 
 
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:

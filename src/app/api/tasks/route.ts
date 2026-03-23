@@ -1,6 +1,6 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
 async function getClient() {
   const cookieStore = await cookies();
@@ -11,15 +11,18 @@ async function getClient() {
   );
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const supabase = await getClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
+  const orgId = request.headers.get('x-org-id');
+  if (!orgId) return NextResponse.json({ tasks: [] });
+
   const { data: incidents, error: incErr } = await supabase
     .from('incidents')
     .select('id, task_number, title, description, priority, date_due, status, reported_by, screen, source')
-    .eq('user_id', user.id)
+    .eq('org_id', orgId)
     .order('source')
     .order('task_number', { nullsFirst: false });
 
@@ -45,11 +48,11 @@ export async function GET() {
 
   const SCREEN_LABEL: Record<string, string> = {
     problem_to_fix:         'Problem to fix',
-    ticket_to_fix:          'Ticket to deal with',
     decision_to_make:       'Decision to make',
     onboarding:             'Onboarding',
     offboarding:            'Offboarding',
     // legacy
+    ticket_to_fix:          'Problem to fix',
     onboarding_offboarding: 'Onboarding',
     project_to_manage:      'Project to manage',
   };
@@ -69,6 +72,7 @@ export async function GET() {
       priority:         inc.priority,
       date_due:         inc.date_due,
       status:           inc.status,
+      source:           inc.source ?? null,
       task_type:        SCREEN_LABEL[screen] ?? null,
       information_needed: isOnboarding ? (detailsUpdate?.note ?? null) : null,
       problem_to_fix:   (screen === 'problem_to_fix' || screen === 'ticket_to_fix') ? (progressUpdate?.note ?? null) : null,

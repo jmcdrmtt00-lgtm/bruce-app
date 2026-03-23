@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { MonitorCheck } from 'lucide-react';
 import UserMenu from '@/components/UserMenu';
+import OrgSwitcher from '@/components/OrgSwitcher';
 import { supabase } from '@/libs/supabase';
 import { useDemoUser } from '@/libs/useDemoUser';
 import { useAdminUser } from '@/libs/useAdminUser';
@@ -13,9 +14,9 @@ import type { User, AuthChangeEvent, Session } from '@supabase/supabase-js';
 const NAV = [
   { href: '/',                   label: 'Dashboard'        },
   { href: '/tickets',            label: 'Tickets'          },
-  { href: '/ask-ai',             label: 'Ask the AI'       },
-  { href: '/upload-download',    label: 'Upload/Download'  },
-  { href: '/maybe-by-myself',    label: 'Maybe by myself'  },
+  { href: '/inventory',          label: 'Inventory'        },
+  { href: '/task-intelligence',  label: 'Task Intelligence'},
+  { href: '/submit-ticket',      label: 'Submit Ticket'    },
 ];
 
 // DemoITbuddy1 only
@@ -28,6 +29,13 @@ const ADMIN_NAV: { href: string; label: string }[] = [];
 
 // Auth pages are public — hide the nav on these routes
 const AUTH_PATHS = ['/auth/'];
+
+const navBtn: React.CSSProperties = {
+  padding: '5px 12px', borderRadius: '6px', fontSize: '13px', fontWeight: 500,
+  fontFamily: "'DM Sans', sans-serif", cursor: 'pointer', border: 'none',
+  transition: 'background 0.12s',
+  textDecoration: 'none', display: 'inline-flex', alignItems: 'center',
+};
 
 export default function Header() {
   const [user, setUser] = useState<User | null>(null);
@@ -48,48 +56,63 @@ export default function Header() {
     return pathname.startsWith(href);
   }
 
-  // Show nav on all protected pages immediately — middleware already blocks
-  // unauthenticated access, so we don't need to wait for the async user check.
   const showNav = !AUTH_PATHS.some(p => pathname.startsWith(p));
 
   return (
-    <header className="navbar bg-base-100 shadow-sm px-4">
-      <div className="flex-1 flex items-center gap-2">
-        <MonitorCheck className="w-6 h-6 text-primary" />
-        <span className="font-bold text-lg">IT Buddy</span>
+    <header style={{
+      background: '#ffffff', borderBottom: '1px solid rgba(0,0,0,0.08)',
+      padding: '0 16px', display: 'flex', alignItems: 'center',
+      height: '52px', fontFamily: "'DM Sans', sans-serif",
+    }}>
+      {/* Wordmark */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flex: 1 }}>
+        <MonitorCheck style={{ width: '20px', height: '20px', color: '#4f8ef7', flexShrink: 0 }} />
+        <span style={{ fontWeight: 700, fontSize: '15px', color: '#1a1a2e' }}>IT Buddy</span>
       </div>
+
+      {/* Nav links */}
       {showNav && (
-        <div className="flex-none flex items-center gap-1 mr-2">
+        <div style={{ display: 'flex', alignItems: 'center', gap: '4px', marginRight: '12px' }}>
           {NAV.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
-              className={`btn btn-sm ${isActive(href) ? 'btn-primary' : 'btn-ghost'}`}
+              style={isActive(href)
+                ? { ...navBtn, background: '#4f8ef7', color: '#ffffff' }
+                : { ...navBtn, background: 'transparent', color: '#4a5568' }}
             >
               {label}
             </Link>
           ))}
+
           {isDemoUser && DEMO_NAV.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
-              className={`btn btn-sm ${isActive(href) ? 'btn-secondary' : 'btn-ghost text-secondary'}`}
+              style={isActive(href)
+                ? { ...navBtn, background: '#7c3aed', color: '#ffffff' }
+                : { ...navBtn, background: 'transparent', color: '#7c3aed' }}
             >
               {label}
             </Link>
           ))}
+
           {isAdminUser && ADMIN_NAV.map(({ href, label }) => (
             <Link
               key={href}
               href={href}
-              className={`btn btn-sm ${isActive(href) ? 'btn-secondary' : 'btn-ghost text-secondary'}`}
+              style={isActive(href)
+                ? { ...navBtn, background: '#7c3aed', color: '#ffffff' }
+                : { ...navBtn, background: 'transparent', color: '#7c3aed' }}
             >
               {label}
             </Link>
           ))}
         </div>
       )}
-      <div className="flex-none">
+
+      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+        <OrgSwitcher />
         <UserMenu user={user} />
       </div>
     </header>

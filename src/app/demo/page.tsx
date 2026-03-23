@@ -65,7 +65,7 @@ export default function DemoPage() {
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <span className="loading loading-spinner loading-lg" />
+            <span className="spinner spinner-lg" />
           </div>
         ) : entries.length === 0 ? (
           <div className="alert alert-warning">No demo scripts found.</div>
@@ -85,7 +85,7 @@ export default function DemoPage() {
                     disabled={!!starting}
                   >
                     {starting === entry.id
-                      ? <span className="loading loading-spinner loading-sm" />
+                      ? <span className="spinner spinner-sm" />
                       : '▶ Start'}
                   </button>
                 </div>

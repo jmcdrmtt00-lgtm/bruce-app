@@ -47,7 +47,7 @@ export default function HistoryPage() {
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <span className="loading loading-spinner loading-lg" />
+            <span className="spinner spinner-lg" />
           </div>
         ) : filtered.length === 0 ? (
           <div className="card bg-base-100 shadow-xl">

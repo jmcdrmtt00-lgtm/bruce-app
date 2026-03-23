@@ -26,8 +26,9 @@ export interface Incident {
   title: string | null;
   description: string;
   reported_by: string | null;
-  status: 'open' | 'in_progress' | 'resolved' | 'pending';
-  source: 'issue' | 'onboarding' | 'ticket';
+  assigned_to: string | null;
+  status: 'open' | 'in_progress' | 'resolved' | 'pending' | 'needs_info';
+  source: 'issue' | 'onboarding' | 'ticket' | 'nurse' | 'nurse_self_fix';
   onboarding_session_id: string | null;
   priority: 'high' | 'low' | null;
   screen: string | null;
@@ -35,6 +36,8 @@ export interface Incident {
   date_due: string | null;
   date_completed: string | null;
   auto_suggested: boolean;
+  triage_result: 'adequate' | 'needs_info' | null;
+  draft_reply: string | null;
   created_at: string;
   updated_at: string;
 }

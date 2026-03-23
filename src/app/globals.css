@@ -1,6 +1,12 @@
 @import "tailwindcss";
 @plugin "daisyui";
 
+/* Override DaisyUI's primary color to match the app's blue everywhere */
+:root, [data-theme="light"] {
+  --color-primary: #4f8ef7;
+  --color-primary-content: #ffffff;
+}
+
 :root {
   --background: #f8fafc;
   --foreground: #171717;
@@ -12,8 +18,35 @@ body {
   font-family: Arial, Helvetica, sans-serif;
 }
 
+/* Right-panel task name input — placeholder when no task selected */
+.rp-task-input::placeholder {
+  color: #a8b8c8;
+  opacity: 1;
+}
+
 @media print {
   .print\:hidden {
     display: none !important;
   }
 }
+
+@keyframes micPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%       { opacity: 0.65; transform: scale(1.15); }
+}
+
+/* Spinner — replaces DaisyUI loading-spinner */
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+.spinner {
+  display: inline-block;
+  border: 2px solid rgba(255,255,255,0.3);
+  border-top-color: currentColor;
+  border-radius: 50%;
+  animation: spin 0.7s linear infinite;
+  flex-shrink: 0;
+}
+.spinner-sm { width: 14px; height: 14px; }
+.spinner-md { width: 20px; height: 20px; }
+.spinner-lg { width: 32px; height: 32px; border-width: 3px; }

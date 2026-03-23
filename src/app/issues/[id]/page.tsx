@@ -13,6 +13,7 @@ const STATUS_CONFIG = {
   open:        { label: 'Open',        className: 'badge-error'   },
   in_progress: { label: 'In Progress', className: 'badge-warning' },
   resolved:    { label: 'Resolved',    className: 'badge-success' },
+  needs_info:  { label: 'Needs info',  className: 'badge-warning' },
 };
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -84,7 +85,7 @@ export default function TaskDetailPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-base-200 flex items-center justify-center">
-        <span className="loading loading-spinner loading-lg" />
+        <span className="spinner spinner-lg" />
       </div>
     );
   }

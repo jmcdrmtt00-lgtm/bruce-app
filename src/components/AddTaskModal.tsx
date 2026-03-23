@@ -143,7 +143,7 @@ export default function AddTaskModal({ isOpen, onClose, onSaved }: Props) {
         <div className="modal-action">
           <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
           <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-            {saving ? <span className="loading loading-spinner loading-sm" /> : 'Add Task'}
+            {saving ? <span className="spinner spinner-sm" /> : 'Add Task'}
           </button>
         </div>
       </div>

@@ -11,6 +11,7 @@ const STATUS_CONFIG = {
   open:        { label: 'Open',        className: 'badge-error'   },
   in_progress: { label: 'In Progress', className: 'badge-warning' },
   resolved:    { label: 'Resolved',    className: 'badge-success' },
+  needs_info:  { label: 'Needs info',  className: 'badge-warning' },
 };
 
 
@@ -63,7 +64,7 @@ export default function IssuesPage() {
 
         {loading ? (
           <div className="flex justify-center py-16">
-            <span className="loading loading-spinner loading-lg" />
+            <span className="spinner spinner-lg" />
           </div>
         ) : displayed.length === 0 ? (
           <div className="card bg-base-100 shadow-xl">
