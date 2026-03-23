@@ -706,7 +706,7 @@ function InventoryTab() {
           transition: 'background 0.15s',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '4px' }}>
-            <span style={{ fontSize: '15px', fontWeight: 700, color: mode === 'ask' ? '#eef2f7' : '#4a5a6b' }}>Ask the AI</span>
+            <span style={{ fontSize: '15px', fontWeight: 700, color: mode === 'ask' ? '#eef2f7' : '#7a90a8' }}>Ask the AI</span>
           </div>
           <div style={{ fontSize: '11px', color: mode === 'ask' ? '#3a6090' : '#2e3e50' }}>Natural language inventory search</div>
         </button>
