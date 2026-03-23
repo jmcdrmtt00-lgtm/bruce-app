@@ -256,15 +256,19 @@ def _process_message(service, msg_id: str) -> None:
     print(f"Email poll: triage result — adequate={adequate}", flush=True)
 
     if adequate:
-        # Enough info — flag for Bruce to promote to Dashboard
-        _sb_patch(f"incidents?id=eq.{incident_id}",
-                  {"source": "email_adequate"})
-        print(f"Email poll: ticket flagged as adequate — awaiting Bruce's review", flush=True)
+        _sb_patch(f"incidents?id=eq.{incident_id}", {"triage_result": "adequate"})
+        print(f"Email poll: ticket flagged adequate — awaiting Bruce's review", flush=True)
     else:
-        # Needs more info — store the draft question for Bruce to review before sending
+        draft = (
+            f"Hi {sender_name},\n\n"
+            f"Thanks for reaching out to IT. To help you as quickly as possible, "
+            f"could you provide a bit more information?\n\n"
+            f"  {missing}\n\n"
+            f"Just reply to this email with the details and we'll get right on it.\n\n"
+            f"— IT Buddy"
+        )
         _sb_patch(f"incidents?id=eq.{incident_id}",
-                  {"source": "email_needs_info", "description":
-                   f"{body or ''}\n\n---\n[IT Buddy draft reply — review and send]\n\n{missing}".strip()})
+                  {"triage_result": "needs_info", "draft_reply": draft})
         print(f"Email poll: ticket flagged needs-info — draft stored for Bruce's review", flush=True)
 
 

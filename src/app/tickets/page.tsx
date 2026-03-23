@@ -108,6 +108,7 @@ export default function TicketsPage() {
   const [allUpdates, setAllUpdates] = useState<IncidentUpdate[]>([]);
   const [infoRequired, setInfoRequired] = useState('');
   const [infoDone, setInfoDone]         = useState('');
+  const [draftReply, setDraftReply]     = useState('');
   const [issues, setIssues]             = useState('');
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
   const [saveStatus, setSaveStatus]     = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -242,6 +243,7 @@ export default function TicketsPage() {
     setAssignedTo('');
     setInfoRequired('');
     setInfoDone('');
+    setDraftReply('');
     setIssues('');
     setSelectedTask(null);
     setSelectedType('general');
@@ -271,6 +273,7 @@ export default function TicketsPage() {
     setSelectedType(typeId);
 
     setInfoDone('');
+    setDraftReply(task.draft_reply || '');
     setIssues('');
     setAiStage('idle');
     setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
@@ -737,6 +740,38 @@ export default function TicketsPage() {
                     </div>
                   </div>
                 </div>
+
+                {/* ── IT Buddy triage result ── */}
+                {selectedTask?.triage_result === 'needs_info' && (
+                  <div style={{ border: '1px solid rgba(255,180,0,0.3)', borderRadius: '8px', background: 'rgba(255,180,0,0.06)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#f0a800', textTransform: 'uppercase', letterSpacing: '0.07em' }}>IT Buddy — More info needed</div>
+                    <p style={{ fontSize: '12px', color: '#a8b8c8', margin: 0 }}>IT Buddy drafted this reply asking the requester for more information. Review it, edit if needed, then click Send.</p>
+                    <AutoTextarea
+                      style={{ fontSize: '12px', color: '#eef2f7', background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,180,0,0.2)', borderRadius: '5px', padding: '8px 10px', fontFamily: "'DM Sans', sans-serif", outline: 'none', width: '100%', resize: 'none', lineHeight: 1.5 }}
+                      value={draftReply}
+                      onChange={e => setDraftReply(e.target.value)}
+                      placeholder="Draft reply..."
+                    />
+                    <button
+                      style={{ alignSelf: 'flex-start', padding: '7px 18px', borderRadius: '6px', background: '#f0a800', color: '#000', border: 'none', cursor: 'not-allowed', fontSize: '12px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", opacity: 0.6 }}
+                      title="Send reply — coming soon"
+                    >
+                      Send Reply
+                    </button>
+                  </div>
+                )}
+                {selectedTask?.triage_result === 'adequate' && (
+                  <div style={{ border: '1px solid rgba(34,204,110,0.3)', borderRadius: '8px', background: 'rgba(34,204,110,0.06)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                    <div style={{ fontSize: '11px', fontWeight: 600, color: '#22cc6e', textTransform: 'uppercase', letterSpacing: '0.07em' }}>IT Buddy — Ready to work</div>
+                    <p style={{ fontSize: '12px', color: '#a8b8c8', margin: 0 }}>IT Buddy has enough information to act on this ticket. Move it to the Dashboard to assign it a task number and start working it.</p>
+                    <button
+                      style={{ alignSelf: 'flex-start', padding: '7px 18px', borderRadius: '6px', background: '#22cc6e', color: '#000', border: 'none', cursor: 'not-allowed', fontSize: '12px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", opacity: 0.6 }}
+                      title="Move to Dashboard — coming soon"
+                    >
+                      Move to Dashboard
+                    </button>
+                  </div>
+                )}
 
                 {/* ── Working area: Problem to fix + AI ── */}
                 <div style={{ borderLeft: '3px solid #4f8ef7', borderRadius: '6px', background: 'rgba(79,142,247,0.06)', padding: '14px 16px', display: 'flex', flexDirection: 'column', gap: '14px' }}>

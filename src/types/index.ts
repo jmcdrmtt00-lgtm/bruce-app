@@ -36,6 +36,8 @@ export interface Incident {
   date_due: string | null;
   date_completed: string | null;
   auto_suggested: boolean;
+  triage_result: 'adequate' | 'needs_info' | null;
+  draft_reply: string | null;
   created_at: string;
   updated_at: string;
 }
