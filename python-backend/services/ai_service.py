@@ -543,26 +543,30 @@ def triage_email_ticket(subject: str, body: str) -> dict:
     """Evaluate whether an email IT ticket has enough info to act on.
     Returns {"adequate": True} or {"adequate": False, "missing": "what to ask for"}.
     Synchronous — safe to call from a background thread.
+
+    Strategy: ask Haiku to extract two specific fields from the body only,
+    then check the results ourselves rather than relying on Haiku's judgment.
     """
     import json as _json
 
     system = (
-        "You are an IT help desk triage assistant. Read an email and decide if it "
-        "contains enough information for IT to act on.\n\n"
-        "The email MUST contain BOTH of the following. If either is missing, respond with adequate=false:\n"
-        "  1. LOCATION INFORMATION — where is the problem? "
-        "(e.g. a room number, a building, a specific workstation, or 'my computer')\n"
-        "  2. TYPE OF PROBLEM — what is actually wrong? "
-        "(e.g. 'won\\'t turn on', 'is jammed', 'can\\'t log in', 'showing an error')\n\n"
-        "If the email has both, respond with adequate=true.\n"
-        "If either is missing, respond with adequate=false.\n\n"
+        "You are an IT help desk data extractor. Read the BODY of an email "
+        "(ignore the subject line) and extract exactly two things:\n\n"
+        "  1. device_or_location: the specific device or place mentioned "
+        "(e.g. 'printer in room 4', 'my computer', 'the nurses station PC'). "
+        "If nothing specific is mentioned, return null.\n\n"
+        "  2. symptom: the specific IT problem described "
+        "(e.g. 'won\\'t turn on', 'is jammed', 'shows error code 503', 'can\\'t log in'). "
+        "Emotional statements, urgency, or vague words like 'broken', 'not working', "
+        "'always happens', 'anxious', 'need help' do NOT count as a symptom — return null for those.\n\n"
         "Respond with JSON only — no other text:\n"
-        '{"adequate": true}\n'
-        'or\n'
-        '{"adequate": false, "missing": "one short sentence describing what is missing"}'
+        '{"device_or_location": "...", "symptom": "..."}\n'
+        "Use null (not a string) when the field is absent."
     )
 
-    content = f"Subject: {subject}\n\nBody: {body or '(no body)'}"
+    body_text = body.strip() if body else ""
+    content = f"Body: {body_text or '(no body)'}"
+
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=100,
@@ -570,10 +574,23 @@ def triage_email_ticket(subject: str, body: str) -> dict:
         messages=[{"role": "user", "content": content}],
     )
     text = message.content[0].text.strip()
+
     try:
-        return _json.loads(text)
+        extracted = _json.loads(text)
     except Exception:
-        return {"adequate": True}  # default to adequate if parsing fails
+        return {"adequate": False, "missing": "Please describe what device or system has the problem and what it is doing."}
+
+    device = extracted.get("device_or_location")
+    symptom = extracted.get("symptom")
+
+    if device and symptom:
+        return {"adequate": True}
+    elif not device and not symptom:
+        return {"adequate": False, "missing": "Please tell us what device or system has the problem and what it is doing."}
+    elif not device:
+        return {"adequate": False, "missing": "Please tell us which device or where the problem is occurring."}
+    else:
+        return {"adequate": False, "missing": "Please describe what the device is actually doing wrong."}
 
 
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:
