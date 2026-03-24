@@ -109,10 +109,7 @@ export default function SubmitTicketPage() {
   // Pre-fill email from the logged-in user on mount
   useEffect(() => {
     supabase.auth.getUser().then(({ data: { user } }) => {
-      if (user?.email) {
-        setEmail(user.email);
-        lookupProfile(user.email);
-      }
+      if (user?.email) setEmail(user.email);
     });
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
