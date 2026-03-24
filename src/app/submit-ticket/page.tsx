@@ -230,7 +230,7 @@ export default function SubmitTicketPage() {
       const res = await fetch('/api/nurse/create-ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ subject: subject.trim(), description: problem.trim(), conversation_summary: summary }),
+        body: JSON.stringify({ subject: subject.trim(), description: problem.trim(), conversation_summary: summary, org_id: activeOrgId }),
       });
       if (res.ok) setItTicketNumber((await res.json()).task_number ?? null);
     } catch { /* silent — still show IT card */ }

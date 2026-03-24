@@ -25,7 +25,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server not configured for ticket creation' }, { status: 500 });
   }
 
-  const { subject, description, conversation_summary } = await request.json();
+  const { subject, description, conversation_summary, org_id } = await request.json();
   if (!subject?.trim()) return NextResponse.json({ error: 'subject is required' }, { status: 400 });
 
   // Build description — include conversation Q&A context for IT
@@ -44,6 +44,7 @@ export async function POST(request: NextRequest) {
     .from('incidents')
     .insert({
       user_id:     adminUserId,
+      org_id:      org_id ?? null,
       title:       subject.trim(),
       description: fullDescription,
       reported_by: user.email ?? null,
