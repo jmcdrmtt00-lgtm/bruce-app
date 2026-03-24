@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import toast from 'react-hot-toast';
 import { supabase } from '@/libs/supabase';
+import { useOrg } from '@/contexts/OrgContext';
 
 type Stage = 'idle' | 'questions' | 'assessed' | 'coaching' | 'completed';
 type Turn  = { role: 'user' | 'ai'; content: string };
@@ -56,6 +57,7 @@ function VoiceButton({ listening, onToggle }: { listening: boolean; onToggle: ()
 }
 
 export default function SubmitTicketPage() {
+  const { activeOrgId } = useOrg();
   // Profile / identity
   const [email, setEmail]               = useState('');
   const [requester, setRequester]       = useState('');
@@ -120,7 +122,9 @@ export default function SubmitTicketPage() {
     setProfileLoading(true);
     setProfileFound(null);
     try {
-      const res = await fetch(`/api/nurse/profile?email=${encodeURIComponent(emailAddr.trim())}`);
+      const params = new URLSearchParams({ email: emailAddr.trim() });
+      if (activeOrgId) params.set('org_id', activeOrgId);
+      const res = await fetch(`/api/nurse/profile?${params}`);
       if (res.ok) {
         const data = await res.json();
         setRequester(data.full_name || '');
