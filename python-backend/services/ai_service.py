@@ -588,7 +588,7 @@ def triage_email_ticket(subject: str, body: str) -> dict:
     elif not device and not symptom:
         return {"adequate": False, "missing": "Please tell us what device or system has the problem and what it is doing."}
     elif not device:
-        return {"adequate": False, "missing": f"We understand there's an issue ({symptom}), but could you tell us which device or where it's happening — for example, a room number, a printer, or a specific computer?"}
+        return {"adequate": False, "missing": f"We understand there's an issue ({symptom}), but could you tell us which device or where it's happening — for example, a room number?"}
     else:
         return {"adequate": False, "missing": f"Please describe what the {device} is actually doing wrong."}
 
