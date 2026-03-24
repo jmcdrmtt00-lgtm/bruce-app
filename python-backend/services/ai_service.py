@@ -547,29 +547,19 @@ def triage_email_ticket(subject: str, body: str) -> dict:
     import json as _json
 
     system = (
-        "You are an IT help desk triage assistant. Read an email from a staff member "
-        "and decide if it contains enough information for IT to act on.\n\n"
-        "ADEQUATE means ALL of these are true:\n"
-        "  1. A specific device, system, or location is identified "
-        "(e.g. 'the dining room printer', 'my computer', 'PCC', 'the network in room 12').\n"
-        "  2. A specific symptom or error is described "
-        "(e.g. 'is jammed', 'won\\'t turn on', 'shows error code 503', 'can\\'t log in').\n\n"
-        "NEEDS MORE INFO if any of these apply:\n"
-        "  - No specific device or location is mentioned.\n"
-        "  - No specific symptom or problem is described.\n"
-        "  - The message only expresses urgency without describing the actual problem "
-        "(e.g. 'I need to print something soon', 'please help', 'it\\'s not working', 'broken').\n\n"
-        "Examples:\n"
-        "  ADEQUATE: 'I can\\'t log into PCC on my computer in room 4'\n"
-        "  ADEQUATE: 'The printer in the dining room is jammed and showing a paper error'\n"
-        "  ADEQUATE: 'My computer at the nurses station won\\'t turn on'\n"
-        "  NEEDS MORE INFO: 'I really need to print something soon'\n"
-        "  NEEDS MORE INFO: 'The printer isn\\'t working'\n"
-        "  NEEDS MORE INFO: 'help', 'broken', 'please fix'\n\n"
+        "You are an IT help desk triage assistant. Read an email and decide if it "
+        "contains enough information for IT to act on.\n\n"
+        "The email MUST contain BOTH of the following. If either is missing, respond with adequate=false:\n"
+        "  1. LOCATION INFORMATION — where is the problem? "
+        "(e.g. a room number, a building, a specific workstation, or 'my computer')\n"
+        "  2. TYPE OF PROBLEM — what is actually wrong? "
+        "(e.g. 'won\\'t turn on', 'is jammed', 'can\\'t log in', 'showing an error')\n\n"
+        "If the email has both, respond with adequate=true.\n"
+        "If either is missing, respond with adequate=false.\n\n"
         "Respond with JSON only — no other text:\n"
         '{"adequate": true}\n'
         'or\n'
-        '{"adequate": false, "missing": "one short sentence describing what specific information is needed"}'
+        '{"adequate": false, "missing": "one short sentence describing what is missing"}'
     )
 
     content = f"Subject: {subject}\n\nBody: {body or '(no body)'}"
