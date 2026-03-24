@@ -588,9 +588,9 @@ def triage_email_ticket(subject: str, body: str) -> dict:
     elif not device and not symptom:
         return {"adequate": False, "missing": "Please tell us what device or system has the problem and what it is doing."}
     elif not device:
-        return {"adequate": False, "missing": "Please tell us which device or where the problem is occurring."}
+        return {"adequate": False, "missing": f"Please tell us where the {symptom} is occurring — which room, computer, or device?"}
     else:
-        return {"adequate": False, "missing": "Please describe what the device is actually doing wrong."}
+        return {"adequate": False, "missing": f"Please describe what the {device} is actually doing wrong."}
 
 
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:
