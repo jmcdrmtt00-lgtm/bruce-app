@@ -360,7 +360,7 @@ export default function DashboardPage() {
         setAllUpdates(updates);
         const latest = (t: string) => updates.filter(u => u.type === t).at(-1)?.note ?? '';
 
-        const progress = latest('progress');
+        const progress = latest('progress') || task.description || '';
         setInfoDone(progress);
         savedInfoDoneRef.current = progress;
 
