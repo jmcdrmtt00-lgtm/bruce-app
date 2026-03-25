@@ -3,10 +3,6 @@ import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-// Required env vars (add to Vercel + Railway):
-//   SUPABASE_SERVICE_ROLE_KEY  — Supabase service role key (bypasses RLS)
-//   IT_ADMIN_USER_ID           — UUID of the IT admin's Supabase user (Bruce)
-
 export async function POST(request: NextRequest) {
   // Verify caller is a logged-in user
   const cookieStore = await cookies();
@@ -18,33 +14,45 @@ export async function POST(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const adminUserId   = process.env.IT_ADMIN_USER_ID;
   const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-  if (!adminUserId || !serviceRoleKey) {
-    console.error('[nurse/create-ticket] Missing IT_ADMIN_USER_ID or SUPABASE_SERVICE_ROLE_KEY');
-    return NextResponse.json({ error: 'Server not configured for ticket creation' }, { status: 500 });
+  if (!serviceRoleKey) {
+    console.error('[nurse/create-ticket] Missing SUPABASE_SERVICE_ROLE_KEY');
+    return NextResponse.json({ error: 'Server misconfigured' }, { status: 500 });
   }
 
   const { subject, description, conversation_summary, org_id } = await request.json();
   if (!subject?.trim()) return NextResponse.json({ error: 'subject is required' }, { status: 400 });
+  if (!org_id) return NextResponse.json({ error: 'org_id is required' }, { status: 400 });
 
-  // Build description — include conversation Q&A context for IT
-  const fullDescription = [
-    description?.trim(),
-    conversation_summary?.trim() ? `\n--- Q&A with staff ---\n${conversation_summary.trim()}` : null,
-  ].filter(Boolean).join('\n');
-
-  // Use service role client so we can write under the IT admin's user_id
+  // Use service role client to bypass RLS
   const adminClient = createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     serviceRoleKey,
   );
 
+  // Look up the IT admin's user_id for this org from user_orgs
+  const { data: orgAdmin, error: adminError } = await adminClient
+    .from('user_orgs')
+    .select('user_id')
+    .eq('org_id', org_id)
+    .eq('role', 'admin')
+    .single();
+
+  if (adminError || !orgAdmin) {
+    console.error('[nurse/create-ticket] Could not find org admin:', adminError?.message);
+    return NextResponse.json({ error: 'Could not find IT admin for this org' }, { status: 500 });
+  }
+
+  const fullDescription = [
+    description?.trim(),
+    conversation_summary?.trim() ? `\n--- Q&A with staff ---\n${conversation_summary.trim()}` : null,
+  ].filter(Boolean).join('\n');
+
   const { data: incident, error } = await adminClient
     .from('incidents')
     .insert({
-      user_id:     adminUserId,
-      org_id:      org_id ?? null,
+      user_id:     orgAdmin.user_id,
+      org_id,
       title:       subject.trim(),
       description: fullDescription,
       reported_by: user.email ?? null,

@@ -24,8 +24,13 @@ export async function GET(request: NextRequest) {
     .select('*')
     .order('created_at', { ascending: false });
 
-  // Always filter by user_id — email-polled tickets also use the org admin's user_id
-  query = query.eq('user_id', user.id);
+  // Filter by org_id — the correct multi-tenant scoping
+  // Fall back to user_id for backward compatibility if no org header
+  if (orgId) {
+    query = query.eq('org_id', orgId);
+  } else {
+    query = query.eq('user_id', user.id);
+  }
 
   if (source === 'dashboard') {
     // IT's work queue: tasks created by IT, email tickets, or nurse-submitted with adequate info
