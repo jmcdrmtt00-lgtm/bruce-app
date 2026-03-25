@@ -543,36 +543,30 @@ def triage_email_ticket(subject: str, body: str) -> dict:
     """Evaluate whether an email IT ticket has enough info to act on.
     Returns {"adequate": True} or {"adequate": False, "missing": "what to ask for"}.
     Synchronous — safe to call from a background thread.
+
+    Strategy: ask Haiku to extract two specific fields from the body only,
+    then check the results ourselves rather than relying on Haiku's judgment.
     """
     import json as _json
 
     system = (
-        "You are an IT help desk triage assistant. Read an email from a staff member "
-        "and decide if it contains enough information for IT to act on.\n\n"
-        "ADEQUATE means ALL of these are true:\n"
-        "  1. A specific device, system, or location is identified "
-        "(e.g. 'the dining room printer', 'my computer', 'PCC', 'the network in room 12').\n"
-        "  2. A specific symptom or error is described "
-        "(e.g. 'is jammed', 'won\\'t turn on', 'shows error code 503', 'can\\'t log in').\n\n"
-        "NEEDS MORE INFO if any of these apply:\n"
-        "  - No specific device or location is mentioned.\n"
-        "  - No specific symptom or problem is described.\n"
-        "  - The message only expresses urgency without describing the actual problem "
-        "(e.g. 'I need to print something soon', 'please help', 'it\\'s not working', 'broken').\n\n"
-        "Examples:\n"
-        "  ADEQUATE: 'I can\\'t log into PCC on my computer in room 4'\n"
-        "  ADEQUATE: 'The printer in the dining room is jammed and showing a paper error'\n"
-        "  ADEQUATE: 'My computer at the nurses station won\\'t turn on'\n"
-        "  NEEDS MORE INFO: 'I really need to print something soon'\n"
-        "  NEEDS MORE INFO: 'The printer isn\\'t working'\n"
-        "  NEEDS MORE INFO: 'help', 'broken', 'please fix'\n\n"
+        "You are an IT help desk data extractor. Read the BODY of an email "
+        "(ignore the subject line) and extract exactly two things:\n\n"
+        "  1. device_or_location: the specific device or place mentioned "
+        "(e.g. 'printer in room 4', 'my computer', 'the nurses station PC'). "
+        "If nothing specific is mentioned, return null.\n\n"
+        "  2. symptom: the specific IT problem described "
+        "(e.g. 'won\\'t turn on', 'is jammed', 'shows error code 503', 'can\\'t log in'). "
+        "Emotional statements, urgency, or vague words like 'broken', 'not working', "
+        "'always happens', 'anxious', 'need help' do NOT count as a symptom — return null for those.\n\n"
         "Respond with JSON only — no other text:\n"
-        '{"adequate": true}\n'
-        'or\n'
-        '{"adequate": false, "missing": "one short sentence describing what specific information is needed"}'
+        '{"device_or_location": "...", "symptom": "..."}\n'
+        "Use null (not a string) when the field is absent."
     )
 
-    content = f"Subject: {subject}\n\nBody: {body or '(no body)'}"
+    body_text = body.strip() if body else ""
+    content = f"Body: {body_text or '(no body)'}"
+
     message = client.messages.create(
         model="claude-haiku-4-5-20251001",
         max_tokens=100,
@@ -580,10 +574,23 @@ def triage_email_ticket(subject: str, body: str) -> dict:
         messages=[{"role": "user", "content": content}],
     )
     text = message.content[0].text.strip()
+
     try:
-        return _json.loads(text)
+        extracted = _json.loads(text)
     except Exception:
-        return {"adequate": True}  # default to adequate if parsing fails
+        return {"adequate": False, "missing": "Please describe what device or system has the problem and what it is doing."}
+
+    device = extracted.get("device_or_location")
+    symptom = extracted.get("symptom")
+
+    if device and symptom:
+        return {"adequate": True}
+    elif not device and not symptom:
+        return {"adequate": False, "missing": "Please tell us what device or system has the problem and what it is doing."}
+    elif not device:
+        return {"adequate": False, "missing": f"We understand there's an issue ({symptom}), but could you tell us which device or where it's happening — for example, a room number?"}
+    else:
+        return {"adequate": False, "missing": f"Please describe what the {device} is actually doing wrong."}
 
 
 async def check_suggestions(completed_tasks: list[dict], user_email: str = "") -> list[dict]:

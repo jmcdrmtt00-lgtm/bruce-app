@@ -13,15 +13,18 @@ export async function GET(request: NextRequest) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-  const email = request.nextUrl.searchParams.get('email');
+  const email  = request.nextUrl.searchParams.get('email');
+  const orgId  = request.nextUrl.searchParams.get('org_id');
   if (!email?.trim()) return NextResponse.json({ error: 'email required' }, { status: 400 });
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('employees')
     .select('first_name, last_name, site')
-    .eq('email', email.trim().toLowerCase())
-    .eq('is_approved_submitter', true)
-    .single();
+    .eq('email', email.trim().toLowerCase());
+
+  if (orgId) query = query.eq('org_id', orgId);
+
+  const { data, error } = await query.single();
 
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 });
 

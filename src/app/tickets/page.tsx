@@ -264,7 +264,7 @@ export default function TicketsPage() {
     const raw = task.status;
     const s = (raw === 'pending' || raw === 'in_progress' || raw === 'open' || raw === 'needs_info') ? 'open' : 'resolved';
     setStatus(s);
-    setRequester(task.reported_by || '');
+    setRequester(task.reporter_name || task.reported_by || '');
     setAssignedTo(task.assigned_to || '');
 
     const rawScreen = task.screen || '';
@@ -617,7 +617,7 @@ export default function TicketsPage() {
                       {visibleCols.requester && <>
                         <div style={cell} onClick={click} onMouseEnter={enter} onMouseLeave={leave} />
                         <div style={{ ...cell, padding: '5px 16px', fontSize: '10px', color: task.reported_by ? '#eef2f7' : '#3a4a5c', justifyContent: 'flex-end', whiteSpace: 'nowrap' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
-                          {formatRequester(task.reported_by)}
+                          {formatRequester(task.reporter_name || task.reported_by)}
                         </div>
                       </>}
                       {/* optional: due */}

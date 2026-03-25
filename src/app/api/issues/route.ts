@@ -24,8 +24,13 @@ export async function GET(request: NextRequest) {
     .select('*')
     .order('created_at', { ascending: false });
 
-  // Always filter by user_id — email-polled tickets also use the org admin's user_id
-  query = query.eq('user_id', user.id);
+  // Filter by org_id — the correct multi-tenant scoping
+  // Fall back to user_id for backward compatibility if no org header
+  if (orgId) {
+    query = query.eq('org_id', orgId);
+  } else {
+    query = query.eq('user_id', user.id);
+  }
 
   if (source === 'dashboard') {
     // IT's work queue: tasks created by IT, email tickets, or nurse-submitted with adequate info
@@ -43,7 +48,31 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ incidents: data });
+
+  // Enrich reported_by: look up employee names in one bulk query
+  const emails = [...new Set(
+    (data ?? []).map(i => i.reported_by).filter((e): e is string => !!e && e.includes('@'))
+  )];
+
+  let nameMap: Record<string, string> = {};
+  if (emails.length > 0) {
+    const { data: emps } = await supabase
+      .from('employees')
+      .select('email, first_name, last_name')
+      .in('email', emails);
+    for (const emp of emps ?? []) {
+      nameMap[emp.email.toLowerCase()] = `${emp.first_name} ${emp.last_name}`.trim();
+    }
+  }
+
+  const enriched = (data ?? []).map(i => ({
+    ...i,
+    reporter_name: i.reported_by
+      ? (nameMap[i.reported_by.toLowerCase()] ?? (i.reported_by.includes('@') ? i.reported_by : null))
+      : null,
+  }));
+
+  return NextResponse.json({ incidents: enriched });
 }
 
 export async function POST(request: NextRequest) {

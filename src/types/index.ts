@@ -38,6 +38,7 @@ export interface Incident {
   auto_suggested: boolean;
   triage_result: 'adequate' | 'needs_info' | null;
   draft_reply: string | null;
+  reporter_name: string | null;
   created_at: string;
   updated_at: string;
 }
