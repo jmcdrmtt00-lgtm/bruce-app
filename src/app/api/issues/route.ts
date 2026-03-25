@@ -48,7 +48,31 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await query;
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-  return NextResponse.json({ incidents: data });
+
+  // Enrich reported_by: look up employee names in one bulk query
+  const emails = [...new Set(
+    (data ?? []).map(i => i.reported_by).filter((e): e is string => !!e && e.includes('@'))
+  )];
+
+  let nameMap: Record<string, string> = {};
+  if (emails.length > 0) {
+    const { data: emps } = await supabase
+      .from('employees')
+      .select('email, first_name, last_name')
+      .in('email', emails);
+    for (const emp of emps ?? []) {
+      nameMap[emp.email.toLowerCase()] = `${emp.first_name} ${emp.last_name}`.trim();
+    }
+  }
+
+  const enriched = (data ?? []).map(i => ({
+    ...i,
+    reporter_name: i.reported_by
+      ? (nameMap[i.reported_by.toLowerCase()] ?? (i.reported_by.includes('@') ? i.reported_by : null))
+      : null,
+  }));
+
+  return NextResponse.json({ incidents: enriched });
 }
 
 export async function POST(request: NextRequest) {

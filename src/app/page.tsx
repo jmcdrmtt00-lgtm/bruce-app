@@ -328,7 +328,7 @@ export default function DashboardPage() {
             : raw === 'needs_info' ? 'needs_info'
             : 'resolved';
     setStatus(s);
-    setRequester(task.reported_by || '');
+    setRequester(task.reporter_name || task.reported_by || '');
     setAssignedTo(task.assigned_to || '');
 
     // Normalize screen → problem type ID, default to 'general'
@@ -888,7 +888,7 @@ export default function DashboardPage() {
                       {visibleCols.requester && <>
                         <div style={cell} onClick={click} onMouseEnter={enter} onMouseLeave={leave} />
                         <div style={{ ...cell, padding: '5px 16px', fontSize: '10px', color: task.reported_by ? '#eef2f7' : '#3a4a5c', justifyContent: 'flex-end', whiteSpace: 'nowrap' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
-                          {task.reported_by ?? '—'}
+                          {task.reporter_name || task.reported_by || '—'}
                         </div>
                       </>}
                       {/* optional: due */}
