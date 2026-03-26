@@ -9,11 +9,8 @@ import VoiceInput from '@/components/VoiceInput';
 import { Incident, IncidentUpdate } from '@/types';
 
 const STATUS_CONFIG = {
-  pending:     { label: 'Queue',       className: 'badge-info'    },
-  open:        { label: 'Open',        className: 'badge-error'   },
-  in_progress: { label: 'In Progress', className: 'badge-warning' },
-  resolved:    { label: 'Resolved',    className: 'badge-success' },
-  needs_info:  { label: 'Needs info',  className: 'badge-warning' },
+  open:      { label: 'Open',      className: 'badge-error'   },
+  completed: { label: 'Completed', className: 'badge-success' },
 };
 
 const PRIORITY_BADGE: Record<string, string> = {
@@ -22,10 +19,10 @@ const PRIORITY_BADGE: Record<string, string> = {
   low:    'badge-info',
 };
 
-const UPDATE_TYPES: { value: 'approach' | 'progress' | 'resolved'; label: string; badge: string }[] = [
-  { value: 'approach', label: 'My Approach', badge: 'badge-info'    },
-  { value: 'progress', label: 'Progress',    badge: 'badge-warning' },
-  { value: 'resolved', label: 'Resolved',    badge: 'badge-success' },
+const UPDATE_TYPES: { value: 'approach' | 'progress' | 'completed'; label: string; badge: string }[] = [
+  { value: 'approach',  label: 'My Approach', badge: 'badge-info'    },
+  { value: 'progress',  label: 'Progress',    badge: 'badge-warning' },
+  { value: 'completed', label: 'Completed',   badge: 'badge-success' },
 ];
 
 function formatDateTime(iso: string) {
@@ -40,7 +37,7 @@ export default function TaskDetailPage() {
   const [incident, setIncident] = useState<Incident | null>(null);
   const [updates, setUpdates] = useState<IncidentUpdate[]>([]);
   const [loading, setLoading] = useState(true);
-  const [updateType, setUpdateType] = useState<'approach' | 'progress' | 'resolved'>('progress');
+  const [updateType, setUpdateType] = useState<'approach' | 'progress' | 'completed'>('progress');
   const [saving, setSaving] = useState(false);
 
   const loadData = useCallback(() => {
@@ -116,7 +113,7 @@ export default function TaskDetailPage() {
           <div className="card-body">
             <div className="flex items-center gap-2 flex-wrap">
               <span className={`badge badge-lg ${statusCfg.className}`}>{statusCfg.label}</span>
-              {(['pending', 'in_progress', 'resolved'] as const)
+              {(['open', 'completed'] as const)
                 .filter(s => s !== incident.status)
                 .map(s => (
                   <button
@@ -193,8 +190,8 @@ export default function TaskDetailPage() {
           </div>
         )}
 
-        {/* Add update — hidden once resolved */}
-        {incident.status !== 'resolved' && (
+        {/* Add update — hidden once completed */}
+        {incident.status !== 'completed' && (
           <div className="card bg-base-100 shadow-xl">
             <div className="card-body">
               <h2 className="font-bold text-lg mb-4">Add Update</h2>

@@ -9,14 +9,14 @@ import { formatDate } from '@/lib/formatDate';
 export default function HistoryPage() {
   const [incidents, setIncidents] = useState<Incident[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter, setFilter] = useState<'all' | 'issue' | 'onboarding'>('all');
+  const [filter, setFilter] = useState<'all' | 'it' | 'email' | 'direct_ticket'>('all');
 
   useEffect(() => {
     fetch('/api/issues')
       .then(r => r.json())
       .then(data => {
-        const resolved = (data.incidents ?? []).filter((i: Incident) => i.status === 'resolved');
-        setIncidents(resolved);
+        const completed = (data.incidents ?? []).filter((i: Incident) => i.status === 'completed');
+        setIncidents(completed);
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -34,13 +34,13 @@ export default function HistoryPage() {
 
         {/* Filter tabs */}
         <div className="flex gap-2 mb-5">
-          {(['all', 'issue', 'onboarding'] as const).map(f => (
+          {(['all', 'it', 'email', 'direct_ticket'] as const).map(f => (
             <button
               key={f}
               className={`btn btn-sm ${filter === f ? 'btn-primary' : 'btn-ghost'}`}
               onClick={() => setFilter(f)}
             >
-              {f === 'all' ? 'All' : f === 'issue' ? 'IT Issues' : 'Onboardings'}
+              {f === 'all' ? 'All' : f === 'it' ? 'IT' : f === 'email' ? 'Email' : 'Direct Ticket'}
             </button>
           ))}
         </div>
@@ -65,7 +65,7 @@ export default function HistoryPage() {
               >
                 <div className="card-body py-4 px-5">
                   <div className="flex items-start gap-3">
-                    {incident.source === 'onboarding'
+                    {incident.source === 'direct_ticket'
                       ? <UserPlus className="w-4 h-4 text-primary mt-0.5 shrink-0" />
                       : <Wrench className="w-4 h-4 text-base-content/40 mt-0.5 shrink-0" />
                     }
@@ -91,7 +91,7 @@ export default function HistoryPage() {
         )}
 
         <p className="text-center text-sm text-base-content/40 mt-6">
-          {filtered.length} resolved {filter === 'onboarding' ? 'onboarding' : filter === 'issue' ? 'issue' : 'item'}{filtered.length !== 1 ? 's' : ''}
+          {filtered.length} completed {filter === 'direct_ticket' ? 'direct ticket' : filter === 'email' ? 'email ticket' : filter === 'it' ? 'IT task' : 'item'}{filtered.length !== 1 ? 's' : ''}
         </p>
       </div>
     </main>
