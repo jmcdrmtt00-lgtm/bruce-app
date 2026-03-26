@@ -597,7 +597,7 @@ export default function SubmitTicketPage() {
                     <p style={{ fontSize: '12px', fontWeight: 600, color: '#4f8ef7', margin: '0 0 4px' }}>IT will take care of this</p>
                     <p style={{ fontSize: '11px', color: '#a8b8c8', margin: '0 0 2px' }}>
                       {itTicketNumber != null
-                        ? `Ticket #${itTicketNumber} has been added to the IT queue.`
+                        ? `Ticket #D${itTicketNumber} has been added to the IT queue.`
                         : 'Your problem has been sent to IT.'}
                     </p>
                     <p style={{ fontSize: '11px', color: '#6b7d8f', margin: 0 }}>You&apos;ll hear back as soon as possible. Thank you for reporting this!</p>

@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Incident, IncidentUpdate } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
+import { formatTaskNumber } from '@/lib/formatTaskNumber';
 import AiDiagnoseSection from '@/components/AiDiagnoseSection';
 import { useOrg } from '@/contexts/OrgContext';
 
@@ -319,7 +320,7 @@ export default function DashboardPage() {
   useEffect(() => { if (selectedTask) resetPanel(); }, [activeView]);
 
   function loadTask(task: Incident) {
-    setTaskNumber(String(task.task_number));
+    setTaskNumber(formatTaskNumber(task.task_number, task.source));
     setTaskName(task.title || task.description);
     setPriority(task.priority || '');
     setDateDue(task.date_due || '');
@@ -871,7 +872,7 @@ export default function DashboardPage() {
                     <Fragment key={task.id}>
                       {/* # */}
                       <div style={{ ...cell, padding: '5px 4px 5px 14px', fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#7a8fa3', justifyContent: 'flex-end', whiteSpace: 'nowrap', borderLeft: isSelected ? '2px solid #4f8ef7' : '2px solid transparent' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
-                        {task.task_number}
+                        {formatTaskNumber(task.task_number, task.source)}
                       </div>
                       {/* dot */}
                       <div style={{ ...cell, padding: '5px 8px 5px 4px' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
