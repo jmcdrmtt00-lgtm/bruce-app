@@ -346,8 +346,8 @@ export default function SubmitTicketPage() {
       const { data: { user } } = await supabase.auth.getUser();
       if (user) {
         await supabase.from('incidents').insert({
-          user_id: user.id, title: subject.trim(), description: problem.trim(),
-          status: 'resolved', screen: 'problem_to_fix', source: 'submitted by nurse fixed by nurse',
+          user_id: user.id, org_id: activeOrgId, title: subject.trim(), description: problem.trim(),
+          status: 'completed', screen: 'problem_to_fix', source: 'direct_ticket', self_fixed: true,
         });
       }
     } catch { /* silent */ }

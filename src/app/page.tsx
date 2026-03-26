@@ -142,7 +142,7 @@ export default function DashboardPage() {
   const [taskName, setTaskName]   = useState('');
   const [priority, setPriority]   = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]     = useState('');
-  const [status, setStatus]       = useState<'open' | 'needs_info' | 'resolved'>('open');
+  const [status, setStatus]       = useState<'open' | 'completed'>('open');
   const [requester, setRequester] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
 
@@ -263,12 +263,12 @@ export default function DashboardPage() {
 
   const openTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'open' || t.status === 'needs_info')
+      .filter(t => t.status === 'open')
       .sort((a, b) => a.task_number - b.task_number);
   }, [tasks]);
 
   const completedTasks = useMemo(() => {
-    let filtered = tasks.filter(t => t.status === 'resolved');
+    let filtered = tasks.filter(t => t.status === 'completed');
     if (filterPriority) filtered = filtered.filter(t => t.priority === filterPriority);
     return filtered.sort((a, b) => a.task_number - b.task_number);
   }, [tasks, filterPriority]);
@@ -323,10 +323,7 @@ export default function DashboardPage() {
     setTaskName(task.title || task.description);
     setPriority(task.priority || '');
     setDateDue(task.date_due || '');
-    const raw = task.status;
-    const s = (raw === 'pending' || raw === 'in_progress' || raw === 'open') ? 'open'
-            : raw === 'needs_info' ? 'needs_info'
-            : 'resolved';
+    const s = task.status === 'completed' ? 'completed' : 'open';
     setStatus(s);
     setRequester(task.reporter_name || task.reported_by || '');
     setAssignedTo(task.assigned_to || '');
@@ -591,7 +588,7 @@ export default function DashboardPage() {
       const res = await orgFetch('/api/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTaskName.trim(), status: 'pending', reported_by: newTaskRequester.trim() || null, priority: newTaskPriority || null, description: newTaskDetails.trim() || newTaskName.trim(), screen: newTaskType || null, source: 'submitted by IT' }),
+        body: JSON.stringify({ title: newTaskName.trim(), status: 'open', reported_by: newTaskRequester.trim() || null, priority: newTaskPriority || null, description: newTaskDetails.trim() || newTaskName.trim(), screen: newTaskType || null, source: 'it' }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -966,10 +963,9 @@ export default function DashboardPage() {
                     {/* Row 1: Status, Priority, Task Type */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Status</label>
-                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }} style={dpAdminSelect}>
+                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'completed'); markDirty(); }} style={dpAdminSelect}>
                         <option value="open">Open</option>
-                        <option value="needs_info">Needs info</option>
-                        <option value="resolved">Completed</option>
+                        <option value="completed">Completed</option>
                       </select>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

@@ -33,16 +33,17 @@ export async function GET(request: NextRequest) {
   }
 
   if (source === 'dashboard') {
-    // IT's work queue: tasks created by IT, email tickets, or nurse-submitted with adequate info
-    // Include legacy sources (null, 'issue') for backward compatibility
+    // IT tasks + direct_ticket where IT is fixing + email with adequate info
     query = query.or(
-      "source.eq.submitted by IT,source.eq.submitted by nurse adequate info,source.eq.issue,source.is.null"
+      'source.eq.it,' +
+      'and(source.eq.direct_ticket,self_fixed.eq.false),' +
+      'and(source.eq.email,triage_result.eq.adequate,awaiting_reply.eq.false)'
     );
   } else if (source === 'tickets') {
-    // Nurse-submitted tickets: needs more info (email route) or fixed by nurse
-    // Include legacy sources ('ticket', 'nurse_self_fix') for backward compatibility
+    // Nurse self-fixed + email needing more info (not awaiting reply)
     query = query.or(
-      "source.eq.submitted by nurse needs more info,source.eq.submitted by nurse fixed by nurse,source.eq.ticket,source.eq.nurse_self_fix,source.eq.email"
+      'and(source.eq.direct_ticket,self_fixed.eq.true),' +
+      'and(source.eq.email,awaiting_reply.eq.false,triage_result.eq.needs_info)'
     );
   }
 
@@ -114,9 +115,9 @@ export async function POST(request: NextRequest) {
       reported_by: reported_by || null,
       priority: priority || null,
       screen: screen || null,
-      status: status || 'pending',
+      status: status || 'open',
       date_due: date_due || null,
-      source: source || 'submitted by IT',
+      source: source || 'it',
     })
     .select('*')
     .single();

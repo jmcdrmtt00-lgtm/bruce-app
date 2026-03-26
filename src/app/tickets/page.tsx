@@ -102,7 +102,7 @@ export default function TicketsPage() {
   const [taskName, setTaskName]     = useState('');
   const [priority, setPriority]     = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]       = useState('');
-  const [status, setStatus]         = useState<'open' | 'resolved'>('open');
+  const [status, setStatus]         = useState<'open' | 'completed'>('open');
   const [requester, setRequester]   = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [allUpdates, setAllUpdates] = useState<IncidentUpdate[]>([]);
@@ -205,12 +205,12 @@ export default function TicketsPage() {
 
   const openTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'open')
+      .filter(t => t.status === 'open')
       .sort((a, b) => a.task_number - b.task_number);
   }, [tasks]);
 
   const completedTasks = useMemo(() => {
-    let filtered = tasks.filter(t => t.status === 'resolved');
+    let filtered = tasks.filter(t => t.status === 'completed');
     if (filterPriority) filtered = filtered.filter(t => t.priority === filterPriority);
     return filtered.sort((a, b) => a.task_number - b.task_number);
   }, [tasks, filterPriority]);
@@ -262,7 +262,7 @@ export default function TicketsPage() {
     setPriority(task.priority || '');
     setDateDue(task.date_due || '');
     const raw = task.status;
-    const s = (raw === 'pending' || raw === 'in_progress' || raw === 'open' || raw === 'needs_info') ? 'open' : 'resolved';
+    const s = raw === 'completed' ? 'completed' : 'open';
     setStatus(s);
     setRequester(task.reporter_name || task.reported_by || '');
     setAssignedTo(task.assigned_to || '');
@@ -692,9 +692,9 @@ export default function TicketsPage() {
                     {/* Row 1: Status, Priority, Task Type */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Status</label>
-                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'resolved'); markDirty(); }} style={dpAdminSelect}>
+                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'completed'); markDirty(); }} style={dpAdminSelect}>
                         <option value="open">Open</option>
-                        <option value="resolved">Completed</option>
+                        <option value="completed">Completed</option>
                       </select>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
