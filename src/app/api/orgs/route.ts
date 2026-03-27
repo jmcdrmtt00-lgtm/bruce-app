@@ -14,10 +14,17 @@ export async function GET() {
   if (!user) return NextResponse.json({ orgs: [] });
 
   const { data, error } = await supabase
-    .from('orgs')
-    .select('id, name, slug')
-    .order('name');
+    .from('user_orgs')
+    .select('is_default, orgs(id, name, slug)')
+    .eq('user_id', user.id);
 
   if (error) return NextResponse.json({ orgs: [] });
-  return NextResponse.json({ orgs: data ?? [] });
+  const orgs = (data ?? [])
+    .map((row: { is_default: boolean; orgs: { id: string; name: string; slug: string } | null }) => ({
+      ...(row.orgs ?? {}),
+      is_default: row.is_default ?? false,
+    }))
+    .filter((o: { id?: string }) => o.id)
+    .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
+  return NextResponse.json({ orgs });
 }

@@ -7,6 +7,7 @@ export interface Org {
   id: string;
   name: string;
   slug: string;
+  is_default: boolean;
 }
 
 interface OrgContextValue {
@@ -56,7 +57,8 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
         if (fetched.length === 0) return;
         const stored = sessionStorage.getItem('activeOrgId');
         const valid = stored && fetched.find(o => o.id === stored);
-        setActiveOrgId(valid ? stored : fetched[0].id);
+        const defaultOrg = fetched.find(o => o.is_default) ?? fetched[0];
+        setActiveOrgId(valid ? stored : defaultOrg.id);
       })
       .catch(() => {});
   }
