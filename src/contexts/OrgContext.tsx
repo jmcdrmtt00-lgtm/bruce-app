@@ -55,10 +55,8 @@ export function OrgProvider({ children }: { children: React.ReactNode }) {
         const fetched: Org[] = data.orgs ?? [];
         setOrgs(fetched);
         if (fetched.length === 0) return;
-        const stored = sessionStorage.getItem('activeOrgId');
-        const valid = stored && fetched.find(o => o.id === stored);
         const defaultOrg = fetched.find(o => o.is_default) ?? fetched[0];
-        setActiveOrgId(valid ? stored : defaultOrg.id);
+        setActiveOrgId(defaultOrg.id);
       })
       .catch(() => {});
   }
