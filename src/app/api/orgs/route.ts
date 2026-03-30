@@ -20,11 +20,12 @@ export async function GET() {
 
   if (error) return NextResponse.json({ orgs: [] });
   const orgs = (data ?? [])
-    .map((row: { is_default: boolean; orgs: { id: string; name: string; slug: string } | null }) => ({
-      ...(row.orgs ?? {}),
-      is_default: row.is_default ?? false,
-    }))
-    .filter((o: { id?: string }) => o.id)
-    .sort((a: { name: string }, b: { name: string }) => a.name.localeCompare(b.name));
+    .map((row: { is_default: boolean; orgs: { id: string; name: string; slug: string } | { id: string; name: string; slug: string }[] | null }) => {
+      const org = Array.isArray(row.orgs) ? row.orgs[0] : row.orgs;
+      if (!org) return null;
+      return { id: org.id, name: org.name, slug: org.slug, is_default: row.is_default ?? false };
+    })
+    .filter((o): o is { id: string; name: string; slug: string; is_default: boolean } => o !== null)
+    .sort((a, b) => a.name.localeCompare(b.name));
   return NextResponse.json({ orgs });
 }
