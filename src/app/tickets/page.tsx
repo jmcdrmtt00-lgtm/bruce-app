@@ -5,6 +5,7 @@ import toast from 'react-hot-toast';
 import { Incident, IncidentUpdate } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
+import { formatTaskNumber } from '@/lib/formatTaskNumber';
 import AiDiagnoseSection from '@/components/AiDiagnoseSection';
 import { useOrg } from '@/contexts/OrgContext';
 
@@ -102,7 +103,7 @@ export default function TicketsPage() {
   const [taskName, setTaskName]     = useState('');
   const [priority, setPriority]     = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]       = useState('');
-  const [status, setStatus]         = useState<'open' | 'resolved'>('open');
+  const [status, setStatus]         = useState<'open' | 'completed'>('open');
   const [requester, setRequester]   = useState('');
   const [assignedTo, setAssignedTo] = useState('');
   const [allUpdates, setAllUpdates] = useState<IncidentUpdate[]>([]);
@@ -205,12 +206,12 @@ export default function TicketsPage() {
 
   const openTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'open')
+      .filter(t => t.status === 'open')
       .sort((a, b) => a.task_number - b.task_number);
   }, [tasks]);
 
   const completedTasks = useMemo(() => {
-    let filtered = tasks.filter(t => t.status === 'resolved');
+    let filtered = tasks.filter(t => t.status === 'completed');
     if (filterPriority) filtered = filtered.filter(t => t.priority === filterPriority);
     return filtered.sort((a, b) => a.task_number - b.task_number);
   }, [tasks, filterPriority]);
@@ -262,7 +263,7 @@ export default function TicketsPage() {
     setPriority(task.priority || '');
     setDateDue(task.date_due || '');
     const raw = task.status;
-    const s = (raw === 'pending' || raw === 'in_progress' || raw === 'open' || raw === 'needs_info') ? 'open' : 'resolved';
+    const s = raw === 'completed' ? 'completed' : 'open';
     setStatus(s);
     setRequester(task.reporter_name || task.reported_by || '');
     setAssignedTo(task.assigned_to || '');
@@ -603,7 +604,7 @@ export default function TicketsPage() {
                     <Fragment key={task.id}>
                       {/* # */}
                       <div style={{ ...cell, padding: '5px 4px 5px 14px', fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#7a8fa3', justifyContent: 'flex-end', whiteSpace: 'nowrap', borderLeft: isSelected ? '2px solid #4f8ef7' : '2px solid transparent' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
-                        {task.task_number}
+                        {formatTaskNumber(task.task_number, task.source)}
                       </div>
                       {/* dot */}
                       <div style={{ ...cell, padding: '5px 8px 5px 4px' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
@@ -692,9 +693,9 @@ export default function TicketsPage() {
                     {/* Row 1: Status, Priority, Task Type */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Status</label>
-                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'resolved'); markDirty(); }} style={dpAdminSelect}>
+                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'completed'); markDirty(); }} style={dpAdminSelect}>
                         <option value="open">Open</option>
-                        <option value="resolved">Completed</option>
+                        <option value="completed">Completed</option>
                       </select>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

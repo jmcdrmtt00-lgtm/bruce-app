@@ -2,16 +2,13 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, ChevronRight, AlertCircle, Clock, CheckCircle2, UserPlus, Wrench } from 'lucide-react';
+import { Plus, ChevronRight, AlertCircle, CheckCircle2, UserPlus, Wrench } from 'lucide-react';
 import { Incident } from '@/types';
 import { formatDate } from '@/lib/formatDate';
 
 const STATUS_CONFIG = {
-  pending:     { label: 'Queue',       className: 'badge-info'    },
-  open:        { label: 'Open',        className: 'badge-error'   },
-  in_progress: { label: 'In Progress', className: 'badge-warning' },
-  resolved:    { label: 'Resolved',    className: 'badge-success' },
-  needs_info:  { label: 'Needs info',  className: 'badge-warning' },
+  open:      { label: 'Open',      className: 'badge-error'   },
+  completed: { label: 'Completed', className: 'badge-success' },
 };
 
 
@@ -29,7 +26,7 @@ export default function IssuesPage() {
   }, []);
 
   const displayed = filter === 'active'
-    ? incidents.filter(i => i.status !== 'resolved')
+    ? incidents.filter(i => i.status !== 'completed')
     : incidents;
 
   return (
@@ -85,7 +82,7 @@ export default function IssuesPage() {
           <div className="space-y-3">
             {displayed.map(incident => {
               const cfg = STATUS_CONFIG[incident.status];
-              const isOnboarding = incident.source === 'onboarding';
+              const isOnboarding = incident.source === 'direct_ticket';
               return (
                 <Link
                   key={incident.id}
@@ -131,12 +128,8 @@ export default function IssuesPage() {
               {incidents.filter(i => i.status === 'open').length} open
             </span>
             <span className="flex items-center gap-1">
-              <Clock className="w-4 h-4 text-warning" />
-              {incidents.filter(i => i.status === 'in_progress').length} in progress
-            </span>
-            <span className="flex items-center gap-1">
               <CheckCircle2 className="w-4 h-4 text-success" />
-              {incidents.filter(i => i.status === 'resolved').length} resolved
+              {incidents.filter(i => i.status === 'completed').length} completed
             </span>
           </div>
         )}

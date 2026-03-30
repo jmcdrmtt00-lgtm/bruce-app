@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Incident, IncidentUpdate } from '@/types';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
+import { formatTaskNumber } from '@/lib/formatTaskNumber';
 import AiDiagnoseSection from '@/components/AiDiagnoseSection';
 import { useOrg } from '@/contexts/OrgContext';
 
@@ -142,7 +143,7 @@ export default function DashboardPage() {
   const [taskName, setTaskName]   = useState('');
   const [priority, setPriority]   = useState<'high' | 'low' | ''>('');
   const [dateDue, setDateDue]     = useState('');
-  const [status, setStatus]       = useState<'open' | 'needs_info' | 'resolved'>('open');
+  const [status, setStatus]       = useState<'open' | 'completed'>('open');
   const [requester, setRequester] = useState('');
   const [assignedTo, setAssignedTo] = useState('');
 
@@ -263,12 +264,12 @@ export default function DashboardPage() {
 
   const openTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status === 'pending' || t.status === 'in_progress' || t.status === 'open' || t.status === 'needs_info')
+      .filter(t => t.status === 'open')
       .sort((a, b) => a.task_number - b.task_number);
   }, [tasks]);
 
   const completedTasks = useMemo(() => {
-    let filtered = tasks.filter(t => t.status === 'resolved');
+    let filtered = tasks.filter(t => t.status === 'completed');
     if (filterPriority) filtered = filtered.filter(t => t.priority === filterPriority);
     return filtered.sort((a, b) => a.task_number - b.task_number);
   }, [tasks, filterPriority]);
@@ -319,14 +320,11 @@ export default function DashboardPage() {
   useEffect(() => { if (selectedTask) resetPanel(); }, [activeView]);
 
   function loadTask(task: Incident) {
-    setTaskNumber(String(task.task_number));
+    setTaskNumber(formatTaskNumber(task.task_number, task.source));
     setTaskName(task.title || task.description);
     setPriority(task.priority || '');
     setDateDue(task.date_due || '');
-    const raw = task.status;
-    const s = (raw === 'pending' || raw === 'in_progress' || raw === 'open') ? 'open'
-            : raw === 'needs_info' ? 'needs_info'
-            : 'resolved';
+    const s = task.status === 'completed' ? 'completed' : 'open';
     setStatus(s);
     setRequester(task.reporter_name || task.reported_by || '');
     setAssignedTo(task.assigned_to || '');
@@ -591,7 +589,7 @@ export default function DashboardPage() {
       const res = await orgFetch('/api/issues', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: newTaskName.trim(), status: 'pending', reported_by: newTaskRequester.trim() || null, priority: newTaskPriority || null, description: newTaskDetails.trim() || newTaskName.trim(), screen: newTaskType || null, source: 'submitted by IT' }),
+        body: JSON.stringify({ title: newTaskName.trim(), status: 'open', reported_by: newTaskRequester.trim() || null, priority: newTaskPriority || null, description: newTaskDetails.trim() || newTaskName.trim(), screen: newTaskType || null, source: 'it' }),
       });
       if (res.ok) {
         const data = await res.json();
@@ -874,7 +872,7 @@ export default function DashboardPage() {
                     <Fragment key={task.id}>
                       {/* # */}
                       <div style={{ ...cell, padding: '5px 4px 5px 14px', fontFamily: "'DM Mono', monospace", fontSize: '10px', color: '#7a8fa3', justifyContent: 'flex-end', whiteSpace: 'nowrap', borderLeft: isSelected ? '2px solid #4f8ef7' : '2px solid transparent' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
-                        {task.task_number}
+                        {formatTaskNumber(task.task_number, task.source)}
                       </div>
                       {/* dot */}
                       <div style={{ ...cell, padding: '5px 8px 5px 4px' }} onClick={click} onMouseEnter={enter} onMouseLeave={leave}>
@@ -966,10 +964,9 @@ export default function DashboardPage() {
                     {/* Row 1: Status, Priority, Task Type */}
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                       <label style={dpAdminLabel}>Status</label>
-                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'needs_info' | 'resolved'); markDirty(); }} style={dpAdminSelect}>
+                      <select value={status} onChange={e => { setStatus(e.target.value as 'open' | 'completed'); markDirty(); }} style={dpAdminSelect}>
                         <option value="open">Open</option>
-                        <option value="needs_info">Needs info</option>
-                        <option value="resolved">Completed</option>
+                        <option value="completed">Completed</option>
                       </select>
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>

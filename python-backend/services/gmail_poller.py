@@ -107,41 +107,44 @@ def _get_body(payload: dict) -> str:
     return ""
 
 
-def _send_reply(service, to: str, original_subject: str, ticket_number: int,
-                sender_name: str, org_name: str) -> None:
-    subject = (
-        original_subject
-        if original_subject.startswith("Re:")
-        else f"Re: {original_subject}"
-    )
-    body = (
-        f"Hi {sender_name},\n\n"
-        f"Your IT request has been received. A ticket has been created:\n\n"
-        f"  Ticket #: {ticket_number}\n"
-        f"  Summary:  {original_subject}\n"
-        f"  Org:      {org_name}\n\n"
-        f"IT Buddy will follow up with you shortly. "
-        f"You can reply to this email with any additional details.\n\n"
-        f"— IT Buddy"
-    )
+def _send_email(service, to: str, subject: str, body: str) -> None:
     msg = MIMEText(body)
     msg["To"]      = to
     msg["From"]    = GMAIL_ADDRESS
     msg["Subject"] = subject
-
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-    service.users().messages().send(
-        userId="me", body={"raw": raw}
-    ).execute()
+    service.users().messages().send(userId="me", body={"raw": raw}).execute()
 
 
-def _send_more_info_reply(service, to: str, original_subject: str,
-                          sender_name: str, missing: str) -> None:
-    subject = (
-        original_subject
-        if original_subject.startswith("Re:")
-        else f"Re: {original_subject}"
+def _reply_subject(original_subject: str) -> str:
+    return original_subject if original_subject.startswith("Re:") else f"Re: {original_subject}"
+
+
+def _send_adequate_ack(service, to: str, original_subject: str,
+                       task_number: int, sender_name: str) -> None:
+    body = (
+        f"Hi {sender_name},\n\n"
+        f"Thank you for submitting ticket #T{task_number}; we will look at the problem "
+        f"as soon as possible and get back to you if we have any more questions.\n\n"
+        f"— IT Buddy"
     )
+    _send_email(service, to, _reply_subject(original_subject), body)
+
+
+def _send_needs_info_ack(service, to: str, original_subject: str,
+                         task_number: int, sender_name: str) -> None:
+    body = (
+        f"Hi {sender_name},\n\n"
+        f"Thank you for submitting ticket #T{task_number}; we will look at the problem "
+        f"as soon as possible; we are likely to get back to you with a few questions.\n\n"
+        f"— IT Buddy"
+    )
+    _send_email(service, to, _reply_subject(original_subject), body)
+
+
+def send_more_info_reply(service, to: str, original_subject: str,
+                         sender_name: str, missing: str) -> None:
+    """Called by the Tickets page when Bruce clicks Send on a needs-info ticket."""
     body = (
         f"Hi {sender_name},\n\n"
         f"Thanks for reaching out to IT. To help you as quickly as possible, "
@@ -150,15 +153,7 @@ def _send_more_info_reply(service, to: str, original_subject: str,
         f"Just reply to this email with the details and we'll get right on it.\n\n"
         f"— IT Buddy"
     )
-    msg = MIMEText(body)
-    msg["To"]      = to
-    msg["From"]    = GMAIL_ADDRESS
-    msg["Subject"] = subject
-
-    raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
-    service.users().messages().send(
-        userId="me", body={"raw": raw}
-    ).execute()
+    _send_email(service, to, _reply_subject(original_subject), body)
 
 
 # ── Core processing ───────────────────────────────────────────────────────────
@@ -243,8 +238,9 @@ def _process_message(service, msg_id: str) -> None:
     except Exception as exc:
         print(f"Email poll: incident insert failed (already processed?): {exc}", flush=True)
         return
-    incident_id = incident.get("id")
-    print(f"Email poll: created ticket for org '{org_slug}' from {reply_to}", flush=True)
+    incident_id  = incident.get("id")
+    task_number  = incident.get("task_number")
+    print(f"Email poll: created ticket #{task_number} for org '{org_slug}' from {reply_to}", flush=True)
 
     # Triage: does this email have enough info to act on?
     from services.ai_service import triage_email_ticket
@@ -259,7 +255,11 @@ def _process_message(service, msg_id: str) -> None:
 
     if adequate:
         _sb_patch(f"incidents?id=eq.{incident_id}", {"triage_result": "adequate"})
-        print(f"Email poll: ticket flagged adequate — awaiting Bruce's review", flush=True)
+        try:
+            _send_adequate_ack(service, reply_to, subject, task_number, sender_name)
+            print(f"Email poll: ticket #{task_number} adequate — ack sent to {reply_to}", flush=True)
+        except Exception as exc:
+            print(f"Email poll: WARNING — could not send adequate ack: {exc}", flush=True)
     else:
         draft = (
             f"Hi {sender_name},\n\n"
@@ -271,7 +271,11 @@ def _process_message(service, msg_id: str) -> None:
         )
         _sb_patch(f"incidents?id=eq.{incident_id}",
                   {"triage_result": "needs_info", "draft_reply": draft})
-        print(f"Email poll: ticket flagged needs-info — draft stored for Bruce's review", flush=True)
+        try:
+            _send_needs_info_ack(service, reply_to, subject, task_number, sender_name)
+            print(f"Email poll: ticket #{task_number} needs-info — ack sent to {reply_to}", flush=True)
+        except Exception as exc:
+            print(f"Email poll: WARNING — could not send needs-info ack: {exc}", flush=True)
 
 
 # ── Public entry point ────────────────────────────────────────────────────────

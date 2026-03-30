@@ -56,9 +56,9 @@ export async function POST(request: NextRequest) {
       title:       subject.trim(),
       description: fullDescription,
       reported_by: user.email ?? null,
-      status:      'pending',
+      status:      'open',
       screen:      'problem_to_fix',
-      source:      'submitted by nurse adequate info',
+      source:      'direct_ticket',
     })
     .select('id, task_number')
     .single();

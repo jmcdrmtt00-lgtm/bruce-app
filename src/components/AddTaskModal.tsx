@@ -16,7 +16,7 @@ export default function AddTaskModal({ isOpen, onClose, onSaved }: Props) {
   const [priority, setPriority] = useState<'high' | 'medium' | 'low' | ''>('');
   const [customer, setCustomer] = useState('');
   const [screen, setScreen] = useState('');
-  const [status, setStatus] = useState<'pending' | 'in_progress'>('pending');
+  const [status] = useState<'open'>('open');
   const [saving, setSaving] = useState(false);
 
   async function handleSave() {
@@ -36,7 +36,7 @@ export default function AddTaskModal({ isOpen, onClose, onSaved }: Props) {
       });
       if (!res.ok) throw new Error();
       toast.success('Task added!');
-      setName(''); setPriority(''); setCustomer(''); setScreen(''); setStatus('pending');
+      setName(''); setPriority(''); setCustomer(''); setScreen('');
       onSaved();
       onClose();
     } catch {
@@ -118,26 +118,6 @@ export default function AddTaskModal({ isOpen, onClose, onSaved }: Props) {
             </select>
           </div>
 
-          {/* Status */}
-          <div className="form-control">
-            <label className="label"><span className="label-text font-semibold">Add to</span></label>
-            <div className="flex gap-2">
-              <button
-                type="button"
-                className={`btn btn-sm ${status === 'pending' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatus('pending')}
-              >
-                Queue
-              </button>
-              <button
-                type="button"
-                className={`btn btn-sm ${status === 'in_progress' ? 'btn-primary' : 'btn-outline'}`}
-                onClick={() => setStatus('in_progress')}
-              >
-                In Progress
-              </button>
-            </div>
-          </div>
         </div>
 
         <div className="modal-action">

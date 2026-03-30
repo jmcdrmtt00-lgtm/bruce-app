@@ -95,7 +95,7 @@ Table: incidents (IT tasks — current and historical)
 - task_number: INTEGER
 - title: TEXT (task name)
 - priority: TEXT ('high', 'low', or NULL)
-- status: TEXT ('pending' = in queue, 'in_progress' = being worked on, 'resolved' = complete)
+- status: TEXT ('open' = in queue or being worked on, 'completed' = done)
 - date_due: DATE (nullable)
 - date_completed: DATE (nullable)
 - screen: TEXT (checklist type, e.g. 'Onboarding', nullable)

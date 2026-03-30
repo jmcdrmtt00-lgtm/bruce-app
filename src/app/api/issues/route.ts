@@ -11,6 +11,14 @@ async function getClient() {
   );
 }
 
+function getServiceClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } }
+  );
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await getClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -19,30 +27,41 @@ export async function GET(request: NextRequest) {
   const orgId  = request.headers.get('x-org-id');
   const source = request.nextUrl.searchParams.get('source');
 
-  let query = supabase
+  // Use service role to bypass RLS — security enforced via explicit checks below
+  const admin = getServiceClient();
+
+  let query = admin
     .from('incidents')
     .select('*')
     .order('created_at', { ascending: false });
 
-  // Filter by org_id — the correct multi-tenant scoping
-  // Fall back to user_id for backward compatibility if no org header
+  // Filter by org_id with manual membership check, or fall back to user_id
   if (orgId) {
+    // Verify the user belongs to this org before returning its data
+    const { data: membership } = await supabase
+      .from('user_orgs')
+      .select('org_id')
+      .eq('user_id', user.id)
+      .eq('org_id', orgId)
+      .single();
+    if (!membership) return NextResponse.json({ incidents: [] });
     query = query.eq('org_id', orgId);
   } else {
     query = query.eq('user_id', user.id);
   }
 
   if (source === 'dashboard') {
-    // IT's work queue: tasks created by IT, email tickets, or nurse-submitted with adequate info
-    // Include legacy sources (null, 'issue') for backward compatibility
+    // IT tasks + direct_ticket where IT is fixing + email with adequate info
     query = query.or(
-      "source.eq.submitted by IT,source.eq.submitted by nurse adequate info,source.eq.issue,source.is.null"
+      'source.eq.it,' +
+      'and(source.eq.direct_ticket,self_fixed.eq.false),' +
+      'and(source.eq.email,triage_result.eq.adequate,awaiting_reply.eq.false)'
     );
   } else if (source === 'tickets') {
-    // Nurse-submitted tickets: needs more info (email route) or fixed by nurse
-    // Include legacy sources ('ticket', 'nurse_self_fix') for backward compatibility
+    // Nurse self-fixed + email needing more info (not awaiting reply)
     query = query.or(
-      "source.eq.submitted by nurse needs more info,source.eq.submitted by nurse fixed by nurse,source.eq.ticket,source.eq.nurse_self_fix,source.eq.email"
+      'and(source.eq.direct_ticket,self_fixed.eq.true),' +
+      'and(source.eq.email,awaiting_reply.eq.false,triage_result.eq.needs_info)'
     );
   }
 
@@ -56,7 +75,7 @@ export async function GET(request: NextRequest) {
 
   let nameMap: Record<string, string> = {};
   if (emails.length > 0) {
-    const { data: emps } = await supabase
+    const { data: emps } = await admin
       .from('employees')
       .select('email, first_name, last_name')
       .in('email', emails);
@@ -114,9 +133,9 @@ export async function POST(request: NextRequest) {
       reported_by: reported_by || null,
       priority: priority || null,
       screen: screen || null,
-      status: status || 'pending',
+      status: status || 'open',
       date_due: date_due || null,
-      source: source || 'submitted by IT',
+      source: source || 'it',
     })
     .select('*')
     .single();

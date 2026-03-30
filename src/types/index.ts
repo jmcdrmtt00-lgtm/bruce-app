@@ -27,8 +27,10 @@ export interface Incident {
   description: string;
   reported_by: string | null;
   assigned_to: string | null;
-  status: 'open' | 'in_progress' | 'resolved' | 'pending' | 'needs_info';
-  source: 'issue' | 'onboarding' | 'ticket' | 'nurse' | 'nurse_self_fix';
+  status: 'open' | 'completed';
+  source: 'it' | 'email' | 'direct_ticket';
+  awaiting_reply: boolean;
+  self_fixed: boolean;
   onboarding_session_id: string | null;
   priority: 'high' | 'low' | null;
   screen: string | null;
