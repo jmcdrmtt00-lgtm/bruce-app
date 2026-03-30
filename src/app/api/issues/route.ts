@@ -11,6 +11,14 @@ async function getClient() {
   );
 }
 
+function getServiceClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } }
+  );
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await getClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -19,14 +27,24 @@ export async function GET(request: NextRequest) {
   const orgId  = request.headers.get('x-org-id');
   const source = request.nextUrl.searchParams.get('source');
 
-  let query = supabase
+  // Use service role to bypass RLS — security enforced via explicit checks below
+  const admin = getServiceClient();
+
+  let query = admin
     .from('incidents')
     .select('*')
     .order('created_at', { ascending: false });
 
-  // Filter by org_id — the correct multi-tenant scoping
-  // Fall back to user_id for backward compatibility if no org header
+  // Filter by org_id with manual membership check, or fall back to user_id
   if (orgId) {
+    // Verify the user belongs to this org before returning its data
+    const { data: membership } = await supabase
+      .from('user_orgs')
+      .select('org_id')
+      .eq('user_id', user.id)
+      .eq('org_id', orgId)
+      .single();
+    if (!membership) return NextResponse.json({ incidents: [] });
     query = query.eq('org_id', orgId);
   } else {
     query = query.eq('user_id', user.id);
@@ -57,7 +75,7 @@ export async function GET(request: NextRequest) {
 
   let nameMap: Record<string, string> = {};
   if (emails.length > 0) {
-    const { data: emps } = await supabase
+    const { data: emps } = await admin
       .from('employees')
       .select('email, first_name, last_name')
       .in('email', emails);

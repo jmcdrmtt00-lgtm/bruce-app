@@ -11,6 +11,14 @@ async function getClient() {
   );
 }
 
+function getServiceClient() {
+  return createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!,
+    { cookies: { getAll: () => [], setAll: () => {} } }
+  );
+}
+
 export async function GET(request: NextRequest) {
   const supabase = await getClient();
   const { data: { user } } = await supabase.auth.getUser();
@@ -19,7 +27,17 @@ export async function GET(request: NextRequest) {
   const orgId = request.headers.get('x-org-id');
   if (!orgId) return NextResponse.json({ tasks: [] });
 
-  const { data: incidents, error: incErr } = await supabase
+  // Verify org membership
+  const { data: membership } = await supabase
+    .from('user_orgs')
+    .select('org_id')
+    .eq('user_id', user.id)
+    .eq('org_id', orgId)
+    .single();
+  if (!membership) return NextResponse.json({ tasks: [] });
+
+  const admin = getServiceClient();
+  const { data: incidents, error: incErr } = await admin
     .from('incidents')
     .select('id, task_number, title, description, priority, date_due, status, reported_by, screen, source')
     .eq('org_id', orgId)
@@ -31,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   // Fetch all incident_updates for these incidents in one query
   const ids = incidents.map(i => i.id);
-  const { data: allUpdates, error: updErr } = await supabase
+  const { data: allUpdates, error: updErr } = await admin
     .from('incident_updates')
     .select('incident_id, type, note, created_at')
     .in('incident_id', ids)
