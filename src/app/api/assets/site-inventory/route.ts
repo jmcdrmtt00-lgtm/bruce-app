@@ -53,6 +53,6 @@ export async function GET(request: NextRequest) {
     .ilike('site', `%${site}%`)
     .or(`category.eq.${category},category.is.null`);
 
-  if (error || !data) return NextResponse.json({ assets: [] });
-  return NextResponse.json({ assets: data });
+  if (error || !data) return NextResponse.json({ assets: [], debug_error: error?.message ?? 'no data' });
+  return NextResponse.json({ assets: data, debug_count: data.length });
 }

@@ -581,6 +581,7 @@ export default function DashboardPage() {
           const [compData, phoneData, ipadData] = await Promise.all([
             compRes.json(), phoneRes.json(), ipadRes.json(),
           ]);
+          console.log('[site-inventory] comp status:', compRes.status, 'data:', JSON.stringify(compData));
           const compGroups  = buildAssetGroups(compData.assets ?? []);
           const phoneGroups = buildAssetGroups(phoneData.assets ?? []);
           const ipadGroups  = buildAssetGroups(ipadData.assets ?? []);
