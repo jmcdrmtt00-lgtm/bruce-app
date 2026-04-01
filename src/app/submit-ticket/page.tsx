@@ -225,15 +225,24 @@ export default function SubmitTicketPage() {
   }
 
   async function createItTicket(conv: Turn[]) {
+    const summary = conv.map(t => `${t.role === 'user' ? 'Staff' : 'AI'}: ${t.content}`).join('\n');
     try {
-      const summary = conv.map(t => `${t.role === 'user' ? 'Staff' : 'AI'}: ${t.content}`).join('\n');
       const res = await fetch('/api/nurse/create-ticket', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ subject: subject.trim(), description: problem.trim(), conversation_summary: summary, org_id: activeOrgId }),
       });
-      if (res.ok) setItTicketNumber((await res.json()).task_number ?? null);
-    } catch { /* silent — still show IT card */ }
+      const data = await res.json();
+      if (res.ok) {
+        setItTicketNumber(data.task_number ?? null);
+      } else {
+        console.error('[create-ticket] API error:', data.error);
+        toast.error(`Ticket creation failed: ${data.error}`);
+      }
+    } catch (err) {
+      console.error('[create-ticket] Network error:', err);
+      toast.error('Could not create ticket — network error');
+    }
     setItNotified(true);
   }
 
