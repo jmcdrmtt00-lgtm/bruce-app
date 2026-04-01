@@ -158,11 +158,22 @@ class SendReplyRequest(BaseModel):
 
 @app.post("/api/send-reply")
 async def send_reply_ep(request: SendReplyRequest):
-    from services.gmail_poller import _gmail_service, _send_email, _reply_subject, _sb_patch
+    from services.gmail_poller import _gmail_service, _send_email, _reply_subject, _sb_patch, _sb_get
     from fastapi import HTTPException
     try:
+        # Look up the org slug so Reply-To is set correctly
+        org_slug = None
+        try:
+            incidents = _sb_get("incidents", {"id": f"eq.{request.incident_id}", "select": "org_id", "limit": "1"})
+            if incidents and incidents[0].get("org_id"):
+                orgs = _sb_get("orgs", {"id": f"eq.{incidents[0]['org_id']}", "select": "slug", "limit": "1"})
+                if orgs:
+                    org_slug = orgs[0].get("slug")
+        except Exception:
+            pass
         service = _gmail_service()
-        _send_email(service, request.to, _reply_subject(request.subject), request.body)
+        reply_to_addr = f"admin+{org_slug}@lm-intel.ai" if org_slug else None
+        _send_email(service, request.to, _reply_subject(request.subject), request.body, reply_to=reply_to_addr)
         _sb_patch(f"incidents?id=eq.{request.incident_id}", {"awaiting_reply": True})
         return {"ok": True}
     except Exception as exc:
