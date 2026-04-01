@@ -107,11 +107,13 @@ def _get_body(payload: dict) -> str:
     return ""
 
 
-def _send_email(service, to: str, subject: str, body: str) -> None:
+def _send_email(service, to: str, subject: str, body: str, reply_to: str | None = None) -> None:
     msg = MIMEText(body)
     msg["To"]      = to
     msg["From"]    = GMAIL_ADDRESS
     msg["Subject"] = subject
+    if reply_to:
+        msg["Reply-To"] = reply_to
     raw = base64.urlsafe_b64encode(msg.as_bytes()).decode()
     service.users().messages().send(userId="me", body={"raw": raw}).execute()
 
@@ -121,29 +123,31 @@ def _reply_subject(original_subject: str) -> str:
 
 
 def _send_adequate_ack(service, to: str, original_subject: str,
-                       task_number: int, sender_name: str) -> None:
+                       task_number: int, sender_name: str, org_slug: str) -> None:
     body = (
         f"Hi {sender_name},\n\n"
         f"Thank you for submitting ticket #T{task_number}; we will look at the problem "
         f"as soon as possible and get back to you if we have any more questions.\n\n"
         f"— IT Buddy"
     )
-    _send_email(service, to, _reply_subject(original_subject), body)
+    _send_email(service, to, _reply_subject(original_subject), body,
+                reply_to=f"admin+{org_slug}@lm-intel.ai")
 
 
 def _send_needs_info_ack(service, to: str, original_subject: str,
-                         task_number: int, sender_name: str) -> None:
+                         task_number: int, sender_name: str, org_slug: str) -> None:
     body = (
         f"Hi {sender_name},\n\n"
         f"Thank you for submitting ticket #T{task_number}; we will look at the problem "
         f"as soon as possible; we are likely to get back to you with a few questions.\n\n"
         f"— IT Buddy"
     )
-    _send_email(service, to, _reply_subject(original_subject), body)
+    _send_email(service, to, _reply_subject(original_subject), body,
+                reply_to=f"admin+{org_slug}@lm-intel.ai")
 
 
 def send_more_info_reply(service, to: str, original_subject: str,
-                         sender_name: str, missing: str) -> None:
+                         sender_name: str, missing: str, org_slug: str) -> None:
     """Called by the Tickets page when Bruce clicks Send on a needs-info ticket."""
     body = (
         f"Hi {sender_name},\n\n"
@@ -153,7 +157,8 @@ def send_more_info_reply(service, to: str, original_subject: str,
         f"Just reply to this email with the details and we'll get right on it.\n\n"
         f"— IT Buddy"
     )
-    _send_email(service, to, _reply_subject(original_subject), body)
+    _send_email(service, to, _reply_subject(original_subject), body,
+                reply_to=f"admin+{org_slug}@lm-intel.ai")
 
 
 # ── Core processing ───────────────────────────────────────────────────────────
@@ -164,34 +169,14 @@ def _process_message(service, msg_id: str) -> None:
         userId="me", id=msg_id, format="full"
     ).execute()
 
-    headers  = full.get("payload", {}).get("headers", [])
-    to_hdr   = _get_header(headers, "To")
-    from_hdr = _get_header(headers, "From")
-    subject  = _get_header(headers, "Subject") or "(no subject)"
-    body     = _get_body(full.get("payload", {})).strip()
+    thread_id = full.get("threadId", "")
+    headers   = full.get("payload", {}).get("headers", [])
+    to_hdr    = _get_header(headers, "To")
+    from_hdr  = _get_header(headers, "From")
+    subject   = _get_header(headers, "Subject") or "(no subject)"
+    body      = _get_body(full.get("payload", {})).strip()
 
-    # Parse org slug and sender name — check To: and Delivered-To: headers
-    # (Google Workspace strips the +tag from To: so we need Delivered-To:)
-    delivered_to = _get_header(headers, "Delivered-To")
-    match = ADDR_PATTERN.search(to_hdr) or ADDR_PATTERN.search(delivered_to)
-    if not match:
-        print(f"Email poll: skipping msg {msg_id} — To: {to_hdr} / Delivered-To: {delivered_to}", flush=True)
-        # Mark as read so we don't keep seeing this unrecognised message
-        service.users().messages().modify(
-            userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
-        ).execute()
-        return
-
-    org_slug = match.group(1).lower()
-
-    # Extract sender name and reply address from the From: header
-    from_email_match = re.search(r"<([^>]+)>", from_hdr)
-    reply_to = from_email_match.group(1) if from_email_match else from_hdr.strip()
-    display_name = from_hdr[:from_hdr.index('<')].strip().strip('"') if '<' in from_hdr else ''
-    sender_name = display_name or reply_to.split('@')[0]
-
-    # Always mark as read — even if later steps fail — so we never reprocess
-    # the same email.  The gmail_message_id unique constraint is a second guard.
+    # Always mark as read first so we never reprocess
     try:
         service.users().messages().modify(
             userId="me", id=msg_id, body={"removeLabelIds": ["UNREAD"]}
@@ -199,6 +184,50 @@ def _process_message(service, msg_id: str) -> None:
         print(f"Email poll: marked msg {msg_id} as read", flush=True)
     except Exception as exc:
         print(f"Email poll: WARNING — could not mark msg {msg_id} as read: {exc}", flush=True)
+
+    # Extract sender info
+    from_email_match = re.search(r"<([^>]+)>", from_hdr)
+    reply_to = from_email_match.group(1) if from_email_match else from_hdr.strip()
+    display_name = from_hdr[:from_hdr.index('<')].strip().strip('"') if '<' in from_hdr else ''
+    sender_name = display_name or reply_to.split('@')[0]
+
+    # ── Check if this is a reply to an existing ticket (same Gmail thread) ──
+    if thread_id:
+        existing = _sb_get("incidents", {
+            "gmail_thread_id": f"eq.{thread_id}",
+            "select": "id,task_number,org_id,user_id",
+            "limit": "1",
+        })
+        if existing:
+            incident_id  = existing[0]["id"]
+            task_number  = existing[0]["task_number"]
+            inc_user_id  = existing[0]["user_id"]
+            print(f"Email poll: reply to existing ticket #{task_number} (thread {thread_id})", flush=True)
+            # Add the reply body as an incident update
+            update_note = f"Reply from {sender_name} <{reply_to}>:\n\n{body}" if body else f"Reply from {sender_name} <{reply_to}> (no body)"
+            try:
+                _sb_post("incident_updates", {
+                    "incident_id": incident_id,
+                    "user_id":     inc_user_id,
+                    "type": "reply",
+                    "note": update_note,
+                })
+            except Exception as exc:
+                print(f"Email poll: WARNING — could not save reply update: {exc}", flush=True)
+            # Move to Dashboard: mark as adequate so it appears there
+            _sb_patch(f"incidents?id=eq.{incident_id}",
+                      {"triage_result": "adequate", "awaiting_reply": False})
+            print(f"Email poll: ticket #{task_number} moved to Dashboard (reply received)", flush=True)
+            return
+
+    # ── New ticket — parse org slug ──
+    delivered_to = _get_header(headers, "Delivered-To")
+    match = ADDR_PATTERN.search(to_hdr) or ADDR_PATTERN.search(delivered_to)
+    if not match:
+        print(f"Email poll: skipping msg {msg_id} — To: {to_hdr} / Delivered-To: {delivered_to}", flush=True)
+        return
+
+    org_slug = match.group(1).lower()
 
     # Look up org
     print(f"Email poll: looking up org slug '{org_slug}'", flush=True)
@@ -210,7 +239,7 @@ def _process_message(service, msg_id: str) -> None:
     org_name = orgs[0]["name"]
     print(f"Email poll: org found: {org_name}", flush=True)
 
-    # Find a user_id to attach the incident to (first admin of this org)
+    # Find a user_id to attach the incident to (prefer admin, fall back to any member)
     members = _sb_get("user_orgs", {"org_id": f"eq.{org_id}", "role": "eq.admin",
                                      "select": "user_id", "limit": "1"})
     if not members:
@@ -221,19 +250,19 @@ def _process_message(service, msg_id: str) -> None:
         return
     user_id = members[0]["user_id"]
 
-    # Insert incident — gmail_message_id unique constraint prevents duplicates
-    # if this message was somehow already processed on a previous run.
+    # Insert incident
     print(f"Email poll: inserting incident for org '{org_slug}'", flush=True)
     try:
         incident = _sb_post("incidents", {
-            "org_id":           org_id,
-            "user_id":          user_id,
-            "title":            subject[:200],
-            "description":      body or f"(Email from {reply_to} — no body text)",
-            "reported_by":      f"{sender_name} <{reply_to}>",
-            "status":           "open",
-            "source":           "email",
-            "gmail_message_id": msg_id,
+            "org_id":            org_id,
+            "user_id":           user_id,
+            "title":             subject[:200],
+            "description":       body or f"(Email from {reply_to} — no body text)",
+            "reported_by":       f"{sender_name} <{reply_to}>",
+            "status":            "open",
+            "source":            "email",
+            "gmail_message_id":  msg_id,
+            "gmail_thread_id":   thread_id or None,
         })
     except Exception as exc:
         print(f"Email poll: incident insert failed (already processed?): {exc}", flush=True)
@@ -256,7 +285,7 @@ def _process_message(service, msg_id: str) -> None:
     if adequate:
         _sb_patch(f"incidents?id=eq.{incident_id}", {"triage_result": "adequate"})
         try:
-            _send_adequate_ack(service, reply_to, subject, task_number, sender_name)
+            _send_adequate_ack(service, reply_to, subject, task_number, sender_name, org_slug)
             print(f"Email poll: ticket #{task_number} adequate — ack sent to {reply_to}", flush=True)
         except Exception as exc:
             print(f"Email poll: WARNING — could not send adequate ack: {exc}", flush=True)
@@ -272,7 +301,7 @@ def _process_message(service, msg_id: str) -> None:
         _sb_patch(f"incidents?id=eq.{incident_id}",
                   {"triage_result": "needs_info", "draft_reply": draft})
         try:
-            _send_needs_info_ack(service, reply_to, subject, task_number, sender_name)
+            _send_needs_info_ack(service, reply_to, subject, task_number, sender_name, org_slug)
             print(f"Email poll: ticket #{task_number} needs-info — ack sent to {reply_to}", flush=True)
         except Exception as exc:
             print(f"Email poll: WARNING — could not send needs-info ack: {exc}", flush=True)
