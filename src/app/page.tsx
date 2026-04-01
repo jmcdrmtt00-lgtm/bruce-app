@@ -13,7 +13,6 @@ import { useOrg } from '@/contexts/OrgContext';
 interface UnassignedAsset {
   id: string;
   asset_number: string | null;
-  name: string | null;
   make: string | null;
   model: string | null;
   os: string | null;
@@ -570,12 +569,13 @@ export default function DashboardPage() {
         localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
         setOnboardingData(data.structured_data);
         setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
-        const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
+        const siteKey   = (data.structured_data.site ?? '').toLowerCase().replace(/\s+/g, '_');
+        const siteLabel = SITE_LABELS[siteKey] ?? '';
         if (siteLabel) {
           const [compRes, phoneRes, ipadRes] = await Promise.all([
-            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
-            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
-            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
+            orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
+            orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
+            orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
           ]);
           const [compData, phoneData, ipadData] = await Promise.all([
             compRes.json(), phoneRes.json(), ipadRes.json(),
@@ -1093,9 +1093,11 @@ export default function DashboardPage() {
                         const setCat   = cat === 'Computer' ? setComputer : cat === 'Phone' ? setPhone : setIpad;
                         const { groups, approved, newMake, ownsThis } = catState;
                         const visibleGroups = groups.filter(g => g.make !== '(Unknown)');
+                        // Phone/iPad only show if there's inventory data at this site; Computer always shows
+                        if (cat !== 'Computer' && groups.length === 0) return null;
                         return (
                           <div key={cat} className="space-y-1">
-                            <p className="text-xs font-semibold text-base-content/50">{cat}</p>
+                            <p className="text-xs font-semibold text-white/60">{cat}</p>
 
                             {approved ? (
                               <p className="text-sm text-success">
