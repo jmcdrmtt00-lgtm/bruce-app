@@ -570,7 +570,8 @@ export default function DashboardPage() {
         localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
         setOnboardingData(data.structured_data);
         setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
-        const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
+        const siteKey   = (data.structured_data.site ?? '').toLowerCase().replace(/\s+/g, '_');
+        const siteLabel = SITE_LABELS[siteKey] ?? '';
         if (siteLabel) {
           const [compRes, phoneRes, ipadRes] = await Promise.all([
             orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
