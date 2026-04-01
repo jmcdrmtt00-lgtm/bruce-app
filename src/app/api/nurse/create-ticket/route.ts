@@ -30,16 +30,20 @@ export async function POST(request: NextRequest) {
     serviceRoleKey,
   );
 
-  // Look up the IT admin's user_id for this org from user_orgs
-  const { data: orgAdmin, error: adminError } = await adminClient
-    .from('user_orgs')
-    .select('user_id')
-    .eq('org_id', org_id)
-    .eq('role', 'admin')
-    .single();
+  // Look up the IT admin's user_id for this org — prefer admin role, fall back to any member
+  let orgAdmin: { user_id: string } | null = null;
+  const { data: adminRow } = await adminClient
+    .from('user_orgs').select('user_id').eq('org_id', org_id).eq('role', 'admin').limit(1).single();
+  if (adminRow) {
+    orgAdmin = adminRow;
+  } else {
+    const { data: memberRow } = await adminClient
+      .from('user_orgs').select('user_id').eq('org_id', org_id).limit(1).single();
+    orgAdmin = memberRow ?? null;
+  }
 
-  if (adminError || !orgAdmin) {
-    console.error('[nurse/create-ticket] Could not find org admin:', adminError?.message);
+  if (!orgAdmin) {
+    console.error('[nurse/create-ticket] No members found for org:', org_id);
     return NextResponse.json({ error: 'Could not find IT admin for this org' }, { status: 500 });
   }
 
@@ -59,6 +63,7 @@ export async function POST(request: NextRequest) {
       status:      'open',
       screen:      'problem_to_fix',
       source:      'direct_ticket',
+      self_fixed:  false,
     })
     .select('id, task_number')
     .single();

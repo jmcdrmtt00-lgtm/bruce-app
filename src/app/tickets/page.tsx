@@ -110,6 +110,7 @@ export default function TicketsPage() {
   const [infoRequired, setInfoRequired] = useState('');
   const [infoDone, setInfoDone]         = useState('');
   const [draftReply, setDraftReply]     = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
   const [issues, setIssues]             = useState('');
   const [selectedTask, setSelectedTask] = useState<Incident | null>(null);
   const [saveStatus, setSaveStatus]     = useState<'idle' | 'saving' | 'saved'>('idle');
@@ -257,6 +258,28 @@ export default function TicketsPage() {
   // Deselect task when the user switches tabs
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedTask) resetPanel(); }, [activeView]);
+
+  async function handleSendReply() {
+    if (!selectedTask || !draftReply.trim()) return;
+    // Parse reply-to address from "Name <email>" format
+    const match = selectedTask.reported_by?.match(/<([^>]+)>/);
+    const to = match ? match[1] : selectedTask.reported_by ?? '';
+    if (!to) { toast.error('No reply address found'); return; }
+    setSendingReply(true);
+    try {
+      const res = await fetch(`/api/issues/${selectedTask.id}/reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to, subject: selectedTask.title || selectedTask.description, body: draftReply }),
+      });
+      const data = await res.json();
+      if (!res.ok) { toast.error(data.error || 'Failed to send'); return; }
+      toast.success('Reply sent');
+      loadTasks();
+      resetPanel();
+    } catch { toast.error('Network error'); }
+    finally { setSendingReply(false); }
+  }
 
   function loadTask(task: Incident) {
     setTaskName(task.title || task.description);
@@ -753,10 +776,11 @@ export default function TicketsPage() {
                       placeholder="Draft reply..."
                     />
                     <button
-                      style={{ alignSelf: 'flex-start', padding: '7px 18px', borderRadius: '6px', background: '#f0a800', color: '#000', border: 'none', cursor: 'not-allowed', fontSize: '12px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", opacity: 0.6 }}
-                      title="Send reply — coming soon"
+                      style={{ alignSelf: 'flex-start', padding: '7px 18px', borderRadius: '6px', background: '#f0a800', color: '#000', border: 'none', cursor: sendingReply ? 'not-allowed' : 'pointer', fontSize: '12px', fontWeight: 600, fontFamily: "'DM Sans', sans-serif", opacity: sendingReply ? 0.6 : 1 }}
+                      onClick={handleSendReply}
+                      disabled={sendingReply}
                     >
-                      Send Reply
+                      {sendingReply ? 'Sending…' : 'Send Reply'}
                     </button>
                   </div>
                 )}

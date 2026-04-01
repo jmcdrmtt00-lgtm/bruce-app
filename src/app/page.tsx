@@ -319,7 +319,19 @@ export default function DashboardPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (selectedTask) resetPanel(); }, [activeView]);
 
+  // Immediately save any pending changes before switching away from the current task
+  function flushSave() {
+    if (!panelDirtyRef.current || !selectedTask) return;
+    if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
+    fetch(`/api/issues/${selectedTask.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null, reported_by: requester.trim() || null, assigned_to: assignedTo || null }),
+    }).catch(() => {});
+  }
+
   function loadTask(task: Incident) {
+    flushSave();
     setTaskNumber(formatTaskNumber(task.task_number, task.source));
     setTaskName(task.title || task.description);
     setPriority(task.priority || '');
