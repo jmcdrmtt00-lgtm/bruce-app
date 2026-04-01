@@ -1093,8 +1093,8 @@ export default function DashboardPage() {
                         const setCat   = cat === 'Computer' ? setComputer : cat === 'Phone' ? setPhone : setIpad;
                         const { groups, approved, newMake, ownsThis } = catState;
                         const visibleGroups = groups.filter(g => g.make !== '(Unknown)');
-                        // Skip categories with no inventory data at this site
-                        if (groups.length === 0) return null;
+                        // Phone/iPad only show if there's inventory data at this site; Computer always shows
+                        if (cat !== 'Computer' && groups.length === 0) return null;
                         return (
                           <div key={cat} className="space-y-1">
                             <p className="text-xs font-semibold text-base-content/50">{cat}</p>
