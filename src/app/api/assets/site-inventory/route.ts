@@ -48,11 +48,11 @@ export async function GET(request: NextRequest) {
   // Allow null category — older records may not have it set
   const { data, error } = await admin
     .from('assets')
-    .select('id, asset_number, name, make, model, os, ram, site, assigned_to')
+    .select('id, asset_number, make, model, os, ram, site, assigned_to')
     .eq('org_id', orgId)
     .ilike('site', `%${site}%`)
     .or(`category.eq.${category},category.is.null`);
 
-  if (error || !data) return NextResponse.json({ assets: [], debug_error: error?.message ?? 'no data' });
-  return NextResponse.json({ assets: data, debug_count: data.length });
+  if (error || !data) return NextResponse.json({ assets: [] });
+  return NextResponse.json({ assets: data });
 }
