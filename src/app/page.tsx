@@ -1098,7 +1098,7 @@ export default function DashboardPage() {
                         if (cat !== 'Computer' && groups.length === 0) return null;
                         return (
                           <div key={cat} className="space-y-1">
-                            <p className="text-xs font-semibold text-base-content/50">{cat}</p>
+                            <p className="text-xs font-semibold text-white/60">{cat}</p>
 
                             {approved ? (
                               <p className="text-sm text-success">
