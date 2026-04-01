@@ -573,9 +573,9 @@ export default function DashboardPage() {
         const siteLabel = SITE_LABELS[data.structured_data.site ?? ''] ?? '';
         if (siteLabel) {
           const [compRes, phoneRes, ipadRes] = await Promise.all([
-            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
-            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
-            fetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
+            orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
+            orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
+            orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
           ]);
           const [compData, phoneData, ipadData] = await Promise.all([
             compRes.json(), phoneRes.json(), ipadRes.json(),
@@ -1093,6 +1093,8 @@ export default function DashboardPage() {
                         const setCat   = cat === 'Computer' ? setComputer : cat === 'Phone' ? setPhone : setIpad;
                         const { groups, approved, newMake, ownsThis } = catState;
                         const visibleGroups = groups.filter(g => g.make !== '(Unknown)');
+                        // Skip categories with no inventory data at this site
+                        if (groups.length === 0) return null;
                         return (
                           <div key={cat} className="space-y-1">
                             <p className="text-xs font-semibold text-base-content/50">{cat}</p>
