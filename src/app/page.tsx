@@ -566,31 +566,21 @@ export default function DashboardPage() {
         }),
       });
       const data = await res.json();
-      console.log('[diagnose] response:', data);
       if (data.structured_data !== undefined) {
         localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
         setOnboardingData(data.structured_data);
         setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
         const siteKey   = (data.structured_data.site ?? '').toLowerCase().replace(/\s+/g, '_');
         const siteLabel = SITE_LABELS[siteKey] ?? '';
-        console.log('[diagnose] siteKey:', siteKey, 'siteLabel:', siteLabel, 'orgId from fetch test:', activeOrgId);
         if (siteLabel) {
-          console.log('[diagnose] fetching inventory...');
-          let compData: { assets?: unknown[] } = {}, phoneData: { assets?: unknown[] } = {}, ipadData: { assets?: unknown[] } = {};
-          try {
-            const [compRes, phoneRes, ipadRes] = await Promise.all([
-              orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
-              orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
-              orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
-            ]);
-            console.log('[site-inventory] status:', compRes.status, phoneRes.status, ipadRes.status);
-            [compData, phoneData, ipadData] = await Promise.all([
-              compRes.json(), phoneRes.json(), ipadRes.json(),
-            ]);
-          } catch (e) {
-            console.error('[site-inventory] fetch error:', e);
-          }
-          console.log('[site-inventory] site:', siteLabel, 'computers:', compData);
+          const [compRes, phoneRes, ipadRes] = await Promise.all([
+            orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
+            orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
+            orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
+          ]);
+          const [compData, phoneData, ipadData] = await Promise.all([
+            compRes.json(), phoneRes.json(), ipadRes.json(),
+          ]);
           const compGroups  = buildAssetGroups(compData.assets ?? []);
           const phoneGroups = buildAssetGroups(phoneData.assets ?? []);
           const ipadGroups  = buildAssetGroups(ipadData.assets ?? []);

@@ -43,13 +43,15 @@ export async function GET(request: NextRequest) {
   if (!site || !category) return NextResponse.json({ assets: [] });
 
   const admin = getServiceClient();
+  // Use ilike for site (handles 'Oakdale' and 'Oakdale (ORSNC)' etc.)
+  // No status filter — unassigned retired computers are still available to assign
+  // Allow null category — older records may not have it set
   const { data, error } = await admin
     .from('assets')
     .select('id, asset_number, name, make, model, os, ram, site, assigned_to')
     .eq('org_id', orgId)
-    .eq('status', 'active')
-    .eq('site', site)
-    .eq('category', category);
+    .ilike('site', `%${site}%`)
+    .or(`category.eq.${category},category.is.null`);
 
   if (error || !data) return NextResponse.json({ assets: [] });
   return NextResponse.json({ assets: data });
