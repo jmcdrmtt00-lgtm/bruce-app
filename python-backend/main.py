@@ -149,6 +149,26 @@ async def check_suggestions(request: CheckSuggestionsRequest):
     return {"suggestions": suggestions}
 
 
+class SendReplyRequest(BaseModel):
+    incident_id: str
+    to: str
+    subject: str
+    body: str
+
+
+@app.post("/api/send-reply")
+async def send_reply_ep(request: SendReplyRequest):
+    from services.gmail_poller import _gmail_service, _send_email, _reply_subject, _sb_patch
+    from fastapi import HTTPException
+    try:
+        service = _gmail_service()
+        _send_email(service, request.to, _reply_subject(request.subject), request.body)
+        _sb_patch(f"incidents?id=eq.{request.incident_id}", {"awaiting_reply": True})
+        return {"ok": True}
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=str(exc))
+
+
 class MatchProblemTypeRequest(BaseModel):
     description: str
     problem_types: list[str]
