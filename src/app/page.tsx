@@ -566,12 +566,14 @@ export default function DashboardPage() {
         }),
       });
       const data = await res.json();
+      console.log('[diagnose] response:', data);
       if (data.structured_data !== undefined) {
         localStorage.setItem('onboarding_prefill', JSON.stringify(data.structured_data));
         setOnboardingData(data.structured_data);
         setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
         const siteKey   = (data.structured_data.site ?? '').toLowerCase().replace(/\s+/g, '_');
         const siteLabel = SITE_LABELS[siteKey] ?? '';
+        console.log('[diagnose] siteKey:', siteKey, 'siteLabel:', siteLabel);
         if (siteLabel) {
           const [compRes, phoneRes, ipadRes] = await Promise.all([
             orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
