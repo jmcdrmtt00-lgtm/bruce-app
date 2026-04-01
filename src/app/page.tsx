@@ -182,8 +182,6 @@ export default function DashboardPage() {
   // Autosave bookkeeping
   const panelDirtyRef     = useRef(false);
   const saveTimerRef      = useRef<ReturnType<typeof setTimeout> | null>(null);
-  // Mirror of current panel field values so we can flush before switching tasks
-  const currentFieldsRef  = useRef({ taskName: '', priority: '' as 'high'|'low'|'', status: 'open' as 'open'|'completed', dateDue: '', selectedType: '', requester: '', assignedTo: '' });
   const savedInfoReqRef   = useRef('');
   const savedInfoDoneRef  = useRef('');
   const savedIssuesRef    = useRef('');
@@ -264,11 +262,6 @@ export default function DashboardPage() {
 
   function markDirty() { panelDirtyRef.current = true; }
 
-  // Keep currentFieldsRef in sync so flushSave can read the latest values
-  useEffect(() => {
-    currentFieldsRef.current = { taskName, priority, status, dateDue, selectedType, requester, assignedTo };
-  }, [taskName, priority, status, dateDue, selectedType, requester, assignedTo]);
-
   const openTasks = useMemo(() => {
     return tasks
       .filter(t => t.status === 'open')
@@ -330,11 +323,10 @@ export default function DashboardPage() {
   function flushSave() {
     if (!panelDirtyRef.current || !selectedTask) return;
     if (saveTimerRef.current) { clearTimeout(saveTimerRef.current); saveTimerRef.current = null; }
-    const { taskName: n, priority: p, status: s, dateDue: d, selectedType: t, requester: r, assignedTo: a } = currentFieldsRef.current;
     fetch(`/api/issues/${selectedTask.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title: n.trim() || null, priority: p || null, screen: t || null, status: s, date_due: d || null, reported_by: r.trim() || null, assigned_to: a || null }),
+      body: JSON.stringify({ title: taskName.trim() || null, priority: priority || null, screen: selectedType || null, status, date_due: dateDue || null, reported_by: requester.trim() || null, assigned_to: assignedTo || null }),
     }).catch(() => {});
   }
 
