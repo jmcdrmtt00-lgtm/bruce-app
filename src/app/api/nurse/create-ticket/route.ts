@@ -59,6 +59,7 @@ export async function POST(request: NextRequest) {
       status:      'open',
       screen:      'problem_to_fix',
       source:      'direct_ticket',
+      self_fixed:  false,
     })
     .select('id, task_number')
     .single();
