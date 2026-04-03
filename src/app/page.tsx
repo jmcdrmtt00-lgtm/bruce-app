@@ -428,9 +428,9 @@ export default function DashboardPage() {
               const compGroups  = buildAssetGroups(compData.assets ?? []);
               const phoneGroups = buildAssetGroups(phoneData.assets ?? []);
               const ipadGroups  = buildAssetGroups(ipadData.assets ?? []);
-              setComputer({ groups: compGroups,  approved: saved.computerApproved ?? null, proposed: pickProposed(compGroups)  });
-              setPhone   ({ groups: phoneGroups, approved: saved.phoneApproved    ?? null, proposed: pickProposed(phoneGroups) });
-              setIpad    ({ groups: ipadGroups,  approved: saved.ipadApproved     ?? null, proposed: pickProposed(ipadGroups)  });
+              setComputer({ groups: compGroups,  approved: saved.computerApproved ?? null, proposed: pickProposed(compGroups),  newMake: '', ownsThis: '' });
+              setPhone   ({ groups: phoneGroups, approved: saved.phoneApproved    ?? null, proposed: pickProposed(phoneGroups), newMake: '', ownsThis: '' });
+              setIpad    ({ groups: ipadGroups,  approved: saved.ipadApproved     ?? null, proposed: pickProposed(ipadGroups),  newMake: '', ownsThis: '' });
             }
           } catch { /* ignore parse errors */ }
         }
