@@ -6,6 +6,7 @@ import toast from 'react-hot-toast';
 import { Incident, IncidentUpdate, GeneratedOutput, NewHire } from '@/types';
 import { ROLES } from '@/data/roles';
 import OnboardingChecklist from '@/components/OnboardingChecklist';
+import LoginInfoSheet from '@/components/LoginInfoSheet';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
 import { formatTaskNumber } from '@/lib/formatTaskNumber';
@@ -177,6 +178,7 @@ export default function DashboardPage() {
   const [initialDiagRecommendation, setInitialDiagRecommendation] = useState<string | null>(null);
   const [onboardingData, setOnboardingData] = useState<Record<string, string> | null>(null);
   const [checklistModal, setChecklistModal] = useState<{ output: GeneratedOutput; sessionId: string | null } | null>(null);
+  const [letterModal,    setLetterModal]    = useState<GeneratedOutput | null>(null);
   const [computer, setComputer] = useState<CategoryState>(emptyCat());
   const [phone,    setPhone]    = useState<CategoryState>(emptyCat());
   const [ipad,     setIpad]     = useState<CategoryState>(emptyCat());
@@ -311,6 +313,7 @@ export default function DashboardPage() {
     setAiStage('idle');
     setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     setOnboardingData(null);
+    setChecklistModal(null); setLetterModal(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
     setAllUpdates([]); setHistoryOpen(false);
     panelDirtyRef.current = false;
@@ -354,6 +357,7 @@ export default function DashboardPage() {
     setAiStage('idle');
     setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     setOnboardingData(null);
+    setChecklistModal(null); setLetterModal(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
     setAllUpdates([]); setHistoryOpen(false);
     setSelectedTask(task);
@@ -549,17 +553,22 @@ export default function DashboardPage() {
     }
   }
 
-  async function handleOpenChecklist() {
-    if (!onboardingData) return;
+  function buildOnboardingOutput(): GeneratedOutput | null {
+    if (!onboardingData) return null;
     const hire = onboardingData as unknown as NewHire;
     const role = ROLES[hire.role];
-    if (!role) return;
-    const generated: GeneratedOutput = {
+    if (!role) return null;
+    return {
       hire,
       loginId: `ohc.${hire.firstName[0].toLowerCase()}${hire.lastName.toLowerCase()}`,
       systems: role.systems,
       computerType: role.computer,
     };
+  }
+
+  async function handleOpenChecklist() {
+    const generated = buildOnboardingOutput();
+    if (!generated) return;
     let sid: string | null = null;
     try {
       const res = await fetch('/api/onboarding', {
@@ -570,6 +579,11 @@ export default function DashboardPage() {
       if (res.ok) sid = (await res.json()).id ?? null;
     } catch { /* silently continue */ }
     setChecklistModal({ output: generated, sessionId: sid });
+  }
+
+  function handleOpenLetter() {
+    const generated = buildOnboardingOutput();
+    if (generated) setLetterModal(generated);
   }
 
   // Onboarding-only: AI extracts structured data then shows asset proposals inline
@@ -1240,12 +1254,20 @@ export default function DashboardPage() {
                         );
                       })}
 
-                      <button
-                        className="btn btn-primary btn-sm w-full"
-                        onClick={handleOpenChecklist}
-                      >
-                        See Checklist →
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          className="btn btn-primary btn-sm flex-1"
+                          onClick={handleOpenChecklist}
+                        >
+                          Show checklist
+                        </button>
+                        <button
+                          className="btn btn-outline btn-sm flex-1"
+                          onClick={handleOpenLetter}
+                        >
+                          Show new hire letter
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1426,6 +1448,22 @@ export default function DashboardPage() {
               sessionId={checklistModal.sessionId}
               onStartOver={() => setChecklistModal(null)}
             />
+          </div>
+        </div>
+      )}
+
+      {/* New hire letter overlay modal */}
+      {letterModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto py-8 px-4"
+          onClick={e => { if (e.target === e.currentTarget) setLetterModal(null); }}
+        >
+          <div className="w-full max-w-xl relative">
+            <button
+              className="btn btn-sm btn-ghost absolute -top-2 -right-2 z-10"
+              onClick={() => setLetterModal(null)}
+            >✕</button>
+            <LoginInfoSheet output={letterModal} />
           </div>
         </div>
       )}
