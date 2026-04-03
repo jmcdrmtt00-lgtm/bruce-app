@@ -3,7 +3,10 @@
 import { useEffect, useState, useCallback, useMemo, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Incident, IncidentUpdate } from '@/types';
+import { Incident, IncidentUpdate, GeneratedOutput, NewHire } from '@/types';
+import { ROLES } from '@/data/roles';
+import OnboardingChecklist from '@/components/OnboardingChecklist';
+import LoginInfoSheet from '@/components/LoginInfoSheet';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
 import { formatTaskNumber } from '@/lib/formatTaskNumber';
@@ -174,6 +177,8 @@ export default function DashboardPage() {
   const [initialDiagActionsText,    setInitialDiagActionsText]    = useState<string | null>(null);
   const [initialDiagRecommendation, setInitialDiagRecommendation] = useState<string | null>(null);
   const [onboardingData, setOnboardingData] = useState<Record<string, string> | null>(null);
+  const [checklistModal, setChecklistModal] = useState<{ output: GeneratedOutput; sessionId: string | null } | null>(null);
+  const [letterModal,    setLetterModal]    = useState<GeneratedOutput | null>(null);
   const [computer, setComputer] = useState<CategoryState>(emptyCat());
   const [phone,    setPhone]    = useState<CategoryState>(emptyCat());
   const [ipad,     setIpad]     = useState<CategoryState>(emptyCat());
@@ -308,6 +313,7 @@ export default function DashboardPage() {
     setAiStage('idle');
     setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     setOnboardingData(null);
+    setChecklistModal(null); setLetterModal(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
     setAllUpdates([]); setHistoryOpen(false);
     panelDirtyRef.current = false;
@@ -351,6 +357,7 @@ export default function DashboardPage() {
     setAiStage('idle');
     setInitialDiagCause(null); setInitialDiagActionsText(null); setInitialDiagRecommendation(null);
     setOnboardingData(null);
+    setChecklistModal(null); setLetterModal(null);
     setComputer(emptyCat()); setPhone(emptyCat()); setIpad(emptyCat());
     setAllUpdates([]); setHistoryOpen(false);
     setSelectedTask(task);
@@ -365,7 +372,7 @@ export default function DashboardPage() {
     // Load updates
     fetch(`/api/issues/${task.id}/updates`)
       .then(r => r.json())
-      .then(({ updates }: { updates: IncidentUpdate[] }) => {
+      .then(async ({ updates }: { updates: IncidentUpdate[] }) => {
         setAllUpdates(updates);
         const latest = (t: string) => updates.filter(u => u.type === t).at(-1)?.note ?? '';
 
@@ -394,6 +401,39 @@ export default function DashboardPage() {
           ? restoredActions.split(' | ').map((s, i) => `${i + 1}. ${s}`).join('\n')
           : null);
         setInitialDiagRecommendation(restoredRecommendation);
+
+        // Restore onboarding AI state (hire data + approved assets)
+        const latestOnboarding = aiUpdates.filter(u => u.note.startsWith('Onboarding state: ')).at(-1);
+        if (latestOnboarding) {
+          try {
+            const saved = JSON.parse(latestOnboarding.note.slice('Onboarding state: '.length)) as {
+              onboardingData: Record<string, string>;
+              computerApproved: UnassignedAsset | null;
+              phoneApproved:    UnassignedAsset | null;
+              ipadApproved:     UnassignedAsset | null;
+            };
+            setOnboardingData(saved.onboardingData);
+            setDiagStage('cause');
+            const siteKey   = (saved.onboardingData.site ?? '').toLowerCase().replace(/\s+/g, '_');
+            const siteLabel = SITE_LABELS[siteKey] ?? '';
+            if (siteLabel) {
+              const [compRes, phoneRes, ipadRes] = await Promise.all([
+                orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Computer`),
+                orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=Phone`),
+                orgFetch(`/api/assets/site-inventory?site=${encodeURIComponent(siteLabel)}&category=iPad`),
+              ]);
+              const [compData, phoneData, ipadData] = await Promise.all([
+                compRes.json(), phoneRes.json(), ipadRes.json(),
+              ]);
+              const compGroups  = buildAssetGroups(compData.assets ?? []);
+              const phoneGroups = buildAssetGroups(phoneData.assets ?? []);
+              const ipadGroups  = buildAssetGroups(ipadData.assets ?? []);
+              setComputer({ groups: compGroups,  approved: saved.computerApproved ?? null, proposed: pickProposed(compGroups),  newMake: '', ownsThis: '' });
+              setPhone   ({ groups: phoneGroups, approved: saved.phoneApproved    ?? null, proposed: pickProposed(phoneGroups), newMake: '', ownsThis: '' });
+              setIpad    ({ groups: ipadGroups,  approved: saved.ipadApproved     ?? null, proposed: pickProposed(ipadGroups),  newMake: '', ownsThis: '' });
+            }
+          } catch { /* ignore parse errors */ }
+        }
       })
       .catch(() => {});
   }
@@ -541,9 +581,64 @@ export default function DashboardPage() {
       const setter = category === 'Computer' ? setComputer : category === 'Phone' ? setPhone : setIpad;
       setter(prev => ({ ...prev, approved: asset }));
       toast.success(`${category} assigned to ${fullName}!`);
+      if (onboardingData) {
+        const newComp  = category === 'Computer' ? asset : computer.approved;
+        const newPhone = category === 'Phone'    ? asset : phone.approved;
+        const newIpad  = category === 'iPad'     ? asset : ipad.approved;
+        await saveOnboardingState(onboardingData, newComp, newPhone, newIpad);
+      }
     } catch {
       toast.error('Could not assign asset — try again.');
     }
+  }
+
+  function buildOnboardingOutput(): GeneratedOutput | null {
+    if (!onboardingData) return null;
+    const hire = onboardingData as unknown as NewHire;
+    const role = ROLES[hire.role];
+    if (!role) return null;
+    return {
+      hire,
+      loginId: `ohc.${hire.firstName[0].toLowerCase()}${hire.lastName.toLowerCase()}`,
+      systems: role.systems,
+      computerType: role.computer,
+    };
+  }
+
+  async function handleOpenChecklist() {
+    const generated = buildOnboardingOutput();
+    if (!generated) return;
+    let sid: string | null = null;
+    try {
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(generated),
+      });
+      if (res.ok) sid = (await res.json()).id ?? null;
+    } catch { /* silently continue */ }
+    setChecklistModal({ output: generated, sessionId: sid });
+  }
+
+  function handleOpenLetter() {
+    const generated = buildOnboardingOutput();
+    if (generated) setLetterModal(generated);
+  }
+
+  // Persist onboarding AI state so it survives task switches / page reloads
+  async function saveOnboardingState(
+    data: Record<string, string>,
+    compApproved: UnassignedAsset | null = null,
+    phApproved:   UnassignedAsset | null = null,
+    ipApproved:   UnassignedAsset | null = null,
+  ) {
+    if (!selectedTask) return;
+    const state = { onboardingData: data, computerApproved: compApproved, phoneApproved: phApproved, ipadApproved: ipApproved };
+    await fetch(`/api/issues/${selectedTask.id}/updates`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type: 'ai_response', note: `Onboarding state: ${JSON.stringify(state)}` }),
+    }).catch(() => {});
   }
 
   // Onboarding-only: AI extracts structured data then shows asset proposals inline
@@ -588,6 +683,7 @@ export default function DashboardPage() {
           setIpad    (prev => ({ ...prev, groups: ipadGroups,  proposed: pickProposed(ipadGroups)  }));
         }
         setDiagStage('cause');
+        await saveOnboardingState(data.structured_data);
       }
     } catch {
       toast.error('Could not get AI response — try again.');
@@ -1214,12 +1310,20 @@ export default function DashboardPage() {
                         );
                       })}
 
-                      <button
-                        className="btn btn-primary btn-sm w-full"
-                        onClick={() => router.push('/onboarding')}
-                      >
-                        Open checklist →
-                      </button>
+                      <div className="flex gap-2">
+                        <button
+                          className="btn btn-primary btn-sm flex-1"
+                          onClick={handleOpenChecklist}
+                        >
+                          Show checklist
+                        </button>
+                        <button
+                          className="btn btn-primary btn-sm flex-1"
+                          onClick={handleOpenLetter}
+                        >
+                          Show new hire letter
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )}
@@ -1383,6 +1487,41 @@ export default function DashboardPage() {
           </div>
           <div className="modal-backdrop" onClick={() => setShowAddModal(false)} />
         </dialog>
+      )}
+      {/* Checklist overlay modal */}
+      {checklistModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto py-8 px-4"
+          onClick={e => { if (e.target === e.currentTarget) setChecklistModal(null); }}
+        >
+          <div className="w-full max-w-xl relative">
+            <button
+              className="btn btn-sm btn-ghost absolute -top-2 -right-2 z-10"
+              onClick={() => setChecklistModal(null)}
+            >✕</button>
+            <OnboardingChecklist
+              output={checklistModal.output}
+              sessionId={checklistModal.sessionId}
+              onStartOver={() => setChecklistModal(null)}
+            />
+          </div>
+        </div>
+      )}
+
+      {/* New hire letter overlay modal */}
+      {letterModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto py-8 px-4"
+          onClick={e => { if (e.target === e.currentTarget) setLetterModal(null); }}
+        >
+          <div className="w-full max-w-xl relative">
+            <button
+              className="btn btn-sm btn-ghost absolute -top-2 -right-2 z-10"
+              onClick={() => setLetterModal(null)}
+            >✕</button>
+            <LoginInfoSheet output={letterModal} />
+          </div>
+        </div>
       )}
     </main>
   );
