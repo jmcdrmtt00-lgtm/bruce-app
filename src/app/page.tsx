@@ -3,7 +3,9 @@
 import { useEffect, useState, useCallback, useMemo, useRef, Fragment } from 'react';
 import { useRouter } from 'next/navigation';
 import toast from 'react-hot-toast';
-import { Incident, IncidentUpdate } from '@/types';
+import { Incident, IncidentUpdate, GeneratedOutput, NewHire } from '@/types';
+import { ROLES } from '@/data/roles';
+import OnboardingChecklist from '@/components/OnboardingChecklist';
 import { TASK_TYPES, QUICK_TASK_TYPES } from '@/data/taskRequirements';
 import { formatDate } from '@/lib/formatDate';
 import { formatTaskNumber } from '@/lib/formatTaskNumber';
@@ -174,6 +176,7 @@ export default function DashboardPage() {
   const [initialDiagActionsText,    setInitialDiagActionsText]    = useState<string | null>(null);
   const [initialDiagRecommendation, setInitialDiagRecommendation] = useState<string | null>(null);
   const [onboardingData, setOnboardingData] = useState<Record<string, string> | null>(null);
+  const [checklistModal, setChecklistModal] = useState<{ output: GeneratedOutput; sessionId: string | null } | null>(null);
   const [computer, setComputer] = useState<CategoryState>(emptyCat());
   const [phone,    setPhone]    = useState<CategoryState>(emptyCat());
   const [ipad,     setIpad]     = useState<CategoryState>(emptyCat());
@@ -544,6 +547,29 @@ export default function DashboardPage() {
     } catch {
       toast.error('Could not assign asset — try again.');
     }
+  }
+
+  async function handleOpenChecklist() {
+    if (!onboardingData) return;
+    const hire = onboardingData as unknown as NewHire;
+    const role = ROLES[hire.role];
+    if (!role) return;
+    const generated: GeneratedOutput = {
+      hire,
+      loginId: `ohc.${hire.firstName[0].toLowerCase()}${hire.lastName.toLowerCase()}`,
+      systems: role.systems,
+      computerType: role.computer,
+    };
+    let sid: string | null = null;
+    try {
+      const res = await fetch('/api/onboarding', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(generated),
+      });
+      if (res.ok) sid = (await res.json()).id ?? null;
+    } catch { /* silently continue */ }
+    setChecklistModal({ output: generated, sessionId: sid });
   }
 
   // Onboarding-only: AI extracts structured data then shows asset proposals inline
@@ -1216,9 +1242,9 @@ export default function DashboardPage() {
 
                       <button
                         className="btn btn-primary btn-sm w-full"
-                        onClick={() => router.push('/onboarding')}
+                        onClick={handleOpenChecklist}
                       >
-                        Open checklist →
+                        See Checklist →
                       </button>
                     </div>
                   </div>
@@ -1383,6 +1409,25 @@ export default function DashboardPage() {
           </div>
           <div className="modal-backdrop" onClick={() => setShowAddModal(false)} />
         </dialog>
+      )}
+      {/* Checklist overlay modal */}
+      {checklistModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/60 overflow-y-auto py-8 px-4"
+          onClick={e => { if (e.target === e.currentTarget) setChecklistModal(null); }}
+        >
+          <div className="w-full max-w-xl relative">
+            <button
+              className="btn btn-sm btn-ghost absolute -top-2 -right-2 z-10"
+              onClick={() => setChecklistModal(null)}
+            >✕</button>
+            <OnboardingChecklist
+              output={checklistModal.output}
+              sessionId={checklistModal.sessionId}
+              onStartOver={() => setChecklistModal(null)}
+            />
+          </div>
+        </div>
       )}
     </main>
   );
