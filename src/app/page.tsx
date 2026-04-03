@@ -1318,7 +1318,7 @@ export default function DashboardPage() {
                           Show checklist
                         </button>
                         <button
-                          className="btn btn-secondary btn-sm flex-1"
+                          className="btn btn-primary btn-sm flex-1"
                           onClick={handleOpenLetter}
                         >
                           Show new hire letter
