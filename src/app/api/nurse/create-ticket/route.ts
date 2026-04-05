@@ -2,6 +2,7 @@ import { createClient } from '@supabase/supabase-js';
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { sendSms } from '@/libs/sms';
 
 export async function POST(request: NextRequest) {
   // Verify caller is a logged-in user
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
     console.error('[nurse/create-ticket] Insert error:', error.message);
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
+
+  void sendSms(`IT Buddy: new ticket from ${user.email ?? 'staff'} — "${subject.trim()}"`);
 
   return NextResponse.json({ task_number: incident.task_number, id: incident.id });
 }
