@@ -1112,8 +1112,10 @@ function DataToolsTab() {
   const [sheets, setSheets]             = useState<SheetInfo[]>([]);
   const [invFileName, setInvFileName]   = useState('');
   const [uploading, setUploading]       = useState(false);
-  const [uploadResult, setUploadResult] = useState<{ inserted: number; updated: number } | null>(null);
+  const [uploadResult, setUploadResult] = useState<{ inserted: number; updated: number; replaced?: boolean } | null>(null);
   const [invError, setInvError]         = useState<string | null>(null);
+  const [replaceMode, setReplaceMode]   = useState(false);
+  const [confirmReplace, setConfirmReplace] = useState(false);
 
   // Tasks state
   const [taskDownloading, setTaskDownloading] = useState(false);
@@ -1143,12 +1145,19 @@ function DataToolsTab() {
   async function handleInvUpload() {
     const selected = sheets.filter(s => s.selected && s.rows.length > 0);
     if (selected.length === 0) { toast.error('No sheets selected.'); return; }
+    if (replaceMode && !confirmReplace) { toast.error('Check the confirmation box before replacing.'); return; }
     setUploading(true); setInvError(null); setUploadResult(null);
     try {
-      const res = await orgFetch('/api/assets/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ assets: selected.flatMap(s => s.rows) }) });
+      const body = { assets: selected.flatMap(s => s.rows), replace: replaceMode };
+      const res = await orgFetch('/api/assets/upload', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json();
       if (!res.ok) setInvError(data.error || 'Upload failed.');
-      else { setUploadResult(data); toast.success(`${data.inserted} added, ${data.updated} updated.`); }
+      else {
+        setUploadResult(data);
+        setConfirmReplace(false);
+        if (data.replaced) toast.success(`Replaced: ${data.inserted} items loaded fresh.`);
+        else toast.success(`${data.inserted} added, ${data.updated} updated.`);
+      }
     } catch (err) { setInvError('Network error: ' + (err instanceof Error ? err.message : String(err))); }
     setUploading(false);
   }
@@ -1230,16 +1239,45 @@ function DataToolsTab() {
                 </div>
               ))}
             </div>
+            {/* Replace mode toggle */}
+            <div style={{ margin: '10px 0', padding: '10px 12px', borderRadius: '6px', background: replaceMode ? 'rgba(255,100,60,0.07)' : 'rgba(255,255,255,0.02)', border: `1px solid ${replaceMode ? 'rgba(255,100,60,0.3)' : 'rgba(168,184,200,0.1)'}` }}>
+              <label style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer' }}>
+                <input type="checkbox" checked={replaceMode} onChange={e => { setReplaceMode(e.target.checked); setConfirmReplace(false); }} style={{ accentColor: '#f87171', cursor: 'pointer' }} />
+                <span style={{ fontSize: '12px', color: replaceMode ? '#fca5a5' : '#a8b8c8', fontWeight: replaceMode ? 600 : 400 }}>
+                  Replace existing data — delete current records and load fresh from this file
+                </span>
+              </label>
+              {replaceMode && (
+                <label style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '8px', cursor: 'pointer' }}>
+                  <input type="checkbox" checked={confirmReplace} onChange={e => setConfirmReplace(e.target.checked)} style={{ accentColor: '#f87171', cursor: 'pointer' }} />
+                  <span style={{ fontSize: '11px', color: '#f87171' }}>Yes, I understand this will permanently delete the existing data</span>
+                </label>
+              )}
+            </div>
+
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
               <span style={{ fontSize: '11px', color: '#a8b8c8' }}>{selectedCount} assets selected</span>
-              <button style={{ ...BTN_PRIMARY, opacity: uploading || selectedCount === 0 ? 0.5 : 1 }} onClick={handleInvUpload} disabled={uploading || selectedCount === 0}>
-                {uploading ? <span className="spinner spinner-sm" /> : <><Upload size={13} /> Upload</>}
+              <button
+                style={{ ...BTN_PRIMARY, opacity: uploading || selectedCount === 0 || (replaceMode && !confirmReplace) ? 0.5 : 1, ...(replaceMode && confirmReplace ? { background: '#b91c1c', borderColor: '#991b1b' } : {}) }}
+                onClick={handleInvUpload}
+                disabled={uploading || selectedCount === 0 || (replaceMode && !confirmReplace)}
+              >
+                {uploading ? <span className="spinner spinner-sm" /> : replaceMode ? <><Upload size={13} /> Replace &amp; Upload</> : <><Upload size={13} /> Upload</>}
               </button>
             </div>
           </div>
         )}
         {invError && <div style={{ ...CARD, border: '1px solid rgba(255,68,68,0.3)', background: 'rgba(255,68,68,0.05)' }}><p style={{ fontSize: '12px', color: '#ff6060', fontWeight: 600, marginBottom: '4px' }}>Upload failed</p><p style={{ fontSize: '11px', color: '#a8b8c8' }}>{invError}</p></div>}
-        {uploadResult && <div style={{ ...CARD, border: '1px solid rgba(34,204,110,0.2)' }}><div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#22cc6e', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}><CheckCircle size={16} /> Upload complete</div><p style={{ fontSize: '11px', color: '#a8b8c8' }}>{uploadResult.inserted} added, {uploadResult.updated} updated.</p></div>}
+        {uploadResult && (
+          <div style={{ ...CARD, border: '1px solid rgba(34,204,110,0.2)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '8px', color: '#22cc6e', fontWeight: 600, fontSize: '13px', marginBottom: '4px' }}><CheckCircle size={16} /> Upload complete</div>
+            <p style={{ fontSize: '11px', color: '#a8b8c8' }}>
+              {uploadResult.replaced
+                ? `${uploadResult.inserted} items loaded fresh (previous data replaced).`
+                : `${uploadResult.inserted} added, ${uploadResult.updated} updated.`}
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Tasks */}
