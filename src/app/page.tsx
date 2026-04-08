@@ -572,7 +572,7 @@ export default function DashboardPage() {
     if (!onboardingData) return;
     const fullName = `${onboardingData.firstName ?? ''} ${onboardingData.lastName ?? ''}`.trim();
     try {
-      const res = await fetch(`/api/assets/${asset.id}/assign`, {
+      const res = await orgFetch(`/api/assets/${asset.id}/assign`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assigned_to: fullName }),
