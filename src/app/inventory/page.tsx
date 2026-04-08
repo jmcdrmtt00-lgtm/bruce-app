@@ -532,6 +532,13 @@ function InventoryTab() {
   const [employeeSaving, setEmployeeSaving]     = useState(false);
 
   const isEmployee = tableCategory === 'Employees';
+  const [sortKey, setSortKey] = useState<string | null>(null);
+  const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc');
+
+  function handleSort(key: string) {
+    if (sortKey === key) setSortDir(d => d === 'asc' ? 'desc' : 'asc');
+    else { setSortKey(key); setSortDir('asc'); }
+  }
 
   // UI state
   const [search, setSearch]               = useState('');
@@ -706,14 +713,36 @@ function InventoryTab() {
   const filteredRows = tableRows.filter(r =>
     !search.trim() || activeCols.some(f => cellValue(r, f.key).toLowerCase().includes(search.toLowerCase()))
   );
+  const sortedRows = sortKey
+    ? [...filteredRows].sort((a, b) => {
+        const av = cellValue(a, sortKey).toLowerCase();
+        const bv = cellValue(b, sortKey).toLowerCase();
+        const n = av.localeCompare(bv, undefined, { numeric: true });
+        return sortDir === 'asc' ? n : -n;
+      })
+    : filteredRows;
+
   const filteredEmployees = employeeRows.filter(r =>
     !search.trim() || EMPLOYEE_FIELDS.some(f => {
       const v = f.key === 'is_approved_submitter' ? (r.is_approved_submitter ? 'yes approved' : 'no') : String((r as unknown as Record<string, unknown>)[f.key] ?? '');
       return v.toLowerCase().includes(search.toLowerCase());
     })
   );
+  const sortedEmployees = sortKey
+    ? [...filteredEmployees].sort((a, b) => {
+        const av = String((a as unknown as Record<string, unknown>)[sortKey] ?? '').toLowerCase();
+        const bv = String((b as unknown as Record<string, unknown>)[sortKey] ?? '').toLowerCase();
+        const n = av.localeCompare(bv, undefined, { numeric: true });
+        return sortDir === 'asc' ? n : -n;
+      })
+    : filteredEmployees;
 
   const rowCount = isEmployee ? employeeRows.length : tableRows.length;
+
+  function sortIcon(key: string) {
+    if (sortKey !== key) return <span style={{ opacity: 0.2, fontSize: '10px', marginLeft: '3px' }}>⇅</span>;
+    return <span style={{ fontSize: '10px', marginLeft: '3px', color: '#4f8ef7' }}>{sortDir === 'asc' ? '▲' : '▼'}</span>;
+  }
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -750,7 +779,7 @@ function InventoryTab() {
               setTableCategory(e.target.value); setTableRows([]); setExtraFields([]);
               setShowMoreCols(false); setEmployeeRows([]); setEditingAssetId(null);
               setAddingAsset(false); setEditingEmployeeId(null); setAddingEmployee(false);
-              setSearch('');
+              setSearch(''); setSortKey(null); setSortDir('asc');
             }}>
               {ASSET_CATEGORIES.map(c => <option key={c} style={{ background: '#1a2535' }}>{c}</option>)}
               <option value="Employees" style={{ background: '#1a2535' }}>Employees</option>
@@ -836,7 +865,11 @@ function InventoryTab() {
                   <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.1)' }}>
-                        {activeCols.map(f => <th key={f.key} style={TH}>{f.label}</th>)}
+                        {activeCols.map(f => (
+                          <th key={f.key} style={{ ...TH, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }} onClick={() => handleSort(f.key)}>
+                            {f.label}{sortIcon(f.key)}
+                          </th>
+                        ))}
                         <th style={{ ...TH, width: '72px' }}></th>
                       </tr>
                     </thead>
@@ -856,7 +889,7 @@ function InventoryTab() {
                           </td>
                         </tr>
                       )}
-                      {filteredRows.map((r, i) => {
+                      {sortedRows.map((r, i) => {
                         const rowKey = r.id ?? i;
                         const isHovered = hoveredRow === rowKey;
                         const isEditing = editingAssetId === r.id;
@@ -920,7 +953,11 @@ function InventoryTab() {
                   <table style={{ fontSize: '12px', width: '100%', borderCollapse: 'collapse', fontFamily: "'DM Sans', sans-serif" }}>
                     <thead>
                       <tr style={{ borderBottom: '1px solid rgba(168,184,200,0.1)' }}>
-                        {EMPLOYEE_FIELDS.map(f => <th key={f.key} style={TH}>{f.label}</th>)}
+                        {EMPLOYEE_FIELDS.map(f => (
+                          <th key={f.key} style={{ ...TH, cursor: 'pointer', userSelect: 'none', whiteSpace: 'nowrap' }} onClick={() => handleSort(f.key)}>
+                            {f.label}{sortIcon(f.key)}
+                          </th>
+                        ))}
                         <th style={{ ...TH, width: '60px' }}></th>
                       </tr>
                     </thead>
@@ -950,7 +987,7 @@ function InventoryTab() {
                           </td>
                         </tr>
                       )}
-                      {filteredEmployees.map(r => {
+                      {sortedEmployees.map(r => {
                         const isHovered = hoveredRow === r.id;
                         const isEditing = editingEmployeeId === r.id;
                         return (
