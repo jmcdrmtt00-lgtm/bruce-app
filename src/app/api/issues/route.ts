@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { sendSms } from '@/libs/sms';
 
 async function getClient() {
   const cookieStore = await cookies();
@@ -141,5 +142,8 @@ export async function POST(request: NextRequest) {
     .single();
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+  void sendSms(`IT Buddy: new task added — "${data.title ?? data.description ?? 'No title'}"`);
+
   return NextResponse.json({ incident: data });
 }

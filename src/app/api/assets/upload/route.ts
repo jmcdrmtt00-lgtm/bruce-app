@@ -1,15 +1,25 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
 const BACKEND_URL = process.env.PYTHON_BACKEND_URL || 'http://localhost:8000';
 
-async function getClient() {
+async function getUserClient() {
   const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
     { cookies: { getAll: () => cookieStore.getAll(), setAll: () => {} } }
+  );
+}
+
+// Service role client — bypasses RLS for reads, so we see all org assets
+// regardless of which user originally uploaded them.
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 }
 
@@ -27,20 +37,47 @@ function cleanDates(asset: Record<string, unknown>): Record<string, unknown> {
 }
 
 export async function POST(request: NextRequest) {
-  const supabase = await getClient();
+  const supabase = await getUserClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const orgId = request.headers.get('x-org-id');
   if (!orgId) return NextResponse.json({ error: 'org required' }, { status: 400 });
 
-  const { assets } = await request.json();
+  const { assets, replace } = await request.json();
   if (!Array.isArray(assets) || assets.length === 0) {
     return NextResponse.json({ error: 'No assets provided' }, { status: 400 });
   }
 
-  // Fetch existing assets that have serial numbers so we can match them for updates
-  const { data: existing } = await supabase
+  const admin = getAdminClient();
+
+  // Replace mode: delete all existing assets for this org in the categories
+  // being uploaded before inserting fresh data.
+  if (replace) {
+    const categories = [...new Set(assets.map((a: Record<string, unknown>) => a.category).filter(Boolean))] as string[];
+    if (categories.length > 0) {
+      const { error: delError } = await admin
+        .from('assets')
+        .delete()
+        .eq('org_id', orgId)
+        .in('category', categories);
+      if (delError) return NextResponse.json({ error: delError.message }, { status: 500 });
+    }
+
+    // After deletion, just insert everything fresh
+    const toInsert = assets.map((asset: Record<string, unknown>) =>
+      cleanDates({ ...asset, user_id: user.id, org_id: orgId })
+    );
+    const { error } = await admin.from('assets').insert(toInsert);
+    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+
+    trackUpload(user.email ?? '', toInsert.length);
+    return NextResponse.json({ inserted: toInsert.length, updated: 0, replaced: true });
+  }
+
+  // Normal mode: use admin client to fetch ALL existing serials for this org,
+  // bypassing RLS so we see every row regardless of who uploaded it.
+  const { data: existing } = await admin
     .from('assets')
     .select('id, serial_number')
     .eq('org_id', orgId)
@@ -63,7 +100,7 @@ export async function POST(request: NextRequest) {
   }
 
   if (toInsert.length > 0) {
-    const { error } = await supabase.from('assets').insert(toInsert);
+    const { error } = await admin.from('assets').insert(toInsert);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
@@ -71,18 +108,19 @@ export async function POST(request: NextRequest) {
     const dedupedUpdate = Array.from(
       new Map(toUpdate.map(r => [r.id as string, r])).values()
     );
-    const { error } = await supabase.from('assets').upsert(dedupedUpdate, { onConflict: 'id' });
+    const { error } = await admin.from('assets').upsert(dedupedUpdate, { onConflict: 'id' });
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  // Track the upload in Headlights (fire-and-forget)
-  if (user.email) {
-    fetch(`${BACKEND_URL}/api/track-upload`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ user_email: user.email }),
-    }).catch(() => {});
-  }
-
+  trackUpload(user.email ?? '', toInsert.length);
   return NextResponse.json({ inserted: toInsert.length, updated: toUpdate.length });
+}
+
+function trackUpload(email: string, count: number) {
+  if (!email) return;
+  fetch(`${BACKEND_URL}/api/track-upload`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ user_email: email, count }),
+  }).catch(() => {});
 }

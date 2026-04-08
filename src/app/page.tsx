@@ -182,6 +182,7 @@ export default function DashboardPage() {
   const [computer, setComputer] = useState<CategoryState>(emptyCat());
   const [phone,    setPhone]    = useState<CategoryState>(emptyCat());
   const [ipad,     setIpad]     = useState<CategoryState>(emptyCat());
+  const [assignError, setAssignError] = useState<string | null>(null);
 
   // Autosave bookkeeping
   const panelDirtyRef     = useRef(false);
@@ -570,14 +571,19 @@ export default function DashboardPage() {
     category: 'Computer' | 'Phone' | 'iPad',
   ) {
     if (!onboardingData) return;
+    setAssignError(null);
     const fullName = `${onboardingData.firstName ?? ''} ${onboardingData.lastName ?? ''}`.trim();
     try {
-      const res = await fetch(`/api/assets/${asset.id}/assign`, {
+      const res = await orgFetch(`/api/assets/${asset.id}/assign`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ assigned_to: fullName }),
       });
-      if (!res.ok) throw new Error();
+      const data = await res.json();
+      if (!res.ok) {
+        setAssignError(data.error || 'Could not assign asset — please try again.');
+        return;
+      }
       const setter = category === 'Computer' ? setComputer : category === 'Phone' ? setPhone : setIpad;
       setter(prev => ({ ...prev, approved: asset }));
       toast.success(`${category} assigned to ${fullName}!`);
@@ -588,7 +594,7 @@ export default function DashboardPage() {
         await saveOnboardingState(onboardingData, newComp, newPhone, newIpad);
       }
     } catch {
-      toast.error('Could not assign asset — try again.');
+      setAssignError('Network error — please try again.');
     }
   }
 
@@ -1183,6 +1189,17 @@ export default function DashboardPage() {
                       <span style={{ fontSize: '11px', color: '#4f8ef7', fontWeight: 500, letterSpacing: '0.05em', textTransform: 'uppercase' }}>IT Buddy</span>
                     </div>
                     <div style={{ padding: '14px' }} className="space-y-4">
+
+                      {assignError && (
+                        <div style={{
+                          padding: '10px 14px', borderRadius: '6px',
+                          background: 'rgba(239,68,68,0.1)', border: '1px solid rgba(239,68,68,0.4)',
+                          display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: '10px',
+                        }}>
+                          <span style={{ fontSize: '13px', color: '#fca5a5', lineHeight: 1.4 }}>{assignError}</span>
+                          <button onClick={() => setAssignError(null)} style={{ background: 'none', border: 'none', color: '#f87171', cursor: 'pointer', fontSize: '16px', lineHeight: 1, flexShrink: 0 }}>×</button>
+                        </div>
+                      )}
 
                       {(['Computer', 'Phone', 'iPad'] as const).map(cat => {
                         const catState = cat === 'Computer' ? computer : cat === 'Phone' ? phone : ipad;
