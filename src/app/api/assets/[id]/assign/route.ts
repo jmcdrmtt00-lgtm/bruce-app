@@ -1,8 +1,9 @@
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-async function getClient() {
+async function getUserClient() {
   const cookieStore = await cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -11,8 +12,15 @@ async function getClient() {
   );
 }
 
+function getAdminClient() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY!
+  );
+}
+
 export async function PATCH(request: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const supabase = await getClient();
+  const supabase = await getUserClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -23,7 +31,9 @@ export async function PATCH(request: NextRequest, { params }: { params: Promise<
   const { assigned_to } = await request.json();
   if (!assigned_to) return NextResponse.json({ error: 'assigned_to required' }, { status: 400 });
 
-  const { error } = await supabase
+  // Use admin client so RLS does not block updates on assets uploaded by other users
+  const admin = getAdminClient();
+  const { error } = await admin
     .from('assets')
     .update({ assigned_to })
     .eq('id', id)
