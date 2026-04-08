@@ -598,6 +598,19 @@ function InventoryTab() {
     XLSX.writeFile(wb, `${tableCategory}_${new Date().toISOString().split('T')[0]}.xlsx`);
   }
 
+  function downloadEmployeesExcel() {
+    if (!employeeRows.length) return;
+    const headers = ['First Name', 'Last Name', 'EE #', 'Email', 'Site', 'Position', 'Hrs/Wk', 'Shift', 'Approved Submitter'];
+    const rows = employeeRows.map(e => [
+      e.first_name, e.last_name, e.ee_number ?? '', e.email,
+      e.site, e.position ?? '', e.hours_per_week ?? '', e.shift ?? '',
+      e.is_approved_submitter ? 'Yes' : 'No',
+    ]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, XLSX.utils.aoa_to_sheet([headers, ...rows]), 'Employees');
+    XLSX.writeFile(wb, `Employees_${new Date().toISOString().split('T')[0]}.xlsx`);
+  }
+
   // Asset CRUD
   async function saveEditedAsset() {
     if (!editingAssetId) return;
@@ -763,9 +776,9 @@ function InventoryTab() {
               <Plus size={13} /> Add
             </button>
 
-            {/* Download (assets only) */}
-            {!isEmployee && tableRows.length > 0 && (
-              <button style={{ ...BTN_GHOST, padding: '6px 10px' }} onClick={downloadExcel} title="Download Excel">
+            {/* Download */}
+            {(isEmployee ? employeeRows.length > 0 : tableRows.length > 0) && (
+              <button style={{ ...BTN_GHOST, padding: '6px 10px' }} onClick={isEmployee ? downloadEmployeesExcel : downloadExcel} title="Download Excel">
                 <Download size={14} />
               </button>
             )}
