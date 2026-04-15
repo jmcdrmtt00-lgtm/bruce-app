@@ -707,9 +707,9 @@ function InventoryTab() {
   }
 
   const allAvailableFields = [...ALL_FIELDS, ...extraFields];
-  const needsMore = allAvailableFields.length > 15;
-  const primaryFields = needsMore ? allAvailableFields.slice(0, 14) : allAvailableFields;
-  const moreFields = needsMore ? allAvailableFields.slice(14) : [];
+  const needsMore = allAvailableFields.length > 25;
+  const primaryFields = needsMore ? allAvailableFields.slice(0, 25) : allAvailableFields;
+  const moreFields = needsMore ? allAvailableFields.slice(25) : [];
   const activeCols = allAvailableFields.filter(f => selectedCols.has(f.key));
   const editCols = ALL_FIELDS.filter(f => selectedCols.has(f.key)); // no extra.* in edit
 
