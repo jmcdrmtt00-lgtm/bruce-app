@@ -120,6 +120,7 @@ interface AssetResult {
   make?: string; model?: string; os?: string; serial_number?: string; asset_number?: string;
   ram?: string; purchased?: string; install_date?: string; warranty_expires?: string;
   price?: number; site?: string; status?: string; extra?: Record<string, unknown> | null;
+  location?: string; function?: string; form_factor?: string; model_desc?: string; computer_name?: string;
   [key: string]: unknown;
 }
 
@@ -135,13 +136,15 @@ interface Employee {
 
 const ALL_FIELDS: FieldDef[] = [
   { key: 'assigned_to', label: 'Assigned To' },
-  { key: 'site', label: 'Site' }, { key: 'status', label: 'Status' },
+  { key: 'site', label: 'Site' }, { key: 'location', label: 'Location' },
+  { key: 'function', label: 'Function' }, { key: 'status', label: 'Status' },
+  { key: 'form_factor', label: 'Form Factor' },
   { key: 'make', label: 'Make' }, { key: 'model', label: 'Model' },
-  { key: 'os', label: 'OS' }, { key: 'ram', label: 'RAM' },
+  { key: 'model_desc', label: 'Model Desc' }, { key: 'os', label: 'OS' }, { key: 'ram', label: 'RAM' },
   { key: 'serial_number', label: 'Serial Number' }, { key: 'asset_number', label: 'Asset Number' },
   { key: 'purchased', label: 'Purchased' }, { key: 'price', label: 'Price' },
   { key: 'install_date', label: 'Install Date' }, { key: 'warranty_expires', label: 'Warranty Expires' },
-  { key: 'notes', label: 'Notes' },
+  { key: 'computer_name', label: 'Computer Name' }, { key: 'notes', label: 'Notes' },
 ];
 const ASK_SUGGESTIONS = [
   'Who has a ThinkCentre Mini?',
