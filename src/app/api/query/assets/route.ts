@@ -70,8 +70,9 @@ export async function POST(request: NextRequest) {
   try {
     generatedSql = await generateSql(question.trim());
   } catch (e) {
-    console.error('[query/assets] SQL generation error:', e);
-    return NextResponse.json({ error: 'AI query failed — please try again.' }, { status: 500 });
+    const msg = e instanceof Error ? e.message : String(e);
+    console.error('[query/assets] SQL generation error:', msg);
+    return NextResponse.json({ error: `AI query failed: ${msg}` }, { status: 500 });
   }
 
   const safeSql = generatedSql.replace(/\{user_id\}/g, user.id).replace(/;+$/, '');
