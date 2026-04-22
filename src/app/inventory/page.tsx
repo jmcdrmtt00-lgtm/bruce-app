@@ -841,7 +841,7 @@ function InventoryTab() {
 
             {/* Filter toggle */}
             <button
-              style={{ ...BTN_GHOST, padding: '6px 10px', position: 'relative', background: showFilterRow ? 'rgba(79,142,247,0.15)' : undefined, color: showFilterRow ? '#4f8ef7' : undefined }}
+              style={{ ...BTN_GHOST, padding: '6px 10px', position: 'relative', background: showFilterRow ? 'rgba(79,142,247,0.15)' : undefined, color: showFilterRow ? '#4f8ef7' : '#a8b8c8' }}
               onClick={() => setShowFilterRow(v => !v)} title="Filter columns"
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
