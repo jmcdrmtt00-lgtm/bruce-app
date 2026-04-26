@@ -5,7 +5,7 @@ import { trackEvents } from '@/libs/trackEvent';
 
 export async function POST(request: NextRequest) {
   try {
-    const { event_type } = await request.json();
+    const { event_type, count = 1 } = await request.json();
     if (event_type !== 'session' && event_type !== 'click') {
       return NextResponse.json({ ok: true });
     }
@@ -23,7 +23,7 @@ export async function POST(request: NextRequest) {
       app_id: 'bruce',
       email: user.email,
       event_type,
-      count: 1,
+      count: Math.max(1, Math.round(count)),
       input_tokens: 0,
       output_tokens: 0,
     }]);
