@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Toaster } from "react-hot-toast";
 import Header from "@/components/Header";
+import TrackingProvider from "@/components/TrackingProvider";
 import { DemoProvider } from "@/contexts/DemoContext";
 import { OrgProvider } from "@/contexts/OrgContext";
 import DemoController from "@/components/DemoController";
@@ -28,6 +29,7 @@ export default function RootLayout({
       <body>
         <OrgProvider>
         <DemoProvider>
+          <TrackingProvider />
           <Header />
           <Toaster position="top-center" toastOptions={{ duration: 8000 }} />
           {children}

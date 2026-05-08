@@ -546,6 +546,8 @@ function InventoryTab() {
   // UI state
   const [search, setSearch]               = useState('');
   const [showColPicker, setShowColPicker] = useState(false);
+  const [showFilterRow, setShowFilterRow] = useState(false);
+  const [columnFilters, setColumnFilters] = useState<Record<string, string>>({});
   const [hoveredRow, setHoveredRow]       = useState<string | number | null>(null);
 
   // Auto-load data on browse mode / category change / org change
@@ -713,9 +715,14 @@ function InventoryTab() {
   const activeCols = allAvailableFields.filter(f => selectedCols.has(f.key));
   const editCols = ALL_FIELDS.filter(f => selectedCols.has(f.key)); // no extra.* in edit
 
-  const filteredRows = tableRows.filter(r =>
-    !search.trim() || activeCols.some(f => cellValue(r, f.key).toLowerCase().includes(search.toLowerCase()))
-  );
+  const activeColFilterCount = Object.values(columnFilters).filter(v => v.trim()).length;
+  const filteredRows = tableRows.filter(r => {
+    if (search.trim() && !activeCols.some(f => cellValue(r, f.key).toLowerCase().includes(search.toLowerCase()))) return false;
+    for (const [key, val] of Object.entries(columnFilters)) {
+      if (val.trim() && !cellValue(r, key).toLowerCase().includes(val.toLowerCase())) return false;
+    }
+    return true;
+  });
   const sortedRows = sortKey
     ? [...filteredRows].sort((a, b) => {
         const av = cellValue(a, sortKey).toLowerCase();
@@ -725,12 +732,19 @@ function InventoryTab() {
       })
     : filteredRows;
 
-  const filteredEmployees = employeeRows.filter(r =>
-    !search.trim() || EMPLOYEE_FIELDS.some(f => {
+  const filteredEmployees = employeeRows.filter(r => {
+    if (search.trim() && !EMPLOYEE_FIELDS.some(f => {
       const v = f.key === 'is_approved_submitter' ? (r.is_approved_submitter ? 'yes approved' : 'no') : String((r as unknown as Record<string, unknown>)[f.key] ?? '');
       return v.toLowerCase().includes(search.toLowerCase());
-    })
-  );
+    })) return false;
+    for (const [key, val] of Object.entries(columnFilters)) {
+      if (val.trim()) {
+        const v = String((r as unknown as Record<string, unknown>)[key] ?? '').toLowerCase();
+        if (!v.includes(val.toLowerCase())) return false;
+      }
+    }
+    return true;
+  });
   const sortedEmployees = sortKey
     ? [...filteredEmployees].sort((a, b) => {
         const av = String((a as unknown as Record<string, unknown>)[sortKey] ?? '').toLowerCase();
@@ -782,7 +796,7 @@ function InventoryTab() {
               setTableCategory(e.target.value); setTableRows([]); setExtraFields([]);
               setShowMoreCols(false); setEmployeeRows([]); setEditingAssetId(null);
               setAddingAsset(false); setEditingEmployeeId(null); setAddingEmployee(false);
-              setSearch(''); setSortKey(null); setSortDir('asc');
+              setSearch(''); setSortKey(null); setSortDir('asc'); setColumnFilters({}); setShowFilterRow(false);
             }}>
               {ASSET_CATEGORIES.map(c => <option key={c} style={{ background: '#1a2535' }}>{c}</option>)}
               <option value="Employees" style={{ background: '#1a2535' }}>Employees</option>
@@ -825,8 +839,23 @@ function InventoryTab() {
               </button>
             )}
 
+            {/* Filter toggle */}
+            <button
+              style={{ ...BTN_GHOST, padding: '6px 10px', position: 'relative', background: showFilterRow ? 'rgba(79,142,247,0.15)' : undefined, color: showFilterRow ? '#4f8ef7' : '#a8b8c8' }}
+              onClick={() => setShowFilterRow(v => !v)} title="Filter columns"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/>
+              </svg>
+              {activeColFilterCount > 0 && (
+                <span style={{ position: 'absolute', top: '2px', right: '2px', background: '#4f8ef7', color: '#fff', borderRadius: '50%', fontSize: '9px', width: '13px', height: '13px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 700 }}>
+                  {activeColFilterCount}
+                </span>
+              )}
+            </button>
+
             <span style={{ fontSize: '11px', color: '#3a4a5c', fontFamily: "'DM Mono', monospace", whiteSpace: 'nowrap' }}>
-              {rowCount} row{rowCount !== 1 ? 's' : ''}
+              {isEmployee ? filteredEmployees.length : filteredRows.length}{(isEmployee ? filteredEmployees.length !== employeeRows.length : filteredRows.length !== tableRows.length) ? ` / ${isEmployee ? employeeRows.length : tableRows.length}` : ''} row{rowCount !== 1 ? 's' : ''}
             </span>
             {(tableLoading || employeeLoading) && <span style={{ fontSize: '11px', color: '#4a5a6b' }}>Loading…</span>}
           </div>
@@ -857,6 +886,65 @@ function InventoryTab() {
                   ))}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* ── Filter panel ── */}
+          {showFilterRow && (
+            <div style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid rgba(168,184,200,0.08)', padding: '10px 16px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
+                <span style={{ fontSize: '10px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#a8b8c8' }}>Column Filters</span>
+                {activeColFilterCount > 0 && (
+                  <button onClick={() => setColumnFilters({})} style={{ fontSize: '10px', color: '#4f8ef7', background: 'none', border: 'none', cursor: 'pointer', padding: 0, fontFamily: "'DM Sans', sans-serif" }}>
+                    Clear all
+                  </button>
+                )}
+              </div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: '6px 12px' }}>
+                {(isEmployee ? EMPLOYEE_FIELDS : activeCols).map(f => {
+                  const val = columnFilters[f.key] ?? '';
+                  const isSite = f.key === 'site';
+                  const isStatus = f.key === 'status';
+                  const isApproved = f.key === 'is_approved_submitter';
+                  return (
+                    <div key={f.key} style={{ display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                      <span style={{ fontSize: '9px', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em', color: val ? '#4f8ef7' : '#5a6a7c' }}>{f.label}</span>
+                      {isSite ? (
+                        <select value={val} onChange={e => setColumnFilters(prev => ({ ...prev, [f.key]: e.target.value }))}
+                          style={{ ...SELECT, fontSize: '11px', padding: '4px 8px', background: val ? 'rgba(79,142,247,0.12)' : 'rgba(0,0,0,0.25)', border: val ? '1px solid rgba(79,142,247,0.4)' : '1px solid rgba(168,184,200,0.18)' }}>
+                          <option value="">All</option>
+                          {SITES.map(s => <option key={s} value={s} style={{ background: '#1a2535' }}>{s}</option>)}
+                        </select>
+                      ) : isStatus ? (
+                        <select value={val} onChange={e => setColumnFilters(prev => ({ ...prev, [f.key]: e.target.value }))}
+                          style={{ ...SELECT, fontSize: '11px', padding: '4px 8px', background: val ? 'rgba(79,142,247,0.12)' : 'rgba(0,0,0,0.25)', border: val ? '1px solid rgba(79,142,247,0.4)' : '1px solid rgba(168,184,200,0.18)' }}>
+                          <option value="">All</option>
+                          <option value="active" style={{ background: '#1a2535' }}>Active</option>
+                          <option value="retired" style={{ background: '#1a2535' }}>Retired</option>
+                        </select>
+                      ) : isApproved ? (
+                        <select value={val} onChange={e => setColumnFilters(prev => ({ ...prev, [f.key]: e.target.value }))}
+                          style={{ ...SELECT, fontSize: '11px', padding: '4px 8px', background: val ? 'rgba(79,142,247,0.12)' : 'rgba(0,0,0,0.25)', border: val ? '1px solid rgba(79,142,247,0.4)' : '1px solid rgba(168,184,200,0.18)' }}>
+                          <option value="">All</option>
+                          <option value="yes" style={{ background: '#1a2535' }}>Approved</option>
+                          <option value="no" style={{ background: '#1a2535' }}>Not Approved</option>
+                        </select>
+                      ) : (
+                        <div style={{ position: 'relative' }}>
+                          <input value={val} onChange={e => setColumnFilters(prev => ({ ...prev, [f.key]: e.target.value }))} placeholder="filter…"
+                            style={{ ...INPUT, fontSize: '11px', padding: '4px 22px 4px 8px', background: val ? 'rgba(79,142,247,0.12)' : 'rgba(0,0,0,0.25)', border: val ? '1px solid rgba(79,142,247,0.4)' : '1px solid rgba(168,184,200,0.18)' }} />
+                          {val && (
+                            <button onClick={() => setColumnFilters(prev => { const n = { ...prev }; delete n[f.key]; return n; })}
+                              style={{ position: 'absolute', right: '5px', top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', cursor: 'pointer', color: '#6a7a8c', padding: 0, display: 'flex' }}>
+                              <X size={10} />
+                            </button>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
             </div>
           )}
 
